@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, FilePlus, Calendar, User } from 'lucide-react';
+import { Search, FilePlus, Calendar, User, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function Dashboard() {
@@ -8,7 +8,7 @@ export default function Dashboard() {
   return (
     <div className="screen-container">
       <header className="mb-6">
-        <h1 className="header-title">Olá, Dr. Gabriel Ferreira!</h1>
+        <h1 className="header-title">Olá, Gabriel Ferreira!</h1>
         <p className="header-subtitle">Resumo de hoje</p>
       </header>
 
@@ -22,12 +22,18 @@ export default function Dashboard() {
         onClick={() => navigate('/patient')}
       >
         <div>
-          <h2 className="text-sm font-bold text-muted">Meus Pacientes</h2>
-          <p className="header-title text-primary mt-1">24 <span className="text-sm font-bold text-muted">Ativos</span></p>
+          <h2 className="text-sm font-bold text-muted">Meus dependentes</h2>
+          <p className="header-title text-primary mt-1">2 <span className="text-sm font-bold text-muted">Ativos</span></p>
         </div>
         <div className="icon-box">
           <User size={24} />
         </div>
+      </div>
+      
+      <h3 className="section-title text-red mb-2">Avisos <AlertCircle size={18} /></h3>
+      <div className="card">
+        <p className="text-sm text muted">Mais de 1 ano desde o último check-up!</p>
+        <p className="text-sm text-muted">Não há outros avisos.</p>
       </div>
 
       <h3 className="section-title">Ações Rápidas</h3>

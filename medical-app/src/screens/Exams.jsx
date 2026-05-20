@@ -41,9 +41,9 @@ export default function Exams() {
       {tab === 'sangue' && (
         <div className="card">
           <h3 className="section-title">Hemograma e Bioquímica</h3>
-          <BarChartItem label="Hemoglobina" value={13.5} min={12.0} max={16.0} unit="g/dL" percent={60} color="bg-red-500" />
-          <BarChartItem label="Glicose" value={85} min={70} max={99} unit="mg/dL" percent={45} color="bg-blue-500" />
-          <BarChartItem label="Colesterol" value={190} min={0} max={200} unit="mg/dL" percent={85} color="bg-yellow-500" />
+          <BarChartItem label="Hemoglobina" value={13.5} min={12.0} max={16.0} unit="g/dL" percent={60} color="bg-green-500" />
+          <BarChartItem label="Glicose" value={85} min={70} max={99} unit="mg/dL" percent={45} color="bg-green-500" />
+          <BarChartItem label="Colesterol" value={190} min={0} max={200} unit="mg/dL" percent={85} color="bg-red-500" />
           <BarChartItem label="Creatinina" value={0.9} min={0.6} max={1.1} unit="mg/dL" percent={50} color="bg-green-500" />
         </div>
       )}

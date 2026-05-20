@@ -10,7 +10,7 @@ export default function BottomNav() {
 
   const navItems = [
     { label: 'Início', icon: Home, path: '/dashboard' },
-    { label: 'Agenda/Pacientes', icon: Users, path: '/patient' }, // Navigates to the patient list/profile feature
+    { label: 'Exames/Registros', icon: Users, path: '/patient' }, // Navigates to the patient list/profile feature
     { label: 'Mais', icon: Menu, path: '#' }
   ];
 

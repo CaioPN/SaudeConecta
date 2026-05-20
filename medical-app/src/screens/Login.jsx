@@ -31,7 +31,7 @@ export default function Login() {
           <label className="input-label">E-mail</label>
           <input 
             type="email" 
-            placeholder="dr.gabriel@exemplo.com" 
+            placeholder="exemplo@email.com" 
             className="input-field"
             value={email}
             onChange={(e) => {

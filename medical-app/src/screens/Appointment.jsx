@@ -6,52 +6,52 @@ export default function Appointment() {
   const navigate = useNavigate();
   
   return (
-    <div className="p-6">
-      <button onClick={() => navigate(-1)} className="mt-2 mb-6 flex items-center text-gray-500 hover:text-blue-600 font-medium">
-        <ChevronLeft size={20} className="mr-1" /> Voltar
+    <div className="screen-container">
+      <button onClick={() => navigate(-1)} className="back-btn">
+        <ChevronLeft size={20} /> Voltar
       </button>
 
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Detalhes da Consulta</h2>
+      <h2 className="header-title mb-6">Detalhes da Consulta</h2>
 
-      <div className="bg-white p-6 rounded-xl shadow-sm mb-6">
-        <div className="flex items-center space-x-4 mb-6 border-b border-gray-100 pb-6">
-          <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 shrink-0">
+      <div className="card mb-6">
+        <div className="flex items-center gap-4 mb-6 pb-6" style={{ borderBottom: '1px solid #f3f4f6' }}>
+          <div className="icon-box icon-box-lg" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
             <User size={28} />
           </div>
           <div>
-            <h3 className="font-bold text-gray-900 text-lg">Dr. Gabriel Ferreira</h3>
-            <p className="text-blue-600 text-sm font-semibold">Clínico Geral</p>
+            <h3 className="font-bold text-lg">Maria Gabriela</h3>
+            <p className="text-sm font-bold text-primary" style={{ color: '#2563eb' }}>Clínico Geral</p>
           </div>
         </div>
 
-        <div className="space-y-6">
-          <div className="flex items-start space-x-4">
-            <Calendar className="text-gray-400 mt-0.5" size={22} />
+        <div className="flex-col gap-4">
+          <div className="flex items-start gap-4">
+            <Calendar className="text-muted" size={22} />
             <div>
-              <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Data e Hora</p>
-              <p className="font-medium text-gray-900">23 Fev 2026 • 14:30</p>
+              <p className="text-xs text-muted font-bold uppercase mb-1">Data e Hora</p>
+              <p className="font-bold">23 Fev 2026 • 14:30</p>
             </div>
           </div>
-          <div className="flex items-start space-x-4">
-            <MapPin className="text-gray-400 mt-0.5" size={22} />
+          <div className="flex items-start gap-4">
+            <MapPin className="text-muted" size={22} />
             <div>
-              <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Local</p>
-              <p className="font-medium text-gray-900">Edifício Saúde, Sala 402</p>
+              <p className="text-xs text-muted font-bold uppercase mb-1">Local</p>
+              <p className="font-bold">Edifício Saúde, Sala 402</p>
             </div>
           </div>
-          <div className="flex items-start space-x-4">
-            <Info className="text-gray-400 mt-0.5" size={22} />
+          <div className="flex items-start gap-4">
+            <Info className="text-muted" size={22} />
             <div>
-              <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Motivo</p>
-              <p className="font-medium text-gray-900">Retorno (Follow-up)</p>
+              <p className="text-xs text-muted font-bold uppercase mb-1">Motivo</p>
+              <p className="font-bold">Retorno (Follow-up)</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="space-y-3">
-        <button className="w-full bg-blue-600 text-white font-semibold py-3.5 rounded-xl shadow-md hover:bg-blue-700 transition">Iniciar Atendimento</button>
-        <button className="w-full bg-white text-gray-700 font-semibold py-3.5 rounded-xl border border-gray-200 shadow-sm hover:bg-gray-50 transition">Remarcar</button>
+      <div className="flex-col gap-4">
+        <button className="btn-primary">Iniciar Atendimento</button>
+        <button className="btn-primary" style={{ backgroundColor: '#ffffff', color: '#374151', border: '1px solid #e5e7eb' }}>Remarcar</button>
       </div>
     </div>
   );

@@ -15,7 +15,7 @@ export default function PatientProfile() {
         <div className="profile-avatar">
           <User size={40} />
         </div>
-        <h2 className="header-title" style={{ fontSize: '20px' }}>Maria Eduarda Silva</h2>
+        <h2 className="header-title" style={{ fontSize: '20px' }}>Gabriel Ferreira</h2>
         <p className="text-sm text-muted">32 anos • ID: #99482</p>
       </div>
 

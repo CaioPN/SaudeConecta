@@ -12,7 +12,7 @@ export default function MedicalRecord() {
       </button>
 
       <h2 className="header-title">Prontuário</h2>
-      <p className="header-subtitle mb-6">Maria Eduarda Silva</p>
+      <p className="header-subtitle mb-6">Gabriel Ferreira</p>
 
       <h3 className="section-title">Visão Geral</h3>
       <div className="quick-actions-grid mb-6">
