@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import BottomNav from './components/BottomNav';
+import MedicalChatbot from './components/MedicalChatbot';
 import Login from './screens/Login';
 import Dashboard from './screens/Dashboard';
 import PatientProfile from './screens/PatientProfile';
@@ -25,6 +26,7 @@ export default function App() {
           </Routes>
         </div>
         <BottomNav />
+        <MedicalChatbot />
       </div>
     </Router>
   );
