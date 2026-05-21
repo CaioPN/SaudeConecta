@@ -38,7 +38,4 @@ public class Prontuario {
         this.paciente = paciente;
     }
 
-    public void setPaciente(Paciente paciente) {
-        this.paciente = paciente;
-    }
 }
