@@ -33,7 +33,7 @@ export default function Dashboard() {
       <h3 className="section-title text-red mb-2">Avisos <AlertCircle size={18} /></h3>
       <div className="card">
         <p className="text-sm text muted">Mais de 1 ano desde o último check-up!</p>
-        <p className="text-sm text-muted">Não há outros avisos.</p>
+        <p className="text-sm text-muted">Não há outros avisos no momento.</p>
       </div>
 
       <h3 className="section-title">Ações Rápidas</h3>
