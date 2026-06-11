@@ -2,13 +2,16 @@ import React, { useState } from 'react';
 import { Activity, Fingerprint, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import logo from '../assets/logo.png';
+import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
   const navigate = useNavigate();
+  const { entrar } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -17,7 +20,7 @@ export default function Login() {
     return 'Boa noite!';
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       setError('Por favor, insira um e-mail válido.');
@@ -28,9 +31,17 @@ export default function Login() {
       return;
     }
     setError('');
-    navigate('/dashboard');
+    setLoading(true);
+    try {
+      await entrar(email, password);
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err?.response?.data?.erro || 'Não foi possível entrar. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
   };
-  
+
   return (
   <div className="login-wrapper">
 
@@ -85,8 +96,8 @@ export default function Login() {
           </div>
         </div>
         {error && <p style={{ color: '#ef4444', fontSize: '14px', marginBottom: '16px' }}>{error}</p>}
-        <button onClick={handleLogin} className="btn-primary">
-          ACESSAR CONTA
+        <button onClick={handleLogin} className="btn-primary" disabled={loading}>
+          {loading ? 'ENTRANDO...' : 'ACESSAR CONTA'}
         </button>
         <button className="bio-btn">
           <Fingerprint size={24} />
@@ -95,7 +106,7 @@ export default function Login() {
       </div>
       
       <div className="login-footer">
-        Não tem uma conta? <button type="button" className="login-footer-link">Clique aqui.</button>
+        Não tem uma conta? <button type="button" onClick={() => navigate('/cadastro')} className="login-footer-link">Clique aqui.</button>
       </div>
     </div>
   );

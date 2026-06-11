@@ -1,0 +1,26 @@
+# Dependências (geradas por `npm install` — nunca versionar)
+node_modules/
+
+# Variáveis de ambiente / segredos
+.env
+*.env
+!*.env.example
+
+# Builds / saídas geradas
+dist/
+build/
+
+# Java compilado
+out/
+*.class
+backend-api/sources.txt
+
+# Logs
+*.log
+npm-debug.log*
+
+# Arquivos do sistema operacional / editores
+.DS_Store
+Thumbs.db
+.vscode/
+*.swp

@@ -3,12 +3,20 @@ package br.com.hackgov.modelos;
 public class Paciente {
     private int idPaciente;
     private String nome;
-    private String dataNascimento;
+    private String dataNascimento; // formato ISO: YYYY-MM-DD
     private String cpf;
     private String telefone;
     private String email;
     private String tipoSanguineo;
     private String genero;
+    private String senhaHash;
+    // Endereço
+    private String cep;
+    private String rua;
+    private String numero;
+    private String bairro;
+    private String cidade;
+    private String estado;
 
     public void exibirFichaPaciente() {
         System.out.println("----- FICHA DO PACIENTE -----");
@@ -20,6 +28,8 @@ public class Paciente {
         System.out.println("Email: " + email);
         System.out.println("Tipo sanguíneo: " + tipoSanguineo);
         System.out.println("Gênero: " + genero);
+        System.out.println("Endereço: " + rua + ", " + numero + " - " + bairro
+                + " - " + cidade + "/" + estado + " (CEP " + cep + ")");
         System.out.println("-----------------------------");
     }
 
@@ -85,5 +95,61 @@ public class Paciente {
 
     public void setGenero(String genero) {
         this.genero = genero;
+    }
+
+    public String getSenhaHash() {
+        return senhaHash;
+    }
+
+    public void setSenhaHash(String senhaHash) {
+        this.senhaHash = senhaHash;
+    }
+
+    public String getCep() {
+        return cep;
+    }
+
+    public void setCep(String cep) {
+        this.cep = cep;
+    }
+
+    public String getRua() {
+        return rua;
+    }
+
+    public void setRua(String rua) {
+        this.rua = rua;
+    }
+
+    public String getNumero() {
+        return numero;
+    }
+
+    public void setNumero(String numero) {
+        this.numero = numero;
+    }
+
+    public String getBairro() {
+        return bairro;
+    }
+
+    public void setBairro(String bairro) {
+        this.bairro = bairro;
+    }
+
+    public String getCidade() {
+        return cidade;
+    }
+
+    public void setCidade(String cidade) {
+        this.cidade = cidade;
+    }
+
+    public String getEstado() {
+        return estado;
+    }
+
+    public void setEstado(String estado) {
+        this.estado = estado;
     }
 }

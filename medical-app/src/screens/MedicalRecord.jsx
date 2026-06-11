@@ -1,10 +1,12 @@
 import React from 'react';
 import { AlertCircle, Heart, Clock, ChevronLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export default function MedicalRecord() {
   const navigate = useNavigate();
-  
+  const { paciente } = useAuth();
+
   return (
     <div className="screen-container">
       <button onClick={() => navigate(-1)} className="back-btn">
@@ -12,7 +14,7 @@ export default function MedicalRecord() {
       </button>
 
       <h2 className="header-title">Prontuário</h2>
-      <p className="header-subtitle mb-6">Gabriel Ferreira</p>
+      <p className="header-subtitle mb-6">{paciente?.nome || 'Paciente'}</p>
 
       <h3 className="section-title">Visão Geral</h3>
       <div className="quick-actions-grid mb-6">

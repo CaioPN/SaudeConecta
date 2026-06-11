@@ -19,7 +19,14 @@ export default function BottomNav() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  if (location.pathname === '/') return null; // Hide on login screen
+  // Sinaliza (via classe no body) quando o menu "Mais" está aberto, para que o
+  // botão flutuante do chatbot saia do caminho do menu.
+  useEffect(() => {
+    document.body.classList.toggle('more-menu-open', isMenuOpen);
+    return () => document.body.classList.remove('more-menu-open');
+  }, [isMenuOpen]);
+
+  if (location.pathname === '/' || location.pathname === '/cadastro') return null; // Hide on login and registration screens
 
   const navItems = [
     { label: 'Início', icon: Home, path: '/dashboard' },
@@ -47,7 +54,7 @@ export default function BottomNav() {
           </button>
           <button onClick={() => handleMenuClick('/terms')} className="more-menu-item">
             <FileText size={20} />
-            <span>Termos de utilização</span>
+            <span>Termos de Uso</span>
           </button>
           <button onClick={() => handleMenuClick('/privacy')} className="more-menu-item">
             <Lock size={20} />

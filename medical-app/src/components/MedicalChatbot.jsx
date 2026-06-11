@@ -2,6 +2,82 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MessageCircle, X, Send, Bot } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 
+// Base de conhecimento do assistente: cada item tem palavras-chave e uma resposta.
+// O primeiro item cujas palavras-chave aparecerem na mensagem é usado como resposta.
+const BASE_CONHECIMENTO = [
+    {
+        chaves: ['agendar', 'agendamento', 'consulta', 'marcar', 'médico', 'medico'],
+        resposta:
+            'Para agendar uma consulta, abra o menu "Início" e toque em "Agendamentos" nas Ações Rápidas. ' +
+            'Lá você escolhe a data e o profissional disponível.',
+    },
+    {
+        chaves: ['exame', 'exames', 'resultado', 'sangue', 'hemograma', 'imagem', 'laudo'],
+        resposta:
+            'Seus exames ficam em "Exames/Registros" → "Exames". Você pode ver os resultados de sangue e de imagem, ' +
+            'e ainda baixar um relatório em PDF com todo o histórico pelo botão "Baixar PDF".',
+    },
+    {
+        chaves: ['dependente', 'dependentes', 'familiar', 'filho', 'filha', 'família', 'familia'],
+        resposta:
+            'Você gerencia dependentes em "Exames/Registros" → "Dependentes". Lá é possível adicionar, listar ' +
+            'e remover familiares vinculados à sua conta.',
+    },
+    {
+        chaves: ['prontuário', 'prontuario', 'histórico', 'historico', 'alergia', 'condição', 'condicao'],
+        resposta:
+            'No seu prontuário ("Dados da Consulta") você encontra alergias, condições de saúde e os registros ' +
+            'recentes das suas consultas.',
+    },
+    {
+        chaves: ['senha', 'login', 'entrar', 'esqueci', 'acesso', 'biometria'],
+        resposta:
+            'Problemas de acesso? Na tela de login use "Esqueceu a senha?" para redefini-la. ' +
+            'Por segurança, sua senha precisa ter ao menos 8 caracteres, com maiúscula, minúscula, número e símbolo.',
+    },
+    {
+        chaves: ['vacina', 'vacinação', 'vacinacao', 'imunização', 'imunizacao'],
+        resposta:
+            'A sua Carteira de Vacinação fica no "Meu perfil", com o registro das imunizações.',
+    },
+    {
+        chaves: ['privacidade', 'dados', 'lgpd', 'termo', 'termos'],
+        resposta:
+            'No menu "Mais" você encontra os "Termos de Utilização" e o "Portal de Privacidade", ' +
+            'com tudo sobre como tratamos e protegemos os seus dados (LGPD).',
+    },
+    {
+        chaves: ['emergência', 'emergencia', 'urgência', 'urgencia', 'socorro', 'samu', 'dor'],
+        resposta:
+            '⚠️ Em caso de emergência, ligue imediatamente para o SAMU (192) ou procure o pronto-socorro mais próximo. ' +
+            'Este assistente não substitui atendimento médico.',
+    },
+    {
+        chaves: ['oi', 'olá', 'ola', 'bom dia', 'boa tarde', 'boa noite', 'eaí', 'eai'],
+        resposta: 'Olá! 👋 Posso ajudar com agendamentos, exames, dependentes, prontuário e privacidade. O que você precisa?',
+    },
+    {
+        chaves: ['obrigado', 'obrigada', 'valeu', 'agradeço', 'agradeco'],
+        resposta: 'Por nada! 😊 Se precisar de mais alguma coisa, é só chamar.',
+    },
+];
+
+// Sugestões rápidas exibidas como botões na primeira interação.
+const SUGESTOES = ['Como agendar consulta?', 'Ver meus exames', 'Adicionar dependente'];
+
+// Encontra a melhor resposta com base nas palavras-chave da mensagem do usuário.
+function gerarResposta(texto) {
+    const t = texto.toLowerCase();
+    const item = BASE_CONHECIMENTO.find((entrada) =>
+        entrada.chaves.some((chave) => t.includes(chave))
+    );
+    if (item) return item.resposta;
+    return (
+        'Ainda não sei responder isso com certeza. 🤔 Posso ajudar com: agendar consultas, exames, ' +
+        'dependentes, prontuário, senha/acesso e privacidade. Tente reformular ou escolha um desses temas.'
+    );
+}
+
 export default function MedicalChatbot() {
     const location = useLocation();
     const [isOpen, setIsOpen] = useState(false);
@@ -17,16 +93,6 @@ export default function MedicalChatbot() {
         },
     ]);
 
-    
-
-    const mockResponses = [
-        "Entendi. Pode me dar mais detalhes sobre isso?",
-        "Certo, vou registrar essa informação no seu prontuário.",
-        "Um dos nossos especialistas irá avaliar e entrará em contato.",
-        "Recomendo que você agende uma consulta pelo menu principal para avaliarmos melhor.",
-        "Isso é um procedimento padrão. Posso ajudar com mais alguma dúvida?"
-    ];
-
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
@@ -37,15 +103,16 @@ export default function MedicalChatbot() {
         }
     }, [messages, isTyping, isOpen]);
 
-    if (location.pathname === '/') return null; // Hide on login screen
+    if (location.pathname === '/' || location.pathname === '/cadastro') return null; // Hide on login and registration screens
 
-    const handleSendMessage = (e) => {
-        e.preventDefault();
-        if (!inputValue.trim()) return;
+    // Processa um texto (vindo do input ou de uma sugestão) e gera a resposta do bot.
+    const enviarTexto = (texto) => {
+        const limpo = texto.trim();
+        if (!limpo || isTyping) return;
 
         const newUserMessage = {
             id: Date.now(),
-            text: inputValue,
+            text: limpo,
             sender: 'user',
         };
 
@@ -53,18 +120,25 @@ export default function MedicalChatbot() {
         setInputValue('');
         setIsTyping(true);
 
-        // Mock typing delay and bot response
+        // Pequeno atraso para simular a digitação do assistente.
         setTimeout(() => {
-            const randomResponse = mockResponses[Math.floor(Math.random() * mockResponses.length)];
             const newBotMessage = {
                 id: Date.now() + 1,
-                text: randomResponse,
+                text: gerarResposta(limpo),
                 sender: 'bot',
             };
             setMessages((prev) => [...prev, newBotMessage]);
             setIsTyping(false);
-        }, 1500);
+        }, 900);
     };
+
+    const handleSendMessage = (e) => {
+        e.preventDefault();
+        enviarTexto(inputValue);
+    };
+
+    // As sugestões só aparecem antes de o usuário enviar a primeira mensagem.
+    const mostrarSugestoes = messages.length === 1;
 
     
     return (
@@ -115,6 +189,22 @@ export default function MedicalChatbot() {
                                 <div className="chat-bubble bot typing-indicator">
                                     <span></span><span></span><span></span>
                                 </div>
+                            </div>
+                        )}
+
+                        {/* Sugestões rápidas (apenas no início da conversa) */}
+                        {mostrarSugestoes && !isTyping && (
+                            <div className="chat-suggestions">
+                                {SUGESTOES.map((sugestao) => (
+                                    <button
+                                        key={sugestao}
+                                        type="button"
+                                        className="chat-suggestion-btn"
+                                        onClick={() => enviarTexto(sugestao)}
+                                    >
+                                        {sugestao}
+                                    </button>
+                                ))}
                             </div>
                         )}
                         <div ref={messagesEndRef} />
