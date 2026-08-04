@@ -6,7 +6,10 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,10 +19,24 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 
+import br.com.hackgov.dao.AcessoDAO;
+import br.com.hackgov.dao.ConsultaDAO;
 import br.com.hackgov.dao.DependenteDAO;
+import br.com.hackgov.dao.ExameDAO;
+import br.com.hackgov.dao.MedicoDAO;
 import br.com.hackgov.dao.PacienteDAO;
+import br.com.hackgov.dao.ProntuarioDAO;
+import br.com.hackgov.modelos.AcessoTemporario;
+import br.com.hackgov.modelos.Alergia;
+import br.com.hackgov.modelos.Consulta;
 import br.com.hackgov.modelos.Dependente;
+import br.com.hackgov.modelos.Exame;
+import br.com.hackgov.modelos.HistoricoMedico;
+import br.com.hackgov.modelos.ItemExame;
+import br.com.hackgov.modelos.Medicacao;
+import br.com.hackgov.modelos.Medico;
 import br.com.hackgov.modelos.Paciente;
+import br.com.hackgov.util.CodigoAcesso;
 import br.com.hackgov.util.Json;
 import br.com.hackgov.util.Jwt;
 import br.com.hackgov.util.SenhaUtil;
@@ -38,6 +55,16 @@ import br.com.hackgov.util.SenhaUtil;
  *   POST   /api/dependentes       (protegido por JWT)
  *   DELETE /api/dependentes/{id}  (protegido por JWT)
  *
+ * E os dados clínicos do paciente logado (todos protegidos por JWT):
+ *
+ *   GET    /api/consultas         lista; aceita ?dependenteId=
+ *   GET    /api/consultas/{id}    detalhe de uma consulta
+ *   GET    /api/exames            coletas de sangue e exames de imagem
+ *   GET    /api/prontuario        alergias, condições e medicações
+ *
+ * Em todas elas o paciente vem do JWT, nunca da requisição — assim um usuário
+ * não consegue ler os dados de outro passando um id na URL.
+ *
  * Senhas são tratadas com SHA-256 (ver SenhaUtil) e a sessão usa JWT (ver Jwt).
  */
 public class ApiServer {
@@ -46,6 +73,19 @@ public class ApiServer {
 
     private static final PacienteDAO pacienteDAO = new PacienteDAO();
     private static final DependenteDAO dependenteDAO = new DependenteDAO();
+    private static final ConsultaDAO consultaDAO = new ConsultaDAO();
+    private static final ExameDAO exameDAO = new ExameDAO();
+    private static final ProntuarioDAO prontuarioDAO = new ProntuarioDAO();
+    private static final AcessoDAO acessoDAO = new AcessoDAO();
+    private static final MedicoDAO medicoDAO = new MedicoDAO();
+
+    /** Validade padrão do código/token do médico, em minutos. */
+    private static final int VALIDADE_ACESSO_MINUTOS = 30;
+
+    /** Limite de códigos errados por IP dentro da janela, contra força bruta. */
+    private static final int TENTATIVAS_MAXIMAS = 10;
+    private static final long JANELA_TENTATIVAS_MS = 10L * 60 * 1000;
+    private static final Map<String, long[]> tentativasPorIp = new HashMap<>();
 
     public static void main(String[] args) throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress(PORTA), 0);
@@ -54,6 +94,11 @@ public class ApiServer {
         server.createContext("/api/auth/login", comCors(ApiServer::login));
         server.createContext("/api/auth/me", comCors(ApiServer::me));
         server.createContext("/api/dependentes", comCors(ApiServer::dependentes));
+        server.createContext("/api/consultas", comCors(ApiServer::consultas));
+        server.createContext("/api/exames", comCors(ApiServer::exames));
+        server.createContext("/api/prontuario", comCors(ApiServer::prontuario));
+        server.createContext("/api/acessos", comCors(ApiServer::acessos));
+        server.createContext("/api/medico", comCors(ApiServer::medico));
         server.createContext("/", comCors(ApiServer::raiz));
 
         server.setExecutor(null); // executor padrão
@@ -288,6 +333,517 @@ public class ApiServer {
         enviarJson(ex, 200, resp);
     }
 
+    /** /api/consultas — lista do paciente logado ou detalhe de /api/consultas/{id}. */
+    private static void consultas(HttpExchange ex) throws IOException {
+        if (!"GET".equals(ex.getRequestMethod())) { enviarErro(ex, 405, "Método não permitido."); return; }
+        Integer userId = autenticar(ex);
+        if (userId == null) return;
+
+        String path = ex.getRequestURI().getPath();
+        try {
+            if ("/api/consultas".equals(path)) {
+                Integer dependenteId = idDependente(ex);
+                List<Object> arr = new ArrayList<>();
+                for (Consulta c : consultaDAO.listarPorPaciente(userId, dependenteId)) {
+                    arr.add(consultaJson(c));
+                }
+                Map<String, Object> resp = new LinkedHashMap<>();
+                resp.put("consultas", arr);
+                enviarJson(ex, 200, resp);
+                return;
+            }
+
+            if (path.startsWith("/api/consultas/")) {
+                int id;
+                try {
+                    id = Integer.parseInt(path.substring("/api/consultas/".length()).trim());
+                } catch (NumberFormatException e) {
+                    enviarErro(ex, 400, "Id de consulta inválido.");
+                    return;
+                }
+                Consulta c = consultaDAO.buscarDoPaciente(id, userId);
+                if (c == null) {
+                    enviarErro(ex, 404, "Consulta não encontrada.");
+                    return;
+                }
+                Map<String, Object> resp = new LinkedHashMap<>();
+                resp.put("consulta", consultaJson(c));
+                enviarJson(ex, 200, resp);
+                return;
+            }
+
+            enviarErro(ex, 404, "Rota não encontrada.");
+
+        } catch (SQLException e) {
+            System.out.println("[ERRO consultas] " + e.getMessage());
+            enviarErro(ex, 500, "Erro ao buscar consultas.");
+        }
+    }
+
+    /** GET /api/exames — coletas de sangue e exames de imagem do paciente logado. */
+    private static void exames(HttpExchange ex) throws IOException {
+        if (!"GET".equals(ex.getRequestMethod())) { enviarErro(ex, 405, "Método não permitido."); return; }
+        Integer userId = autenticar(ex);
+        if (userId == null) return;
+
+        try {
+            Integer dependenteId = idDependente(ex);
+            List<Object> sangue = new ArrayList<>();
+            List<Object> imagem = new ArrayList<>();
+
+            for (Exame e : exameDAO.listarPorPaciente(userId, dependenteId)) {
+                if (Exame.TIPO_IMAGEM.equals(e.getTipo())) {
+                    imagem.add(exameJson(e));
+                } else {
+                    sangue.add(exameJson(e));
+                }
+            }
+
+            Map<String, Object> resp = new LinkedHashMap<>();
+            resp.put("coletas", sangue);
+            resp.put("imagem", imagem);
+            enviarJson(ex, 200, resp);
+
+        } catch (SQLException e) {
+            System.out.println("[ERRO exames] " + e.getMessage());
+            enviarErro(ex, 500, "Erro ao buscar exames.");
+        }
+    }
+
+    /** GET /api/prontuario — alergias, condições e medicações do paciente logado. */
+    private static void prontuario(HttpExchange ex) throws IOException {
+        if (!"GET".equals(ex.getRequestMethod())) { enviarErro(ex, 405, "Método não permitido."); return; }
+        Integer userId = autenticar(ex);
+        if (userId == null) return;
+
+        try {
+            Integer dependenteId = idDependente(ex);
+
+            List<Object> alergias = new ArrayList<>();
+            for (Alergia a : prontuarioDAO.listarAlergias(userId, dependenteId)) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("id", a.getIdAlergia());
+                m.put("descricao", a.getDescricao());
+                alergias.add(m);
+            }
+
+            List<Object> condicoes = new ArrayList<>();
+            for (HistoricoMedico h : prontuarioDAO.listarCondicoes(userId, dependenteId)) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("id", h.getIdHistorico());
+                m.put("descricao", h.getDescricao());
+                m.put("desde", h.getData());
+                condicoes.add(m);
+            }
+
+            List<Object> medicacoes = new ArrayList<>();
+            for (Medicacao med : prontuarioDAO.listarMedicacoes(userId, dependenteId)) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("id", med.getIdMedicacao());
+                m.put("nome", med.getNome());
+                m.put("dosagem", med.getDosagem());
+                m.put("frequencia", med.getFrequencia());
+                m.put("desde", med.getDesde());
+                medicacoes.add(m);
+            }
+
+            Map<String, Object> resp = new LinkedHashMap<>();
+            resp.put("alergias", alergias);
+            resp.put("condicoes", condicoes);
+            resp.put("medicacoes", medicacoes);
+            enviarJson(ex, 200, resp);
+
+        } catch (SQLException e) {
+            System.out.println("[ERRO prontuario] " + e.getMessage());
+            enviarErro(ex, 500, "Erro ao buscar o prontuário.");
+        }
+    }
+
+    // ===================== ACESSO TEMPORÁRIO (LADO DO PACIENTE) =====================
+
+    /** /api/acessos — gera (POST), lista (GET) ou revoga (DELETE /{id}) acessos. */
+    private static void acessos(HttpExchange ex) throws IOException {
+        Integer userId = autenticar(ex);
+        if (userId == null) return;
+
+        String metodo = ex.getRequestMethod();
+        String path = ex.getRequestURI().getPath();
+
+        try {
+            if ("POST".equals(metodo) && "/api/acessos".equals(path)) {
+                gerarAcesso(ex, userId);
+            } else if ("GET".equals(metodo) && "/api/acessos".equals(path)) {
+                listarAcessos(ex, userId);
+            } else if ("DELETE".equals(metodo) && path.startsWith("/api/acessos/")) {
+                revogarAcesso(ex, userId, path.substring("/api/acessos/".length()));
+            } else {
+                enviarErro(ex, 405, "Método não permitido.");
+            }
+        } catch (IllegalArgumentException e) {
+            enviarErro(ex, 400, "Corpo da requisição inválido (JSON).");
+        } catch (SQLException e) {
+            System.out.println("[ERRO acessos] " + e.getMessage());
+            enviarErro(ex, 500, "Erro ao processar o acesso temporário.");
+        }
+    }
+
+    private static void gerarAcesso(HttpExchange ex, int userId) throws IOException, SQLException {
+        Map<String, Object> body = lerCorpo(ex);
+        String escopo = campo(body, "escopo");
+        if (!AcessoTemporario.ESCOPO_ESCRITA.equals(escopo)) {
+            escopo = AcessoTemporario.ESCOPO_LEITURA;
+        }
+
+        int minutos = VALIDADE_ACESSO_MINUTOS;
+        Object m = body.get("minutos");
+        if (m instanceof Number) {
+            // Aceita entre 5 e 60 minutos; fora disso usa o padrão.
+            int pedido = ((Number) m).intValue();
+            if (pedido >= 5 && pedido <= 60) minutos = pedido;
+        }
+
+        String codigo = CodigoAcesso.gerar();
+        int id = acessoDAO.criar(userId, CodigoAcesso.hash(codigo), escopo, minutos);
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("id", id);
+        // Única vez em que o código trafega: ele não é recuperável depois.
+        resp.put("codigo", codigo);
+        resp.put("escopo", escopo);
+        resp.put("validade_minutos", minutos);
+        enviarJson(ex, 201, resp);
+    }
+
+    private static void listarAcessos(HttpExchange ex, int userId) throws IOException, SQLException {
+        List<Object> arr = new ArrayList<>();
+        for (AcessoTemporario a : acessoDAO.listarPorPaciente(userId)) {
+            arr.add(acessoJson(a));
+        }
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("acessos", arr);
+        enviarJson(ex, 200, resp);
+    }
+
+    private static void revogarAcesso(HttpExchange ex, int userId, String idTexto)
+            throws IOException, SQLException {
+        int id;
+        try {
+            id = Integer.parseInt(idTexto.trim());
+        } catch (NumberFormatException e) {
+            enviarErro(ex, 400, "Id de acesso inválido.");
+            return;
+        }
+        if (!acessoDAO.revogar(id, userId)) {
+            enviarErro(ex, 404, "Acesso não encontrado ou já revogado.");
+            return;
+        }
+        acessoDAO.registrarLog(id, "revogado", "Revogado pelo paciente.");
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("sucesso", Boolean.TRUE);
+        enviarJson(ex, 200, resp);
+    }
+
+    // ===================== PORTAL DO MÉDICO =====================
+
+    /** /api/medico/* — entrada com o código e registro de dados no prontuário. */
+    private static void medico(HttpExchange ex) throws IOException {
+        String metodo = ex.getRequestMethod();
+        String path = ex.getRequestURI().getPath();
+
+        try {
+            if ("POST".equals(metodo) && "/api/medico/entrar".equals(path)) {
+                entrarComoMedico(ex);
+            } else if ("GET".equals(metodo) && "/api/medico/paciente".equals(path)) {
+                pacienteDoMedico(ex);
+            } else if ("POST".equals(metodo) && "/api/medico/consultas".equals(path)) {
+                registrarConsulta(ex);
+            } else if ("POST".equals(metodo) && "/api/medico/exames".equals(path)) {
+                registrarExame(ex);
+            } else {
+                enviarErro(ex, 404, "Rota não encontrada.");
+            }
+        } catch (IllegalArgumentException e) {
+            enviarErro(ex, 400, "Corpo da requisição inválido (JSON).");
+        } catch (SQLException e) {
+            System.out.println("[ERRO medico] " + e.getMessage());
+            enviarErro(ex, 500, "Erro ao processar a requisição do médico.");
+        }
+    }
+
+    /**
+     * POST /api/medico/entrar — troca o código do paciente por um token curto.
+     * É a única rota pública do portal; por isso tem limite de tentativas.
+     */
+    private static void entrarComoMedico(HttpExchange ex) throws IOException, SQLException {
+        String ip = ex.getRemoteAddress().getAddress().getHostAddress();
+        if (excedeuTentativas(ip)) {
+            enviarErro(ex, 429, "Muitas tentativas. Aguarde alguns minutos e tente de novo.");
+            return;
+        }
+
+        Map<String, Object> body = lerCorpo(ex);
+        String codigo = campo(body, "codigo");
+        String nome = campo(body, "nome");
+        String crm = campo(body, "crm");
+        String especialidade = campo(body, "especialidade");
+
+        if (codigo == null || nome == null || crm == null) {
+            enviarErro(ex, 400, "Informe o código do paciente, seu nome e seu CRM.");
+            return;
+        }
+
+        AcessoTemporario acesso = acessoDAO.buscarUtilizavelPorHash(CodigoAcesso.hash(codigo));
+        if (acesso == null) {
+            registrarTentativa(ip);
+            // Mensagem única de propósito: não revela se o código existe, se já
+            // foi usado ou se expirou.
+            enviarErro(ex, 401, "Código inválido, expirado ou já utilizado.");
+            return;
+        }
+
+        Medico med = medicoDAO.buscarOuCriar(nome, especialidade == null ? "Não informada" : especialidade, crm);
+        acessoDAO.marcarUso(acesso.getIdAcesso(), med.getIdMedico());
+        acessoDAO.registrarLog(acesso.getIdAcesso(), "entrou",
+                med.getNome() + " (CRM " + med.getCrm() + ")");
+
+        Paciente p = pacienteDAO.buscarPorId(acesso.getIdPaciente());
+        if (p == null) {
+            enviarErro(ex, 404, "Paciente não encontrado.");
+            return;
+        }
+
+        // O token do médico vale o tempo que resta do acesso, no máximo.
+        Map<String, Object> claims = new LinkedHashMap<>();
+        claims.put("tipo", "medico");
+        claims.put("acesso", acesso.getIdAcesso());
+        claims.put("pid", acesso.getIdPaciente());
+        claims.put("escopo", acesso.getEscopo());
+        claims.put("medico", med.getNome());
+        claims.put("crm", med.getCrm());
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("token", Jwt.gerar(claims, VALIDADE_ACESSO_MINUTOS * 60L));
+        resp.put("escopo", acesso.getEscopo());
+        resp.put("expira_em", acesso.getExpiraEm());
+        resp.put("paciente", resumoPacienteJson(p));
+        enviarJson(ex, 200, resp);
+    }
+
+    /** GET /api/medico/paciente — resumo clínico liberado pelo acesso. */
+    private static void pacienteDoMedico(HttpExchange ex) throws IOException, SQLException {
+        AcessoTemporario acesso = autenticarMedico(ex);
+        if (acesso == null) return;
+
+        Paciente p = pacienteDAO.buscarPorId(acesso.getIdPaciente());
+        if (p == null) {
+            enviarErro(ex, 404, "Paciente não encontrado.");
+            return;
+        }
+
+        List<Object> alergias = new ArrayList<>();
+        for (Alergia a : prontuarioDAO.listarAlergias(acesso.getIdPaciente(), null)) {
+            alergias.add(a.getDescricao());
+        }
+        List<Object> condicoes = new ArrayList<>();
+        for (HistoricoMedico h : prontuarioDAO.listarCondicoes(acesso.getIdPaciente(), null)) {
+            condicoes.add(h.getDescricao());
+        }
+        List<Object> medicacoes = new ArrayList<>();
+        for (Medicacao m : prontuarioDAO.listarMedicacoes(acesso.getIdPaciente(), null)) {
+            medicacoes.add(m.getNome() + " " + m.getDosagem() + " — " + m.getFrequencia());
+        }
+
+        acessoDAO.registrarLog(acesso.getIdAcesso(), "leu_prontuario", null);
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("paciente", resumoPacienteJson(p));
+        resp.put("alergias", alergias);
+        resp.put("condicoes", condicoes);
+        resp.put("medicacoes", medicacoes);
+        resp.put("escopo", acesso.getEscopo());
+        enviarJson(ex, 200, resp);
+    }
+
+    /** POST /api/medico/consultas — registra o atendimento no prontuário. */
+    private static void registrarConsulta(HttpExchange ex) throws IOException, SQLException {
+        AcessoTemporario acesso = autenticarMedico(ex);
+        if (acesso == null) return;
+        if (!exigirEscrita(ex, acesso)) return;
+
+        Map<String, Object> body = lerCorpo(ex);
+        String motivo = campo(body, "motivo");
+        String local = campo(body, "local");
+        if (motivo == null || local == null) {
+            enviarErro(ex, 400, "Informe ao menos o motivo e o local do atendimento.");
+            return;
+        }
+
+        Medico med = acesso.getMedico();
+        if (med == null) {
+            enviarErro(ex, 403, "Acesso sem médico identificado.");
+            return;
+        }
+
+        String data = campo(body, "data");
+        String hora = campo(body, "hora");
+
+        Consulta c = new Consulta();
+        c.setIdPaciente(acesso.getIdPaciente());
+        c.setMedico(med);
+        c.setData(data != null ? data : LocalDate.now().toString());
+        c.setHora(hora != null ? hora : LocalTime.now().withSecond(0).withNano(0).toString());
+        c.setLocal(local);
+        c.setMotivo(motivo);
+        c.setStatus("realizada");
+        c.setResumo(campo(body, "resumo"));
+        c.setConduta(campo(body, "conduta"));
+
+        int id = consultaDAO.inserir(c, acesso.getIdAcesso());
+        acessoDAO.registrarLog(acesso.getIdAcesso(), "registrou_consulta", motivo);
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("id", id);
+        resp.put("sucesso", Boolean.TRUE);
+        enviarJson(ex, 201, resp);
+    }
+
+    /** POST /api/medico/exames — registra uma coleta de sangue ou exame de imagem. */
+    @SuppressWarnings("unchecked")
+    private static void registrarExame(HttpExchange ex) throws IOException, SQLException {
+        AcessoTemporario acesso = autenticarMedico(ex);
+        if (acesso == null) return;
+        if (!exigirEscrita(ex, acesso)) return;
+
+        Map<String, Object> body = lerCorpo(ex);
+        String tipo = campo(body, "tipo");
+        String local = campo(body, "local");
+        if (local == null) {
+            enviarErro(ex, 400, "Informe o laboratório ou o local do exame.");
+            return;
+        }
+        if (!Exame.TIPO_IMAGEM.equals(tipo)) {
+            tipo = Exame.TIPO_SANGUE;
+        }
+
+        String data = campo(body, "data");
+
+        Exame e = new Exame();
+        e.setIdPaciente(acesso.getIdPaciente());
+        e.setSolicitante(acesso.getMedico());
+        e.setTipo(tipo);
+        e.setData(data != null ? data : LocalDate.now().toString());
+        e.setLocal(local);
+        e.setNome(campo(body, "nome"));
+        e.setLaudo(campo(body, "laudo"));
+
+        if (Exame.TIPO_SANGUE.equals(tipo)) {
+            Object bruto = body.get("itens");
+            if (!(bruto instanceof List) || ((List<Object>) bruto).isEmpty()) {
+                enviarErro(ex, 400, "Informe ao menos um resultado na coleta.");
+                return;
+            }
+            for (Object o : (List<Object>) bruto) {
+                if (!(o instanceof Map)) continue;
+                Map<String, Object> linha = (Map<String, Object>) o;
+
+                String nomeItem = campo(linha, "nome");
+                Object valor = linha.get("valor");
+                Object refMin = linha.get("refMin");
+                Object refMax = linha.get("refMax");
+                if (nomeItem == null || !(valor instanceof Number)
+                        || !(refMin instanceof Number) || !(refMax instanceof Number)) {
+                    enviarErro(ex, 400, "Cada resultado precisa de nome, valor e faixa de referência.");
+                    return;
+                }
+
+                ItemExame item = new ItemExame();
+                item.setNome(nomeItem);
+                item.setValor(((Number) valor).doubleValue());
+                item.setUnidade(campo(linha, "unidade") == null ? "" : campo(linha, "unidade"));
+                item.setRefMin(((Number) refMin).doubleValue());
+                item.setRefMax(((Number) refMax).doubleValue());
+                e.getItens().add(item);
+            }
+        } else if (e.getNome() == null) {
+            enviarErro(ex, 400, "Informe o nome do exame de imagem.");
+            return;
+        }
+
+        int id = exameDAO.inserir(e, acesso.getIdAcesso());
+        acessoDAO.registrarLog(acesso.getIdAcesso(), "registrou_exame",
+                Exame.TIPO_IMAGEM.equals(tipo) ? e.getNome() : e.getItens().size() + " resultado(s)");
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("id", id);
+        resp.put("sucesso", Boolean.TRUE);
+        enviarJson(ex, 201, resp);
+    }
+
+    /**
+     * Valida o token do médico e devolve o acesso correspondente.
+     *
+     * O token sozinho não basta: o acesso é reconferido no banco a cada
+     * requisição, então uma revogação feita pelo paciente vale imediatamente,
+     * sem esperar o token expirar. Responde o erro e devolve null se algo falhar.
+     */
+    private static AcessoTemporario autenticarMedico(HttpExchange ex) throws IOException, SQLException {
+        String header = ex.getRequestHeaders().getFirst("Authorization");
+        if (header == null) header = "";
+        String[] partes = header.split(" ");
+        if (partes.length != 2 || !"Bearer".equals(partes[0]) || partes[1].isEmpty()) {
+            enviarErro(ex, 401, "Token não fornecido.");
+            return null;
+        }
+
+        Map<String, Object> claims = Jwt.validar(partes[1]);
+        if (claims == null || !"medico".equals(claims.get("tipo"))
+                || !(claims.get("acesso") instanceof Number)) {
+            enviarErro(ex, 401, "Token inválido ou expirado.");
+            return null;
+        }
+
+        int idAcesso = ((Number) claims.get("acesso")).intValue();
+        AcessoTemporario acesso = acessoDAO.buscarValidoPorId(idAcesso);
+        if (acesso == null) {
+            enviarErro(ex, 401, "Este acesso foi revogado pelo paciente ou expirou.");
+            return null;
+        }
+        return acesso;
+    }
+
+    /** Bloqueia com 403 quando o acesso é somente leitura. */
+    private static boolean exigirEscrita(HttpExchange ex, AcessoTemporario acesso) throws IOException {
+        if (acesso.permiteEscrita()) return true;
+        enviarErro(ex, 403, "Este acesso é somente leitura.");
+        return false;
+    }
+
+    /**
+     * Controle simples de força bruta na troca do código, por IP: no máximo
+     * TENTATIVAS_MAXIMAS erros dentro da janela.
+     */
+    private static synchronized boolean excedeuTentativas(String ip) {
+        long agora = System.currentTimeMillis();
+        long[] registro = tentativasPorIp.get(ip);
+        if (registro == null) return false;
+        if (agora - registro[1] > JANELA_TENTATIVAS_MS) {
+            tentativasPorIp.remove(ip);
+            return false;
+        }
+        return registro[0] >= TENTATIVAS_MAXIMAS;
+    }
+
+    private static synchronized void registrarTentativa(String ip) {
+        long agora = System.currentTimeMillis();
+        long[] registro = tentativasPorIp.get(ip);
+        if (registro == null || agora - registro[1] > JANELA_TENTATIVAS_MS) {
+            tentativasPorIp.put(ip, new long[] { 1, agora });
+        } else {
+            registro[0]++;
+        }
+    }
+
     // ===================== AUTENTICAÇÃO =====================
 
     /**
@@ -336,6 +892,84 @@ public class ApiServer {
         m.put("bairro", p.getBairro());
         m.put("cidade", p.getCidade());
         m.put("estado", p.getEstado());
+        return m;
+    }
+
+    private static Map<String, Object> consultaJson(Consulta c) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", c.getIdConsulta());
+        m.put("dependente_id", c.getIdDependente() > 0 ? c.getIdDependente() : null);
+        m.put("data", c.getData());
+        m.put("hora", c.getHora());
+        m.put("local", c.getLocal());
+        m.put("motivo", c.getMotivo());
+        m.put("status", c.getStatus());
+        m.put("resumo", c.getResumo());
+        m.put("conduta", c.getConduta());
+        m.put("medico", medicoJson(c.getMedico()));
+        return m;
+    }
+
+    private static Map<String, Object> exameJson(Exame e) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", e.getIdExame());
+        m.put("dependente_id", e.getIdDependente() > 0 ? e.getIdDependente() : null);
+        m.put("consulta_id", e.getIdConsulta() > 0 ? e.getIdConsulta() : null);
+        m.put("tipo", e.getTipo());
+        m.put("data", e.getData());
+        m.put("local", e.getLocal());
+        m.put("nome", e.getNome());
+        m.put("laudo", e.getLaudo());
+        m.put("solicitante", medicoJson(e.getSolicitante()));
+
+        List<Object> itens = new ArrayList<>();
+        for (ItemExame i : e.getItens()) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", i.getIdItem());
+            item.put("nome", i.getNome());
+            item.put("valor", i.getValor());
+            item.put("unidade", i.getUnidade());
+            item.put("ref_min", i.getRefMin());
+            item.put("ref_max", i.getRefMax());
+            itens.add(item);
+        }
+        m.put("itens", itens);
+        return m;
+    }
+
+    private static Map<String, Object> acessoJson(AcessoTemporario a) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", a.getIdAcesso());
+        m.put("escopo", a.getEscopo());
+        m.put("criado_em", a.getCriadoEm());
+        m.put("expira_em", a.getExpiraEm());
+        m.put("usado_em", a.getUsadoEm());
+        m.put("revogado_em", a.getRevogadoEm());
+        m.put("medico", medicoJson(a.getMedico()));
+        return m;
+    }
+
+    /**
+     * Resumo do paciente enviado ao médico. Deliberadamente sem CPF, e-mail,
+     * telefone, endereço ou dependentes: o acesso temporário é clínico, e o
+     * mínimo necessário já identifica o paciente no atendimento.
+     */
+    private static Map<String, Object> resumoPacienteJson(Paciente p) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("nome", p.getNome());
+        m.put("data_nascimento", p.getDataNascimento());
+        m.put("genero", p.getGenero());
+        m.put("tipo_sanguineo", p.getTipoSanguineo());
+        return m;
+    }
+
+    private static Map<String, Object> medicoJson(Medico med) {
+        if (med == null) return null;
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", med.getIdMedico());
+        m.put("nome", med.getNome());
+        m.put("especialidade", med.getEspecialidade());
+        m.put("crm", med.getCrm());
         return m;
     }
 
@@ -402,6 +1036,30 @@ public class ApiServer {
 
     private static String apenasDigitos(String s) {
         return s == null ? "" : s.replaceAll("\\D", "");
+    }
+
+    /**
+     * Lê ?dependenteId= da query string. Devolve null quando ausente ou
+     * inválido — nesse caso as rotas trazem os dados do titular da conta.
+     *
+     * Não é preciso conferir se o dependente é do paciente: as consultas dos
+     * DAOs sempre filtram também por paciente_id, vindo do JWT.
+     */
+    private static Integer idDependente(HttpExchange ex) {
+        String query = ex.getRequestURI().getQuery();
+        if (query == null || query.isEmpty()) return null;
+
+        for (String par : query.split("&")) {
+            int igual = par.indexOf('=');
+            if (igual <= 0) continue;
+            if (!"dependenteId".equals(par.substring(0, igual))) continue;
+            try {
+                return Integer.valueOf(par.substring(igual + 1).trim());
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
     }
 
     private static void enviarJson(HttpExchange ex, int status, Map<String, Object> obj) throws IOException {

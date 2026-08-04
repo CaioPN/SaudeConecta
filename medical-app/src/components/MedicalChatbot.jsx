@@ -103,7 +103,8 @@ export default function MedicalChatbot() {
         }
     }, [messages, isTyping, isOpen]);
 
-    if (location.pathname === '/' || location.pathname === '/cadastro') return null; // Hide on login and registration screens
+    // Esconde no login, no cadastro e no portal do médico (que não é do paciente).
+    if (['/', '/cadastro', '/medico'].includes(location.pathname)) return null;
 
     // Processa um texto (vindo do input ou de uma sugestão) e gera a resposta do bot.
     const enviarTexto = (texto) => {

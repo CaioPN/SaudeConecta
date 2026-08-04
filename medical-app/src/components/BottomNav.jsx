@@ -26,7 +26,8 @@ export default function BottomNav() {
     return () => document.body.classList.remove('more-menu-open');
   }, [isMenuOpen]);
 
-  if (location.pathname === '/' || location.pathname === '/cadastro') return null; // Hide on login and registration screens
+  // Esconde no login, no cadastro e no portal do médico (que não é do paciente).
+  if (['/', '/cadastro', '/medico'].includes(location.pathname)) return null;
 
   const navItems = [
     { label: 'Início', icon: Home, path: '/dashboard' },

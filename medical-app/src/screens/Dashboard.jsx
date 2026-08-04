@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Search, Calendar, User, AlertCircle } from 'lucide-react';
+import { Calendar, User, AlertCircle, MapPin, KeyRound } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
@@ -35,11 +35,6 @@ export default function Dashboard() {
         <p className="header-subtitle">Resumo de hoje</p>
       </header>
 
-      <div className="search-wrapper">
-        <Search className="search-icon" size={20} />
-        <input type="text" placeholder="Buscar pacientes..." className="search-input" />
-      </div>
-
       <div
         className="card patient-summary"
         onClick={() => navigate('/patient')}
@@ -71,6 +66,21 @@ export default function Dashboard() {
             <Calendar size={24} />
           </div>
           <span className="font-bold text-sm">Agendamentos</span>
+        </button>
+
+        {/* TODO: definir destino (ex.: /rede-saude) quando a busca de UPAs estiver pronta. */}
+        <button className="action-btn">
+          <div className="icon-box icon-box-gray">
+            <MapPin size={24} />
+          </div>
+          <span className="font-bold text-sm">Rede de Saúde</span>
+        </button>
+
+        <button onClick={() => navigate('/acesso-medico')} className="action-btn">
+          <div className="icon-box icon-box-gray">
+            <KeyRound size={24} />
+          </div>
+          <span className="font-bold text-sm">Acesso do médico</span>
         </button>
       </div>
     </div>

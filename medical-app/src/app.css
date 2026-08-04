@@ -8,6 +8,13 @@
   --text-dark: #111827;
   --text-gray: #6b7280;
   --border-radius: 12px;
+  /* Situação de resultados/eventos clínicos */
+  --status-ok: #16a34a;
+  --status-ok-bg: #dcfce7;
+  --status-warn: #ca8a04;
+  --status-warn-bg: #fef9c3;
+  --status-bad: #dc2626;
+  --status-bad-bg: #fee2e2;
 }
 
 * {
@@ -97,6 +104,10 @@ body {
 }
 
 .btn-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   width: 100%;
   background-color: var(--white);
   color: var(--text-dark);
@@ -253,29 +264,6 @@ body {
 }
 
 /* Dashboard */
-.search-wrapper {
-  position: relative;
-  margin-bottom: 24px;
-}
-
-.search-icon {
-  position: absolute;
-  left: 12px;
-  top: 14px;
-  color: #9ca3af;
-}
-
-.search-input {
-  width: 100%;
-  padding: 12px 16px 12px 40px;
-  background-color: var(--white);
-  border: none;
-  border-radius: var(--border-radius);
-  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-  font-size: 15px;
-  outline: none;
-}
-
 .patient-summary {
   display: flex;
   align-items: center;
@@ -416,10 +404,434 @@ body {
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 
-.bar-chart-item { margin-bottom: 24px; }
-.bar-chart-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px; }
-.bar-bg { width: 100%; background-color: var(--bg-gray); border-radius: 9999px; height: 10px; margin-bottom: 6px; }
-.bar-fill { height: 10px; border-radius: 9999px; transition: width 1s; }
+/* Cartão de uma coleta de exames (cabeçalho + itens) */
+.exam-card { padding-bottom: 8px; }
+
+.exam-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.exam-card-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 6px;
+}
+
+.exam-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-gray);
+  line-height: 1.6;
+}
+
+.exam-laudo-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-gray);
+  margin-top: 16px;
+}
+
+.exam-aviso {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-gray);
+  margin: 8px 0 12px;
+}
+
+/* Linha de resultado com régua da faixa de referência */
+.result-row { margin-bottom: 20px; }
+
+.result-row-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.result-nome { font-size: 14px; font-weight: 600; color: var(--text-dark); }
+.result-valor { font-size: 15px; font-weight: 700; color: var(--text-dark); }
+.result-unidade { font-size: 12px; font-weight: 400; color: var(--text-gray); }
+
+.result-regua {
+  position: relative;
+  height: 8px;
+  background-color: var(--bg-gray);
+  border-radius: 9999px;
+  margin-bottom: 8px;
+}
+
+/* Bloco central = intervalo considerado normal para o exame. As bordas
+   laterais marcam visualmente onde ficam o mínimo e o máximo da referência. */
+.result-regua-faixa {
+  position: absolute;
+  top: 0;
+  height: 8px;
+  background-color: var(--status-ok-bg);
+  border-left: 2px solid var(--status-ok);
+  border-right: 2px solid var(--status-ok);
+  border-radius: 3px;
+}
+
+/* Marcador do valor do paciente; a cor segue a situação calculada. */
+.result-regua-marcador {
+  position: absolute;
+  top: -3px;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  border-radius: 50%;
+  border: 2px solid var(--white);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  transition: left 0.6s ease;
+}
+
+.result-regua-marcador.normal { background-color: var(--status-ok); }
+.result-regua-marcador.limite { background-color: var(--status-warn); }
+.result-regua-marcador.alterado { background-color: var(--status-bad); }
+
+.result-row-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.result-referencia { font-size: 12px; color: var(--text-gray); }
+
+/* Selo de situação (exames, consultas) */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status-badge.normal,
+.status-badge.realizada { background-color: var(--status-ok-bg); color: var(--status-ok); }
+.status-badge.limite,
+.status-badge.pendente { background-color: var(--status-warn-bg); color: var(--status-warn); }
+.status-badge.alterado { background-color: var(--status-bad-bg); color: var(--status-bad); }
+.status-badge.agendada { background-color: #dbeafe; color: var(--primary-blue); }
+
+/* Par rótulo + valor (componente InfoField) */
+.info-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.info-field-icon { color: var(--text-gray); flex-shrink: 0; padding-top: 2px; }
+.info-field-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+.info-field-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-gray);
+}
+
+.info-field-value { font-size: 14px; font-weight: 600; color: var(--text-dark); line-height: 1.5; }
+
+.detail-card-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 16px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+/* Lista de consultas */
+.consulta-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  text-align: left;
+  background-color: var(--white);
+  border: 1px solid #f3f4f6;
+  border-radius: var(--border-radius);
+  padding: 14px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  transition: border-color 0.2s;
+}
+
+.consulta-item:hover { border-color: var(--primary-blue); }
+
+.consulta-item-data {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  padding: 8px 0;
+  background-color: #eff6ff;
+  border-radius: 10px;
+  color: var(--primary-blue);
+}
+
+.consulta-item-dia { font-size: 18px; font-weight: 700; line-height: 1; }
+.consulta-item-mes { font-size: 11px; font-weight: 600; text-transform: uppercase; }
+
+.consulta-item-body { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.consulta-item-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.consulta-item-espec { font-size: 13px; color: var(--primary-blue); font-weight: 600; }
+
+.consulta-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-gray);
+}
+
+/* Medicações em uso (prontuário) */
+.medicacao-item { display: flex; align-items: center; gap: 12px; padding: 6px 0; }
+
+/* Acesso temporário do médico */
+.codigo-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  border: 2px solid var(--primary-blue);
+  background-color: #eff6ff;
+}
+
+.codigo-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--primary-blue);
+}
+
+.codigo-valor {
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--text-dark);
+  font-variant-numeric: tabular-nums;
+}
+
+.codigo-rodape {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.codigo-timer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-gray);
+  font-variant-numeric: tabular-nums;
+}
+
+.codigo-copiar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary-blue);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.codigo-aviso {
+  font-size: 11px;
+  color: var(--text-gray);
+  text-align: center;
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
+.codigo-input {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+}
+
+.escopo-opcoes {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.escopo-opcao {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+  text-align: left;
+  background-color: var(--white);
+  border: 1px solid #e5e7eb;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  color: var(--text-gray);
+}
+
+.escopo-opcao.active {
+  border-color: var(--primary-blue);
+  background-color: #eff6ff;
+  color: var(--primary-blue);
+}
+
+.escopo-titulo { font-size: 13px; font-weight: 700; color: var(--text-dark); }
+.escopo-desc { font-size: 11px; color: var(--text-gray); line-height: 1.4; }
+
+.acesso-nota {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-gray);
+  line-height: 1.5;
+  margin-top: 12px;
+}
+
+.acesso-item { display: flex; flex-direction: column; gap: 8px; }
+
+.acesso-item-topo {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.acesso-revogar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--status-bad);
+  background-color: var(--status-bad-bg);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* Portal do médico */
+.portal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.sessao-barra {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  background-color: #eff6ff;
+  border-radius: var(--border-radius);
+}
+
+.sessao-timer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary-blue);
+  font-variant-numeric: tabular-nums;
+}
+
+.sessao-sair {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-gray);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.item-exame-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+  background-color: var(--bg-gray);
+  border-radius: var(--border-radius);
+}
+
+.item-exame-linha { display: flex; gap: 8px; align-items: center; }
+.item-exame-linha .input-field { flex: 1; }
+
+.item-remover {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  color: var(--status-bad);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.form-erro {
+  font-size: 13px;
+  color: var(--status-bad);
+  margin-bottom: 12px;
+}
+
+.form-ok {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--status-ok);
+  margin-bottom: 12px;
+}
+
+/* Estado vazio padrão das listas */
+.empty-state {
+  background-color: var(--white);
+  border: 1px dashed #e5e7eb;
+  border-radius: var(--border-radius);
+  padding: 20px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-gray);
+}
+
 .bg-red-500 { background-color: #ef4444; }
 .bg-blue-500 { background-color: #3b82f6; }
 .bg-yellow-500 { background-color: #eab308; }
@@ -440,24 +852,48 @@ body {
 
 .timeline-dot {
   position: absolute;
-  left: -9px;
-  top: 4px;
-  width: 16px;
-  height: 16px;
+  left: -11px;
+  top: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background-color: var(--primary-blue);
   border: 2px solid var(--white);
+  color: var(--white);
+}
+
+/* Exame usa outra cor para diferenciar da consulta na mesma linha do tempo. */
+.timeline-dot.exame { background-color: #0ea5e9; }
+
+.timeline-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 2px;
 }
 
 .record-card {
+  display: block;
+  width: 100%;
+  text-align: left;
   background-color: var(--white);
   padding: 16px;
+  border: 1px solid #f3f4f6;
   border-radius: var(--border-radius);
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
   margin-top: 12px;
   font-size: 14px;
   line-height: 1.5;
+  color: var(--text-dark);
+  cursor: pointer;
+  transition: border-color 0.2s;
 }
+
+button.record-card:hover { border-color: var(--primary-blue); }
 
 /* Misc */
 .border-red { border: 1px solid #fee2e2; }
@@ -873,3 +1309,110 @@ body.more-menu-open .chatbot-wrapper {
   padding: 20px;
   overflow-y: auto;
 }
+
+/* Carteira de Vacinação */
+.vacina-pessoa-selector {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 20px;
+}
+.vacina-pessoa-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 9999px;
+  border: 1px solid #e5e7eb;
+  background-color: var(--white);
+  color: var(--text-gray);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+.vacina-pessoa-pill.active {
+  background-color: #eff6ff;
+  border-color: #bfdbfe;
+  color: var(--primary-blue);
+}
+
+.vacina-resumo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.vacina-progress-bg {
+  width: 100%;
+  height: 8px;
+  background-color: var(--bg-gray);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+.vacina-progress-fill {
+  height: 100%;
+  background-color: #22c55e;
+  border-radius: 9999px;
+  transition: width 0.6s ease;
+}
+
+.vacina-item {
+  display: flex;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 12px;
+  margin-bottom: 10px;
+  border: 1px solid #e5e7eb;
+  background-color: var(--white);
+}
+.vacina-item.tomada {
+  background-color: #f0fdf4;
+  border-color: #bbf7d0;
+}
+.vacina-item.pendente {
+  background-color: #fffbeb;
+  border-color: #fde68a;
+}
+.vacina-status-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--white);
+}
+.vacina-status-icon.tomada { background-color: #22c55e; }
+.vacina-status-icon.pendente { background-color: #f59e0b; }
+.vacina-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.vacina-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.vacina-nome { font-weight: 700; font-size: 15px; color: var(--text-dark); }
+.vacina-periodo {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-gray);
+  background-color: var(--bg-gray);
+  padding: 2px 8px;
+  border-radius: 9999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.vacina-dose { font-size: 13px; color: var(--text-gray); }
+.vacina-protege { font-size: 12px; color: var(--text-gray); font-style: italic; }
+.vacina-data { font-size: 12px; font-weight: 600; margin-top: 2px; }
+.vacina-item.tomada .vacina-data { color: #16a34a; }
+.vacina-item.pendente .vacina-data { color: #d97706; }

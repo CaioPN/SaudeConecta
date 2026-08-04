@@ -71,7 +71,7 @@ export default function PatientProfile() {
           </div>
         </button>
 
-        <button className="list-action-btn">
+        <button onClick={() => navigate('/vacinas')} className="list-action-btn">
           <div className="icon-box icon-box-lg">
             <Syringe size={26} />
           </div>

@@ -34,6 +34,14 @@ public final class Jwt {
      * os campos padrão (iat/exp).
      */
     public static String gerar(Map<String, Object> claims) {
+        return gerar(claims, EXPIRACAO_SEGUNDOS);
+    }
+
+    /**
+     * Gera um token com validade própria, em segundos. Usado pelo acesso
+     * temporário do médico, que dura minutos em vez de dias.
+     */
+    public static String gerar(Map<String, Object> claims, long validadeSegundos) {
         Map<String, Object> header = new LinkedHashMap<>();
         header.put("alg", "HS256");
         header.put("typ", "JWT");
@@ -41,7 +49,7 @@ public final class Jwt {
         long agora = System.currentTimeMillis() / 1000L;
         Map<String, Object> payload = new LinkedHashMap<>(claims);
         payload.put("iat", agora);
-        payload.put("exp", agora + EXPIRACAO_SEGUNDOS);
+        payload.put("exp", agora + validadeSegundos);
 
         String h = B64.encodeToString(Json.escreverObjeto(header).getBytes(StandardCharsets.UTF_8));
         String p = B64.encodeToString(Json.escreverObjeto(payload).getBytes(StandardCharsets.UTF_8));

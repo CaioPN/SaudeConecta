@@ -1,28 +1,41 @@
-import React, { useState } from 'react';
-import { ChevronLeft, Image as ImageIcon, Droplet, Download } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ChevronLeft, Image as ImageIcon, Droplet, Download, Calendar, Building2, Stethoscope, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import { useAuth } from '../context/AuthContext';
-
-// Dados dos exames (origem única usada tanto na tela quanto no PDF).
-const EXAMES_SANGUE = [
-  { label: 'Hemoglobina', value: 13.5, min: 12.0, max: 16.0, unit: 'g/dL', percent: 60, color: 'bg-green-500' },
-  { label: 'Glicose', value: 85, min: 70, max: 99, unit: 'mg/dL', percent: 45, color: 'bg-green-500' },
-  { label: 'Colesterol', value: 190, min: 0, max: 200, unit: 'mg/dL', percent: 85, color: 'bg-red-500' },
-  { label: 'Creatinina', value: 0.9, min: 0.6, max: 1.1, unit: 'mg/dL', percent: 50, color: 'bg-green-500' },
-];
-
-const EXAMES_IMAGEM = [
-  { nome: 'Raio-X de Tórax (PA)', data: '12 Jan 2026' },
-];
+import ResultRow from '../components/ResultRow';
+import InfoField from '../components/InfoField';
+import StatusBadge from '../components/StatusBadge';
+import { buscarExames } from '../services/exames';
+import { situacaoItem, textoReferencia, formatarData, totalAlterados } from '../utils/exames';
 
 export default function Exams() {
   const navigate = useNavigate();
   const { paciente } = useAuth();
   const [tab, setTab] = useState('sangue');
+  const [coletas, setColetas] = useState([]);
+  const [imagem, setImagem] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState(null);
 
-  // Considera "fora da referência" quando o valor sai do intervalo min–max.
-  const situacao = (e) => (e.value < e.min || e.value > e.max ? 'Alterado' : 'Normal');
+  useEffect(() => {
+    let ativo = true;
+    buscarExames()
+      .then(({ coletas: c, imagem: i }) => {
+        if (!ativo) return;
+        setColetas(c);
+        setImagem(i);
+      })
+      .catch(() => {
+        if (ativo) setErro('Não foi possível carregar seus exames.');
+      })
+      .finally(() => {
+        if (ativo) setCarregando(false);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, []);
 
   // Gera e baixa um PDF com o histórico de exames do paciente.
   const baixarPDF = () => {
@@ -30,6 +43,14 @@ export default function Exams() {
     const nome = paciente?.nome || 'Paciente';
     const hoje = new Date().toLocaleDateString('pt-BR');
     let y = 20;
+
+    // Quebra de página quando o conteúdo chega perto do rodapé.
+    const espaco = (altura) => {
+      if (y + altura > 275) {
+        doc.addPage();
+        y = 20;
+      }
+    };
 
     // Cabeçalho
     doc.setFontSize(18);
@@ -51,44 +72,58 @@ export default function Exams() {
     y += 4;
     doc.line(14, y, 196, y);
 
-    // Seção: Exames de Sangue
-    y += 10;
-    doc.setFontSize(12);
-    doc.setTextColor(30, 30, 30);
-    doc.text('Exames de Sangue (Hemograma e Bioquímica)', 14, y);
-
-    // Cabeçalho da tabela
-    y += 8;
-    doc.setFontSize(9);
-    doc.setTextColor(110, 110, 110);
-    doc.text('Exame', 14, y);
-    doc.text('Resultado', 80, y);
-    doc.text('Referência', 120, y);
-    doc.text('Situação', 170, y);
-
-    doc.setTextColor(30, 30, 30);
-    doc.setFontSize(10);
-    EXAMES_SANGUE.forEach((e) => {
-      y += 7;
-      const alterado = situacao(e) === 'Alterado';
-      doc.text(String(e.label), 14, y);
-      doc.text(`${e.value} ${e.unit}`, 80, y);
-      doc.text(`${e.min} - ${e.max} ${e.unit}`, 120, y);
-      if (alterado) doc.setTextColor(220, 38, 38);
-      else doc.setTextColor(22, 163, 74);
-      doc.text(situacao(e), 170, y);
+    // Seção: Exames de Sangue — uma tabela por coleta.
+    coletas.forEach((coleta) => {
+      espaco(50);
+      y += 10;
+      doc.setFontSize(12);
       doc.setTextColor(30, 30, 30);
+      doc.text(`Coleta de ${formatarData(coleta.data)}`, 14, y);
+
+      y += 5;
+      doc.setFontSize(9);
+      doc.setTextColor(110, 110, 110);
+      const origem = [coleta.local, coleta.solicitante && `Solicitado por ${coleta.solicitante}`]
+        .filter(Boolean)
+        .join(' · ');
+      doc.text(origem, 14, y);
+
+      // Cabeçalho da tabela
+      y += 8;
+      doc.text('Exame', 14, y);
+      doc.text('Resultado', 80, y);
+      doc.text('Referência', 120, y);
+      doc.text('Situação', 170, y);
+
+      doc.setFontSize(10);
+      coleta.itens.forEach((item) => {
+        espaco(10);
+        y += 7;
+        const situacao = situacaoItem(item);
+        doc.setTextColor(30, 30, 30);
+        doc.text(String(item.nome), 14, y);
+        doc.text(`${item.valor} ${item.unidade}`, 80, y);
+        doc.text(textoReferencia(item), 120, y);
+
+        if (situacao === 'alterado') doc.setTextColor(220, 38, 38);
+        else if (situacao === 'limite') doc.setTextColor(202, 138, 4);
+        else doc.setTextColor(22, 163, 74);
+        doc.text(situacao === 'normal' ? 'Normal' : situacao === 'limite' ? 'Limite' : 'Alterado', 170, y);
+        doc.setTextColor(30, 30, 30);
+      });
     });
 
     // Seção: Exames de Imagem
+    espaco(30);
     y += 14;
     doc.setFontSize(12);
     doc.text('Exames de Imagem', 14, y);
     doc.setFontSize(10);
     doc.setTextColor(60, 60, 60);
-    EXAMES_IMAGEM.forEach((e) => {
+    imagem.forEach((e) => {
+      espaco(10);
       y += 7;
-      doc.text(`• ${e.nome} — Realizado em ${e.data}`, 14, y);
+      doc.text(`• ${e.nome} — ${formatarData(e.data)} · ${e.local}`, 14, y);
     });
 
     // Rodapé
@@ -104,18 +139,7 @@ export default function Exams() {
     doc.save(nomeArquivo);
   };
 
-  const BarChartItem = ({ label, value, min, max, unit, percent, color }) => (
-    <div className="bar-chart-item">
-      <div className="bar-chart-header">
-        <span className="font-bold">{label}</span>
-        <span className="font-bold">{value} <span className="text-xs text-muted font-normal">{unit}</span></span>
-      </div>
-      <div className="bar-bg">
-        <div className={`bar-fill ${color}`} style={{ width: `${percent}%` }}></div>
-      </div>
-      <div className="text-xs text-muted">Ref: {min} - {max} {unit}</div>
-    </div>
-  );
+  const temExames = coletas.length > 0 || imagem.length > 0;
 
   return (
     <div className="screen-container">
@@ -125,10 +149,12 @@ export default function Exams() {
 
       <div className="flex items-center justify-between mb-6">
         <h2 className="header-title">Exames</h2>
-        <button onClick={baixarPDF} className="pdf-download-btn">
-          <Download size={18} />
-          <span>Baixar PDF</span>
-        </button>
+        {temExames && (
+          <button onClick={baixarPDF} className="pdf-download-btn">
+            <Download size={18} />
+            <span>Baixar PDF</span>
+          </button>
+        )}
       </div>
 
       <div className="tabs-wrapper">
@@ -142,22 +168,87 @@ export default function Exams() {
         </button>
       </div>
 
-      {tab === 'sangue' && (
-        <div className="card">
-          <h3 className="section-title">Hemograma e Bioquímica</h3>
-          {EXAMES_SANGUE.map((e) => (
-            <BarChartItem key={e.label} {...e} />
-          ))}
-        </div>
+      {carregando && <p className="empty-state">Carregando exames…</p>}
+      {erro && !carregando && <p className="empty-state">{erro}</p>}
+
+      {!carregando && !erro && tab === 'sangue' && (
+        coletas.length === 0 ? (
+          <p className="empty-state">Nenhum exame de sangue registrado até o momento.</p>
+        ) : (
+          coletas.map((coleta) => {
+            const alterados = totalAlterados(coleta);
+            return (
+              <div key={coleta.id} className="card exam-card">
+                <div className="exam-card-header">
+                  <div>
+                    <h3 className="exam-card-title">
+                      <Calendar size={16} /> {formatarData(coleta.data)}
+                    </h3>
+                    <p className="exam-card-meta">
+                      <Building2 size={13} /> {coleta.local}
+                    </p>
+                    {coleta.solicitante && (
+                      <p className="exam-card-meta">
+                        <Stethoscope size={13} /> Solicitado por {coleta.solicitante}
+                        {coleta.crm ? ` · ${coleta.crm}` : ''}
+                      </p>
+                    )}
+                  </div>
+                  <StatusBadge
+                    status={alterados > 0 ? 'alterado' : 'normal'}
+                    texto={
+                      alterados > 0
+                        ? `${alterados} ${alterados === 1 ? 'alterado' : 'alterados'}`
+                        : 'Tudo normal'
+                    }
+                  />
+                </div>
+
+                {coleta.itens.map((item) => (
+                  <ResultRow key={item.id} item={item} />
+                ))}
+              </div>
+            );
+          })
+        )
       )}
 
-      {tab === 'imagem' && (
-        <div className="card flex-col items-center">
-          <div className="icon-box icon-box-gray icon-box-lg mb-6"><ImageIcon size={32} /></div>
-          <h3 className="font-bold mb-2">{EXAMES_IMAGEM[0].nome}</h3>
-          <p className="text-sm text-muted mb-6">Realizado em {EXAMES_IMAGEM[0].data}</p>
-          <button className="btn-primary" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>Visualizar Laudo</button>
-        </div>
+      {!carregando && !erro && tab === 'imagem' && (
+        imagem.length === 0 ? (
+          <p className="empty-state">Nenhum exame de imagem registrado até o momento.</p>
+        ) : (
+          imagem.map((exame) => (
+            <div key={exame.id} className="card exam-card">
+              <div className="exam-card-header">
+                <h3 className="exam-card-title">
+                  <ImageIcon size={16} /> {exame.nome}
+                </h3>
+              </div>
+
+              <InfoField icon={Calendar} label="Realizado em">
+                {formatarData(exame.data)}
+              </InfoField>
+              <InfoField icon={Building2} label="Local">
+                {exame.local}
+              </InfoField>
+              {exame.solicitante && (
+                <InfoField icon={Stethoscope} label="Solicitado por">
+                  {exame.solicitante}
+                </InfoField>
+              )}
+
+              {exame.laudo && (
+                <>
+                  <p className="exam-laudo-label">Conclusão do laudo</p>
+                  <p className="record-card">{exame.laudo}</p>
+                  <p className="exam-aviso">
+                    <AlertTriangle size={13} /> Resumo informativo — não substitui o laudo oficial.
+                  </p>
+                </>
+              )}
+            </div>
+          ))
+        )
       )}
     </div>
   );

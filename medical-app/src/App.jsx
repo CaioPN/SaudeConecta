@@ -2,14 +2,19 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import BottomNav from './components/BottomNav';
 import MedicalChatbot from './components/MedicalChatbot';
+import VLibras from './components/VLibras';
 import Login from './screens/Login';
 import Dashboard from './screens/Dashboard';
 import PatientProfile from './screens/PatientProfile';
 import MedicalRecord from './screens/MedicalRecord';
 import Exams from './screens/Exams';
 import Appointment from './screens/Appointment';
+import Appointments from './screens/Appointments';
+import AcessoMedico from './screens/AcessoMedico';
+import PortalMedico from './screens/PortalMedico';
 import Cadastro from './screens/Cadastro';
 import Dependentes from './screens/Dependentes';
+import Vacinas from './screens/Vacinas';
 import Profile from './screens/Profile';
 import Terms from './screens/Terms';
 import Privacy from './screens/Privacy';
@@ -29,14 +34,20 @@ export default function App() {
             <Route path="/profile" element={<Profile />} />
             <Route path="/record" element={<MedicalRecord />} />
             <Route path="/exams" element={<Exams />} />
-            <Route path="/appointment" element={<Appointment />} />
+            <Route path="/appointment" element={<Appointments />} />
+            <Route path="/appointment/:id" element={<Appointment />} />
             <Route path="/dependentes" element={<Dependentes />} />
+            <Route path="/vacinas" element={<Vacinas />} />
+            <Route path="/acesso-medico" element={<AcessoMedico />} />
+            {/* Rota usada pelo profissional de saúde, fora do app do paciente. */}
+            <Route path="/medico" element={<PortalMedico />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
           </Routes>
         </div>
         <BottomNav />
         <MedicalChatbot />
+        <VLibras />
       </div>
     </Router>
   );
