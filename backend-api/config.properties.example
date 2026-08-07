@@ -1,0 +1,16 @@
+# Configuração do assistente com IA (chatbot).
+#
+# COPIE este arquivo para "config.properties" na mesma pasta e cole a sua chave.
+# O config.properties está no .gitignore — a chave NUNCA vai para o repositório.
+#
+# A chave é gratuita e sai em https://aistudio.google.com/apikey
+# (nível gratuito: 1.500 requisições por dia, sem cartão de crédito).
+#
+# Alternativa: em vez do arquivo, exportar a variável de ambiente GEMINI_API_KEY.
+# Ela tem prioridade sobre este arquivo.
+
+gemini.api.key=COLE_SUA_CHAVE_AQUI
+
+# Modelo usado. Se a API responder 404, troque aqui pelo nome de um modelo
+# disponível no seu projeto (ex.: gemini-2.5-flash) — não precisa recompilar.
+gemini.modelo=gemini-2.0-flash

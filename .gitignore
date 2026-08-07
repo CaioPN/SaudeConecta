@@ -6,6 +6,9 @@ node_modules/
 *.env
 !*.env.example
 
+# Chave da API de IA do chatbot (use o config.properties.example como modelo)
+backend-api/config.properties
+
 # Builds / saídas geradas
 dist/
 build/

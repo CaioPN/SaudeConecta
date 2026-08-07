@@ -18,6 +18,7 @@ import Vacinas from './screens/Vacinas';
 import Profile from './screens/Profile';
 import Terms from './screens/Terms';
 import Privacy from './screens/Privacy';
+import Faq from './screens/Faq';
 import './app.css';
 
 export default function App() {
@@ -43,6 +44,7 @@ export default function App() {
             <Route path="/medico" element={<PortalMedico />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
+            <Route path="/faq" element={<Faq />} />
           </Routes>
         </div>
         <BottomNav />

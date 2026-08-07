@@ -20,6 +20,7 @@ import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 
 import br.com.hackgov.dao.AcessoDAO;
+import br.com.hackgov.dao.AvisoDAO;
 import br.com.hackgov.dao.ConsultaDAO;
 import br.com.hackgov.dao.DependenteDAO;
 import br.com.hackgov.dao.ExameDAO;
@@ -28,6 +29,7 @@ import br.com.hackgov.dao.PacienteDAO;
 import br.com.hackgov.dao.ProntuarioDAO;
 import br.com.hackgov.modelos.AcessoTemporario;
 import br.com.hackgov.modelos.Alergia;
+import br.com.hackgov.modelos.Aviso;
 import br.com.hackgov.modelos.Consulta;
 import br.com.hackgov.modelos.Dependente;
 import br.com.hackgov.modelos.Exame;
@@ -36,6 +38,7 @@ import br.com.hackgov.modelos.ItemExame;
 import br.com.hackgov.modelos.Medicacao;
 import br.com.hackgov.modelos.Medico;
 import br.com.hackgov.modelos.Paciente;
+import br.com.hackgov.util.ChatIA;
 import br.com.hackgov.util.CodigoAcesso;
 import br.com.hackgov.util.Json;
 import br.com.hackgov.util.Jwt;
@@ -61,6 +64,8 @@ import br.com.hackgov.util.SenhaUtil;
  *   GET    /api/consultas/{id}    detalhe de uma consulta
  *   GET    /api/exames            coletas de sangue e exames de imagem
  *   GET    /api/prontuario        alergias, condições e medicações
+ *   GET    /api/avisos            avisos do Dashboard (derivados dos dados)
+ *   POST   /api/chat              pergunta livre do chatbot (IA)
  *
  * Em todas elas o paciente vem do JWT, nunca da requisição — assim um usuário
  * não consegue ler os dados de outro passando um id na URL.
@@ -76,6 +81,7 @@ public class ApiServer {
     private static final ConsultaDAO consultaDAO = new ConsultaDAO();
     private static final ExameDAO exameDAO = new ExameDAO();
     private static final ProntuarioDAO prontuarioDAO = new ProntuarioDAO();
+    private static final AvisoDAO avisoDAO = new AvisoDAO();
     private static final AcessoDAO acessoDAO = new AcessoDAO();
     private static final MedicoDAO medicoDAO = new MedicoDAO();
 
@@ -87,6 +93,11 @@ public class ApiServer {
     private static final long JANELA_TENTATIVAS_MS = 10L * 60 * 1000;
     private static final Map<String, long[]> tentativasPorIp = new HashMap<>();
 
+    /** Limite de perguntas ao chatbot por paciente, para proteger a cota da IA. */
+    private static final int PERGUNTAS_MAXIMAS = 15;
+    private static final long JANELA_CHAT_MS = 60L * 1000;
+    private static final Map<Integer, long[]> perguntasPorPaciente = new HashMap<>();
+
     public static void main(String[] args) throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress(PORTA), 0);
 
@@ -97,6 +108,8 @@ public class ApiServer {
         server.createContext("/api/consultas", comCors(ApiServer::consultas));
         server.createContext("/api/exames", comCors(ApiServer::exames));
         server.createContext("/api/prontuario", comCors(ApiServer::prontuario));
+        server.createContext("/api/avisos", comCors(ApiServer::avisos));
+        server.createContext("/api/chat", comCors(ApiServer::chat));
         server.createContext("/api/acessos", comCors(ApiServer::acessos));
         server.createContext("/api/medico", comCors(ApiServer::medico));
         server.createContext("/", comCors(ApiServer::raiz));
@@ -407,6 +420,102 @@ public class ApiServer {
         } catch (SQLException e) {
             System.out.println("[ERRO exames] " + e.getMessage());
             enviarErro(ex, 500, "Erro ao buscar exames.");
+        }
+    }
+
+    /**
+     * POST /api/chat — pergunta livre do chatbot, respondida pelo modelo de IA.
+     *
+     * A rota exige login por dois motivos: a chave da API mora só aqui no
+     * servidor (nunca no front) e um endpoint aberto viraria proxy de graça
+     * para a cota gratuita. Nada do paciente é enviado ao modelo — só o texto
+     * digitado (ver ChatIA).
+     */
+    private static void chat(HttpExchange ex) throws IOException {
+        if (!"POST".equals(ex.getRequestMethod())) { enviarErro(ex, 405, "Método não permitido."); return; }
+        Integer userId = autenticar(ex);
+        if (userId == null) return;
+
+        if (!ChatIA.disponivel()) {
+            enviarErro(ex, 503, "O assistente com IA não está configurado.");
+            return;
+        }
+        if (!liberarPergunta(userId)) {
+            enviarErro(ex, 429, "Muitas perguntas seguidas. Aguarde um minuto para continuar.");
+            return;
+        }
+
+        try {
+            Map<String, Object> body = lerCorpo(ex);
+            String pergunta = campo(body, "pergunta");
+            if (pergunta == null || pergunta.isBlank()) {
+                enviarErro(ex, 400, "Escreva uma pergunta.");
+                return;
+            }
+            if (pergunta.length() > ChatIA.LIMITE_PERGUNTA) {
+                enviarErro(ex, 400, "Pergunta muito longa. Resuma em até "
+                        + ChatIA.LIMITE_PERGUNTA + " caracteres.");
+                return;
+            }
+
+            String resposta = ChatIA.responder(pergunta);
+            if (resposta == null) {
+                enviarErro(ex, 502, "O assistente não conseguiu responder agora.");
+                return;
+            }
+
+            Map<String, Object> resp = new LinkedHashMap<>();
+            resp.put("resposta", resposta);
+            enviarJson(ex, 200, resp);
+
+        } catch (IllegalArgumentException e) {
+            enviarErro(ex, 400, "Corpo da requisição inválido (JSON).");
+        }
+    }
+
+    /**
+     * Limite simples de perguntas por paciente dentro da janela. Existe para a
+     * cota gratuita do modelo não ser gasta por um único usuário (ou por um
+     * script) em poucos segundos.
+     */
+    private static synchronized boolean liberarPergunta(int idPaciente) {
+        long agora = System.currentTimeMillis();
+        long[] registro = perguntasPorPaciente.get(idPaciente);
+        if (registro == null || agora - registro[1] > JANELA_CHAT_MS) {
+            perguntasPorPaciente.put(idPaciente, new long[] { 1, agora });
+            return true;
+        }
+        if (registro[0] >= PERGUNTAS_MAXIMAS) {
+            return false;
+        }
+        registro[0]++;
+        return true;
+    }
+
+    /** GET /api/avisos — avisos do Dashboard, derivados dos dados do paciente logado. */
+    private static void avisos(HttpExchange ex) throws IOException {
+        if (!"GET".equals(ex.getRequestMethod())) { enviarErro(ex, 405, "Método não permitido."); return; }
+        Integer userId = autenticar(ex);
+        if (userId == null) return;
+
+        try {
+            List<Object> lista = new ArrayList<>();
+            for (Aviso a : avisoDAO.listarPorPaciente(userId)) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("tipo", a.getTipo());
+                m.put("titulo", a.getTitulo());
+                m.put("detalhe", a.getDetalhe());
+                m.put("severidade", a.getSeveridade());
+                lista.add(m);
+            }
+
+            Map<String, Object> resp = new LinkedHashMap<>();
+            resp.put("avisos", lista);
+            enviarJson(ex, 200, resp);
+
+        } catch (SQLException e) {
+            System.out.println("[ERRO avisos] " + e.getMessage());
+            enviarErro(ex, 500, "Erro ao buscar os avisos.");
         }
     }
 

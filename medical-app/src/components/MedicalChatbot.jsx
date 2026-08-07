@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageCircle, X, Send, Bot } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
+import { perguntarIA } from '../services/chatbot';
 
 // Base de conhecimento do assistente: cada item tem palavras-chave e uma resposta.
 // O primeiro item cujas palavras-chave aparecerem na mensagem é usado como resposta.
@@ -8,8 +9,8 @@ const BASE_CONHECIMENTO = [
     {
         chaves: ['agendar', 'agendamento', 'consulta', 'marcar', 'médico', 'medico'],
         resposta:
-            'Para agendar uma consulta, abra o menu "Início" e toque em "Agendamentos" nas Ações Rápidas. ' +
-            'Lá você escolhe a data e o profissional disponível.',
+            'Suas consultas ficam em "Início" → "Agendamentos", separadas entre as próximas e as anteriores. ' +
+            'Toque em uma delas para ver o local, o profissional, o resumo e a conduta.',
     },
     {
         chaves: ['exame', 'exames', 'resultado', 'sangue', 'hemograma', 'imagem', 'laudo'],
@@ -32,19 +33,26 @@ const BASE_CONHECIMENTO = [
     {
         chaves: ['senha', 'login', 'entrar', 'esqueci', 'acesso', 'biometria'],
         resposta:
-            'Problemas de acesso? Na tela de login use "Esqueceu a senha?" para redefini-la. ' +
-            'Por segurança, sua senha precisa ter ao menos 8 caracteres, com maiúscula, minúscula, número e símbolo.',
+            'Sua senha precisa ter ao menos 8 caracteres, com maiúscula, minúscula, número e caractere especial. ' +
+            'A redefinição pelo app ainda está em desenvolvimento: se esqueceu a senha, escreva para suporte@saudeconecta.com.br.',
     },
     {
         chaves: ['vacina', 'vacinação', 'vacinacao', 'imunização', 'imunizacao'],
         resposta:
-            'A sua Carteira de Vacinação fica no "Meu perfil", com o registro das imunizações.',
+            'A Carteira de Vacinação fica em "Exames/Registros" → "Carteira de Vacinação". Ela é montada pelo calendário ' +
+            'do PNI a partir da data de nascimento, e o seletor do topo alterna entre você e cada dependente.',
     },
     {
         chaves: ['privacidade', 'dados', 'lgpd', 'termo', 'termos'],
         resposta:
             'No menu "Mais" você encontra os "Termos de Utilização" e o "Portal de Privacidade", ' +
             'com tudo sobre como tratamos e protegemos os seus dados (LGPD).',
+    },
+    {
+        chaves: ['faq', 'duvidas frequentes', 'dúvidas frequentes', 'perguntas frequentes', 'ajuda', 'tutorial'],
+        resposta:
+            'No menu "Mais" existe a tela "Dúvidas frequentes", com as perguntas mais comuns sobre conta, ' +
+            'dependentes, exames, vacinação, acesso do médico e privacidade.',
     },
     {
         chaves: ['emergência', 'emergencia', 'urgência', 'urgencia', 'socorro', 'samu', 'dor'],
@@ -65,18 +73,36 @@ const BASE_CONHECIMENTO = [
 // Sugestões rápidas exibidas como botões na primeira interação.
 const SUGESTOES = ['Como agendar consulta?', 'Ver meus exames', 'Adicionar dependente'];
 
-// Encontra a melhor resposta com base nas palavras-chave da mensagem do usuário.
-function gerarResposta(texto) {
-    const t = texto.toLowerCase();
-    const item = BASE_CONHECIMENTO.find((entrada) =>
-        entrada.chaves.some((chave) => t.includes(chave))
-    );
-    if (item) return item.resposta;
-    return (
-        'Ainda não sei responder isso com certeza. 🤔 Posso ajudar com: agendar consultas, exames, ' +
-        'dependentes, prontuário, senha/acesso e privacidade. Tente reformular ou escolha um desses temas.'
-    );
+// Tira acentos e caixa para o casamento não depender de "vacinação" vs "vacinacao".
+function normalizar(texto) {
+    return texto
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
 }
+
+// Procura na base local e devolve a resposta, ou null se nada casar.
+// Vence a entrada com MAIS palavras-chave presentes: antes vencia a primeira que
+// casasse, então "resultado do exame de sangue da consulta" caía em consultas.
+function buscarNaBase(texto) {
+    const t = normalizar(texto);
+    let melhor = null;
+    let melhorPontos = 0;
+    for (const entrada of BASE_CONHECIMENTO) {
+        const pontos = entrada.chaves.filter((chave) => t.includes(normalizar(chave))).length;
+        if (pontos > melhorPontos) {
+            melhorPontos = pontos;
+            melhor = entrada;
+        }
+    }
+    return melhor ? melhor.resposta : null;
+}
+
+// Exibida quando a base local não sabe e a IA também não respondeu (sem chave
+// configurada, cota do dia estourada ou sem internet).
+const RESPOSTA_FALLBACK =
+    'Ainda não sei responder isso com certeza. 🤔 Posso ajudar com: agendar consultas, exames, ' +
+    'dependentes, prontuário, senha/acesso e privacidade. Tente reformular ou escolha um desses temas.';
 
 export default function MedicalChatbot() {
     const location = useLocation();
@@ -106,31 +132,33 @@ export default function MedicalChatbot() {
     // Esconde no login, no cadastro e no portal do médico (que não é do paciente).
     if (['/', '/cadastro', '/medico'].includes(location.pathname)) return null;
 
-    // Processa um texto (vindo do input ou de uma sugestão) e gera a resposta do bot.
-    const enviarTexto = (texto) => {
+    // Acrescenta uma fala do bot e libera o input.
+    const responder = (texto) => {
+        setMessages((prev) => [...prev, { id: Date.now() + 1, text: texto, sender: 'bot' }]);
+        setIsTyping(false);
+    };
+
+    // Duas camadas: a base local responde na hora as dúvidas sobre o app; o que
+    // ela não conhece vai para a IA. Se a IA não responder (sem chave, cota do
+    // dia estourada ou sem internet), cai no texto de fallback — assim o
+    // chatbot nunca fica mudo.
+    const enviarTexto = async (texto) => {
         const limpo = texto.trim();
         if (!limpo || isTyping) return;
 
-        const newUserMessage = {
-            id: Date.now(),
-            text: limpo,
-            sender: 'user',
-        };
-
-        setMessages((prev) => [...prev, newUserMessage]);
+        setMessages((prev) => [...prev, { id: Date.now(), text: limpo, sender: 'user' }]);
         setInputValue('');
         setIsTyping(true);
 
-        // Pequeno atraso para simular a digitação do assistente.
-        setTimeout(() => {
-            const newBotMessage = {
-                id: Date.now() + 1,
-                text: gerarResposta(limpo),
-                sender: 'bot',
-            };
-            setMessages((prev) => [...prev, newBotMessage]);
-            setIsTyping(false);
-        }, 900);
+        const local = buscarNaBase(limpo);
+        if (local) {
+            // Pequeno atraso para simular a digitação do assistente.
+            setTimeout(() => responder(local), 900);
+            return;
+        }
+
+        const daIA = await perguntarIA(limpo);
+        responder(daIA || RESPOSTA_FALLBACK);
     };
 
     const handleSendMessage = (e) => {

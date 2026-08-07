@@ -148,3 +148,36 @@ SELECT @pid, 'Losartana', '50mg', '1 comprimido pela manhã', '2025-07-08'
 WHERE NOT EXISTS (
   SELECT 1 FROM medicacoes WHERE paciente_id = @pid AND nome = 'Losartana'
 );
+
+-- --- Campanhas de vacinação ---
+-- Datas REAIS do calendário de estratégias nacionais de vacinação de 2026,
+-- divulgado pelo Ministério da Saúde em março/2026. Fonte:
+-- https://sbim.org.br/noticias/saude-divulga-calendario-de-estrategias-nacionais-de-vacinacao-em-2026
+--
+-- Não existe API pública do governo com o calendário de campanhas: o que o
+-- Ministério abre (OpenDataSUS, dados.gov.br) são as doses já aplicadas, não os
+-- períodos em cartaz. Por isso esta tabela é alimentada à mão, uma vez por ano.
+INSERT INTO campanhas_vacinacao (nome, vacina, publico_alvo, inicio, fim)
+SELECT 'Campanha Nacional de Vacinação contra a Influenza', 'Influenza (gripe)',
+       'Grupos prioritários das regiões Nordeste, Centro-Oeste, Sul e Sudeste',
+       '2026-03-28', '2026-05-30'
+WHERE NOT EXISTS (
+  SELECT 1 FROM campanhas_vacinacao
+  WHERE nome = 'Campanha Nacional de Vacinação contra a Influenza'
+);
+
+INSERT INTO campanhas_vacinacao (nome, vacina, publico_alvo, inicio, fim)
+SELECT 'Estratégia de Vacinação Escolar', 'Multivacinação',
+       'Menores de 15 anos, nas escolas',
+       '2026-04-01', '2026-05-31'
+WHERE NOT EXISTS (
+  SELECT 1 FROM campanhas_vacinacao WHERE nome = 'Estratégia de Vacinação Escolar'
+);
+
+INSERT INTO campanhas_vacinacao (nome, vacina, publico_alvo, inicio, fim)
+SELECT 'Campanha Nacional de Multivacinação', 'Multivacinação',
+       'Crianças e adolescentes menores de 15 anos',
+       '2026-08-03', '2026-09-01'
+WHERE NOT EXISTS (
+  SELECT 1 FROM campanhas_vacinacao WHERE nome = 'Campanha Nacional de Multivacinação'
+);

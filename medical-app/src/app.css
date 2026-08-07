@@ -1310,7 +1310,54 @@ body.more-menu-open .chatbot-wrapper {
   overflow-y: auto;
 }
 
+/* Avisos do Dashboard — a cor vem da severidade calculada pela API. */
+.aviso-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+.aviso-item:first-child { padding-top: 0; }
+.aviso-item:last-child { padding-bottom: 0; border-bottom: none; }
+
+.aviso-icone {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.aviso-item.alta .aviso-icone { background-color: var(--status-bad-bg); color: var(--status-bad); }
+.aviso-item.media .aviso-icone { background-color: var(--status-warn-bg); color: var(--status-warn); }
+.aviso-item.baixa .aviso-icone { background-color: #eff6ff; color: var(--primary-blue); }
+
+.aviso-texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.aviso-titulo { font-size: 14px; font-weight: 600; color: var(--text-dark); line-height: 1.4; }
+.aviso-detalhe { font-size: 12px; color: var(--text-gray); line-height: 1.4; }
+
 /* Carteira de Vacinação */
+
+/* A tela ocupa a altura do frame e só a lista de doses rola: o botão voltar,
+   o título, o seletor de pessoa e o resumo ficam parados no topo. */
+.vacinas-screen {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+}
+.vacinas-topo {
+  flex-shrink: 0;
+}
+.vacinas-lista {
+  flex: 1;
+  min-height: 0; /* sem isso o flex não deixa o filho encolher e a rolagem não aparece */
+  overflow-y: auto;
+  padding-bottom: 24px;
+}
+
 .vacina-pessoa-selector {
   display: flex;
   gap: 8px;
@@ -1338,6 +1385,14 @@ body.more-menu-open .chatbot-wrapper {
   border-color: #bfdbfe;
   color: var(--primary-blue);
 }
+/* Ícone do dependente colorido por gênero: azul para meninos, rosa para
+   meninas. Sem a classe, o ícone herda a cor da pílula (neutro). */
+.vacina-pessoa-icone {
+  display: inline-flex;
+  align-items: center;
+}
+.vacina-pessoa-icone.menino { color: #2563eb; }
+.vacina-pessoa-icone.menina { color: #ec4899; }
 
 .vacina-resumo {
   display: flex;
@@ -1416,3 +1471,48 @@ body.more-menu-open .chatbot-wrapper {
 .vacina-data { font-size: 12px; font-weight: 600; margin-top: 2px; }
 .vacina-item.tomada .vacina-data { color: #16a34a; }
 .vacina-item.pendente .vacina-data { color: #d97706; }
+
+/* Dúvidas Frequentes — cada pergunta é um botão que abre a resposta abaixo. */
+.faq-categoria {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--primary-blue);
+  margin-bottom: 8px;
+}
+.faq-categoria-titulo { font-size: 15px; font-weight: 700; color: var(--text-dark); }
+
+.faq-item { border-bottom: 1px solid #f3f4f6; }
+.faq-item:last-child { border-bottom: none; }
+
+.faq-pergunta {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 0;
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-dark);
+  line-height: 1.4;
+  cursor: pointer;
+}
+.faq-pergunta:hover { color: var(--primary-blue); }
+
+.faq-seta {
+  flex-shrink: 0;
+  color: var(--text-gray);
+  transition: transform 0.2s;
+}
+.faq-item.aberta .faq-seta { transform: rotate(180deg); color: var(--primary-blue); }
+
+.faq-resposta {
+  font-size: 14px;
+  color: var(--text-gray);
+  line-height: 1.6;
+  padding: 0 0 14px;
+}

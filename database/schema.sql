@@ -194,3 +194,18 @@ CREATE TABLE IF NOT EXISTS medicacoes (
   CONSTRAINT fk_medicacao_dependente
     FOREIGN KEY (dependente_id) REFERENCES dependentes(id) ON DELETE CASCADE
 );
+
+-- ============================================================
+--  Campanhas de vacinação
+--  Diferente das outras tabelas, esta NÃO é por paciente: são as
+--  campanhas nacionais/municipais em cartaz (ex.: Influenza), usadas
+--  para montar os avisos do Dashboard.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS campanhas_vacinacao (
+  id               INT AUTO_INCREMENT PRIMARY KEY,
+  nome             VARCHAR(160)  NOT NULL,
+  vacina           VARCHAR(80)   NOT NULL,
+  publico_alvo     VARCHAR(160)  NOT NULL,
+  inicio           DATE          NOT NULL,
+  fim              DATE          NOT NULL
+);

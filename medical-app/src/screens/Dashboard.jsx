@@ -1,13 +1,36 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, User, AlertCircle, MapPin, KeyRound } from 'lucide-react';
+import { Calendar, User, AlertCircle, MapPin, KeyRound, Syringe, FlaskConical, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import { buscarAvisos } from '../services/avisos';
+
+// Cada tipo de aviso tem seu ícone; "exame" é o padrão para o que não casar.
+const ICONES_AVISO = {
+  consulta: Calendar,
+  campanha: Syringe,
+  resultado: Activity,
+  exame: FlaskConical,
+};
+
+function AvisoItem({ aviso }) {
+  const Icone = ICONES_AVISO[aviso.tipo] || FlaskConical;
+  return (
+    <div className={`aviso-item ${aviso.severidade}`}>
+      <div className="aviso-icone"><Icone size={18} /></div>
+      <div className="aviso-texto">
+        <p className="aviso-titulo">{aviso.titulo}</p>
+        {aviso.detalhe && <p className="aviso-detalhe">{aviso.detalhe}</p>}
+      </div>
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { paciente } = useAuth();
   const [totalDependentes, setTotalDependentes] = useState(null);
+  const [avisos, setAvisos] = useState(null);
 
   // Usa o primeiro nome do paciente logado; tem um fallback amigável.
   const primeiroNome = paciente?.nome ? paciente.nome.split(' ')[0] : 'Visitante';
@@ -22,6 +45,21 @@ export default function Dashboard() {
       })
       .catch(() => {
         if (ativo) setTotalDependentes(0);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, []);
+
+  // Avisos calculados pela API a partir dos exames, consultas e campanhas.
+  useEffect(() => {
+    let ativo = true;
+    buscarAvisos()
+      .then((lista) => {
+        if (ativo) setAvisos(lista);
+      })
+      .catch(() => {
+        if (ativo) setAvisos([]);
       });
     return () => {
       ativo = false;
@@ -55,13 +93,21 @@ export default function Dashboard() {
       
       <h3 className="section-title text-red mb-2">Avisos <AlertCircle size={18} /></h3>
       <div className="card">
-        <p className="text-sm text muted">Mais de 1 ano desde o último check-up!</p>
-        <p className="text-sm text-muted">Não há outros avisos no momento.</p>
+        {avisos === null ? (
+          <p className="text-sm text-muted">Carregando avisos...</p>
+        ) : avisos.length === 0 ? (
+          <p className="text-sm text-muted">Não há avisos no momento.</p>
+        ) : (
+          avisos.map((aviso, i) => (
+            <AvisoItem key={`${aviso.tipo}-${i}`} aviso={aviso} />
+          ))
+        )}
       </div>
 
       <h3 className="section-title">Ações Rápidas</h3>
       <div className="quick-actions-grid">
-        <button onClick={() => navigate('/appointment')} className="action-btn">
+        <button onClick={() => navigate('/appointment')} className="actio
+        n-btn">
           <div className="icon-box icon-box-gray">
             <Calendar size={24} />
           </div>
