@@ -209,3 +209,38 @@ CREATE TABLE IF NOT EXISTS campanhas_vacinacao (
   inicio           DATE          NOT NULL,
   fim              DATE          NOT NULL
 );
+
+-- ============================================================
+--  Rede de Saúde (UBS, prontos-socorros e UPAs)
+--  Cache local do CNES (Cadastro Nacional de Estabelecimentos de
+--  Saúde), lido dos dados abertos do Ministério da Saúde:
+--  https://apidadosabertos.saude.gov.br/cnes/estabelecimentos
+--
+--  Assim como campanhas_vacinacao, NÃO é por paciente. A API de lá
+--  devolve 20 itens por requisição — uma cidade grande precisa de
+--  dezenas de chamadas —, então o resultado é gravado aqui e só é
+--  buscado de novo quando passa do prazo de validade (ver
+--  UnidadeSaudeDAO.DIAS_VALIDADE_CACHE).
+-- ============================================================
+CREATE TABLE IF NOT EXISTS unidades_saude (
+  codigo_cnes      INT           PRIMARY KEY,   -- id oficial do estabelecimento
+  codigo_municipio INT           NOT NULL,      -- código IBGE sem o dígito verificador
+  nome             VARCHAR(160)  NOT NULL,
+  tipo             VARCHAR(40)   NOT NULL,      -- 'ubs' | 'pronto_socorro' | 'upa'
+  logradouro       VARCHAR(160),
+  numero           VARCHAR(20),
+  bairro           VARCHAR(120),
+  cep              VARCHAR(8),
+  telefone         VARCHAR(30),
+  turno            VARCHAR(160),                -- turnos de atendimento, como vêm do CNES
+  latitude         DECIMAL(10, 7),
+  longitude        DECIMAL(10, 7),
+  -- 1 = a coordenada já foi conferida contra o CEP da unidade.
+  -- Parte do cadastro do CNES vem geocodificada no centro da cidade (ver
+  -- UnidadeSaudeDAO.refinarCoordenadas). A conferência é lenta de propósito,
+  -- porque a API de CEP é gratuita e limita requisições, então esta coluna
+  -- guarda o que já foi feito para nunca repetir o trabalho.
+  cep_conferido    TINYINT(1)    NOT NULL DEFAULT 0,
+  atualizado_em    TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_unidade_municipio (codigo_municipio)
+);

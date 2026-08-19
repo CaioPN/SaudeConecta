@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, User, AlertCircle, MapPin, KeyRound, Syringe, FlaskConical, Activity } from 'lucide-react';
+import { Calendar, Syringe, FlaskConical, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { usePrivacidade } from '../context/PrivacidadeContext';
+import BotaoPrivacidade from '../components/BotaoPrivacidade';
+import { mascararTexto } from '../utils/privacidade';
+import { ICONES } from '../utils/icones';
 import api from '../services/api';
 import { buscarAvisos } from '../services/avisos';
 
@@ -13,14 +17,36 @@ const ICONES_AVISO = {
   exame: FlaskConical,
 };
 
+// Atalhos do Início: só os destinos mais usados, em grade compacta. O índice
+// completo dos registros fica em "Minha Saúde" (/patient), em forma de lista.
+const ATALHOS = [
+  { rota: '/appointment', icone: ICONES.consultas, label: 'Consultas' },
+  { rota: '/exams', icone: ICONES.exames, label: 'Exames' },
+  { rota: '/vacinas', icone: ICONES.vacinas, label: 'Vacinas' },
+  { rota: '/acesso-medico', icone: ICONES.acessoMedico, label: 'Acesso do médico' },
+];
+
 function AvisoItem({ aviso }) {
+  const { oculto } = usePrivacidade();
   const Icone = ICONES_AVISO[aviso.tipo] || FlaskConical;
+
+  // Campanha de vacinação é informação pública, igual para todo mundo — não há
+  // o que esconder. Os outros avisos falam de exame, consulta e resultado do
+  // paciente, então seguem o olhinho.
+  const escondido = oculto && aviso.tipo !== 'campanha';
+
   return (
     <div className={`aviso-item ${aviso.severidade}`}>
       <div className="aviso-icone"><Icone size={18} /></div>
       <div className="aviso-texto">
-        <p className="aviso-titulo">{aviso.titulo}</p>
-        {aviso.detalhe && <p className="aviso-detalhe">{aviso.detalhe}</p>}
+        <p className={`aviso-titulo ${escondido ? 'valor-oculto' : ''}`}>
+          {escondido ? mascararTexto(aviso.titulo) : aviso.titulo}
+        </p>
+        {aviso.detalhe && (
+          <p className={`aviso-detalhe ${escondido ? 'valor-oculto' : ''}`}>
+            {escondido ? mascararTexto(aviso.detalhe) : aviso.detalhe}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -75,7 +101,7 @@ export default function Dashboard() {
 
       <div
         className="card patient-summary"
-        onClick={() => navigate('/patient')}
+        onClick={() => navigate('/dependentes')}
       >
         <div>
           <h2 className="text-sm font-bold text-muted">Meus dependentes</h2>
@@ -87,11 +113,14 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="icon-box">
-          <User size={24} />
+          <ICONES.dependentes size={24} />
         </div>
       </div>
-      
-      <h3 className="section-title text-red mb-2">Avisos <AlertCircle size={18} /></h3>
+
+      <div className="section-header">
+        <h3 className="section-title text-red">Avisos</h3>
+        <BotaoPrivacidade rotulo="avisos" />
+      </div>
       <div className="card">
         {avisos === null ? (
           <p className="text-sm text-muted">Carregando avisos...</p>
@@ -106,28 +135,18 @@ export default function Dashboard() {
 
       <h3 className="section-title">Ações Rápidas</h3>
       <div className="quick-actions-grid">
-        <button onClick={() => navigate('/appointment')} className="actio
-        n-btn">
-          <div className="icon-box icon-box-gray">
-            <Calendar size={24} />
-          </div>
-          <span className="font-bold text-sm">Agendamentos</span>
-        </button>
-
-        {/* TODO: definir destino (ex.: /rede-saude) quando a busca de UPAs estiver pronta. */}
-        <button className="action-btn">
-          <div className="icon-box icon-box-gray">
-            <MapPin size={24} />
-          </div>
-          <span className="font-bold text-sm">Rede de Saúde</span>
-        </button>
-
-        <button onClick={() => navigate('/acesso-medico')} className="action-btn">
-          <div className="icon-box icon-box-gray">
-            <KeyRound size={24} />
-          </div>
-          <span className="font-bold text-sm">Acesso do médico</span>
-        </button>
+        {ATALHOS.map((atalho) => (
+          <button
+            key={atalho.rota}
+            onClick={() => navigate(atalho.rota)}
+            className="action-btn"
+          >
+            <div className="icon-box icon-box-gray">
+              <atalho.icone size={24} />
+            </div>
+            <span className="font-bold text-sm">{atalho.label}</span>
+          </button>
+        ))}
       </div>
     </div>
   );

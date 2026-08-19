@@ -11,10 +11,12 @@ import Exams from './screens/Exams';
 import Appointment from './screens/Appointment';
 import Appointments from './screens/Appointments';
 import AcessoMedico from './screens/AcessoMedico';
+import HistoricoAcessos from './screens/HistoricoAcessos';
 import PortalMedico from './screens/PortalMedico';
 import Cadastro from './screens/Cadastro';
 import Dependentes from './screens/Dependentes';
 import Vacinas from './screens/Vacinas';
+import RedeSaude from './screens/RedeSaude';
 import Profile from './screens/Profile';
 import Terms from './screens/Terms';
 import Privacy from './screens/Privacy';
@@ -39,7 +41,9 @@ export default function App() {
             <Route path="/appointment/:id" element={<Appointment />} />
             <Route path="/dependentes" element={<Dependentes />} />
             <Route path="/vacinas" element={<Vacinas />} />
+            <Route path="/rede-saude" element={<RedeSaude />} />
             <Route path="/acesso-medico" element={<AcessoMedico />} />
+            <Route path="/acessos-log" element={<HistoricoAcessos />} />
             {/* Rota usada pelo profissional de saúde, fora do app do paciente. */}
             <Route path="/medico" element={<PortalMedico />} />
             <Route path="/terms" element={<Terms />} />

@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { AlertCircle, Heart, Clock, ChevronLeft, Pill, Stethoscope, Droplet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { usePrivacidade } from '../context/PrivacidadeContext';
+import BotaoPrivacidade from '../components/BotaoPrivacidade';
+import { mascararTexto } from '../utils/privacidade';
 import { buscarProntuario } from '../services/prontuario';
 import { listarConsultas } from '../services/consultas';
 import { buscarExames } from '../services/exames';
@@ -13,6 +16,7 @@ const ICONES = { consulta: Stethoscope, exame: Droplet };
 export default function MedicalRecord() {
   const navigate = useNavigate();
   const { paciente } = useAuth();
+  const { oculto } = usePrivacidade();
   const [prontuario, setProntuario] = useState({ alergias: [], condicoes: [], medicacoes: [] });
   const [eventos, setEventos] = useState([]);
   const [carregando, setCarregando] = useState(true);
@@ -47,8 +51,13 @@ export default function MedicalRecord() {
         <ChevronLeft size={20} /> Voltar
       </button>
 
-      <h2 className="header-title">Prontuário</h2>
-      <p className="header-subtitle mb-6">{paciente?.nome || 'Paciente'}</p>
+      <div className="section-header">
+        <div>
+          <h2 className="header-title">Prontuário</h2>
+          <p className="header-subtitle">{paciente?.nome || 'Paciente'}</p>
+        </div>
+        <BotaoPrivacidade rotulo="prontuário" />
+      </div>
 
       {carregando && <p className="empty-state">Carregando prontuário…</p>}
       {erro && !carregando && <p className="empty-state">{erro}</p>}
@@ -65,7 +74,11 @@ export default function MedicalRecord() {
               {alergias.length === 0 ? (
                 <p className="text-sm text-muted">Nenhuma registrada</p>
               ) : (
-                alergias.map((a) => <p key={a.id} className="font-bold">{a.descricao}</p>)
+                alergias.map((a) => (
+                  <p key={a.id} className={`font-bold ${oculto ? 'valor-oculto' : ''}`}>
+                    {oculto ? mascararTexto(a.descricao) : a.descricao}
+                  </p>
+                ))
               )}
             </div>
 
@@ -77,7 +90,11 @@ export default function MedicalRecord() {
               {condicoes.length === 0 ? (
                 <p className="text-sm text-muted">Nenhuma registrada</p>
               ) : (
-                condicoes.map((c) => <p key={c.id} className="font-bold">{c.descricao}</p>)
+                condicoes.map((c) => (
+                  <p key={c.id} className={`font-bold ${oculto ? 'valor-oculto' : ''}`}>
+                    {oculto ? mascararTexto(c.descricao) : c.descricao}
+                  </p>
+                ))
               )}
             </div>
           </div>
@@ -90,8 +107,12 @@ export default function MedicalRecord() {
                   <div key={m.id} className="medicacao-item">
                     <div className="icon-box icon-box-gray"><Pill size={18} /></div>
                     <div>
-                      <p className="font-bold">{m.nome} {m.dosagem}</p>
-                      <p className="text-xs text-muted">{m.posologia}</p>
+                      <p className={`font-bold ${oculto ? 'valor-oculto' : ''}`}>
+                        {oculto ? mascararTexto(m.nome) : `${m.nome} ${m.dosagem}`}
+                      </p>
+                      <p className={`text-xs text-muted ${oculto ? 'valor-oculto' : ''}`}>
+                        {oculto ? mascararTexto(m.posologia) : m.posologia}
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -113,7 +134,9 @@ export default function MedicalRecord() {
                     </div>
 
                     <div className="timeline-head">
-                      <h4 className="font-bold">{evento.titulo}</h4>
+                      <h4 className={`font-bold ${oculto ? 'valor-oculto' : ''}`}>
+                        {oculto ? mascararTexto(evento.titulo) : evento.titulo}
+                      </h4>
                       <span className="text-xs text-muted flex items-center">
                         <Clock size={12} style={{ marginRight: '4px' }} /> {evento.dataFormatada}
                       </span>
@@ -122,7 +145,11 @@ export default function MedicalRecord() {
 
                     {evento.descricao && (
                       <button className="record-card" onClick={() => navigate(evento.rota)}>
-                        <span className={evento.alerta ? 'text-red font-bold' : ''}>{evento.descricao}</span>
+                        {oculto ? (
+                          <span className="valor-oculto">{mascararTexto(evento.descricao)}</span>
+                        ) : (
+                          <span className={evento.alerta ? 'text-red font-bold' : ''}>{evento.descricao}</span>
+                        )}
                       </button>
                     )}
                   </div>

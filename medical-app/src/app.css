@@ -931,7 +931,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   bottom: calc(100% + 10px);
   right: 16px;
   z-index: 50;
-  width: 220px;
+  width: 260px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -1054,23 +1054,18 @@ button.record-card:hover { border-color: var(--primary-blue); }
   text-decoration: underline;
 }
 
-/* Chatbot Wrapper & FAB */
+/* Chatbot Wrapper & FAB
+   Fica no canto inferior ESQUERDO de propósito: o canto direito já é disputado
+   pelo menu "Mais" (que abre para cima, à direita) e pelo avatar do VLibras,
+   que é fixo na janela. Antes o chatbot ficava à direita e pulava para cá
+   quando o menu abria; parado do lado esquerdo, ninguém precisa se desviar. */
 .chatbot-wrapper {
   position: absolute;
-  bottom: 80px; /* Positions it right above BottomNav */
-  right: 20px;
+  bottom: 80px; /* logo acima da BottomNav */
+  left: 20px;
   z-index: 100;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  transition: left 0.25s ease, right 0.25s ease;
-}
-
-/* Quando o menu "Mais" está aberto, o chatbot vai para o lado esquerdo,
-   liberando a área do menu (que abre no canto inferior direito). */
-body.more-menu-open .chatbot-wrapper {
-  right: auto;
-  left: 20px;
   align-items: flex-start;
 }
 
@@ -1109,7 +1104,7 @@ body.more-menu-open .chatbot-wrapper {
   margin-bottom: 16px;
   border: 1px solid #e5e7eb;
   animation: slideUpFade 0.2s ease-out forwards;
-  transform-origin: bottom right;
+  transform-origin: bottom left;
 }
 
 .chat-header {
@@ -1516,3 +1511,324 @@ body.more-menu-open .chatbot-wrapper {
   line-height: 1.6;
   padding: 0 0 14px;
 }
+
+/* ============================================================
+   Rede de Saúde (/rede-saude)
+   Lista de UBS, UPAs e prontos-socorros, do mais perto ao mais
+   longe. Segue o mesmo desenho de cartão da lista de consultas.
+   ============================================================ */
+.rede-filtros {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 20px;
+}
+
+.rede-filtro {
+  padding: 8px 14px;
+  border-radius: 9999px;
+  border: 1px solid #e5e7eb;
+  background-color: var(--white);
+  color: var(--text-gray);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+.rede-filtro.active {
+  background-color: #eff6ff;
+  border-color: #bfdbfe;
+  color: var(--primary-blue);
+}
+
+.unidade-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  background-color: var(--white);
+  border: 1px solid #f3f4f6;
+  border-radius: var(--border-radius);
+  padding: 14px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+/* Cor do ícone por tipo: azul para a UBS (atendimento do dia a dia) e
+   vermelho para quem atende urgência, para o olho achar rápido. */
+.unidade-icone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background-color: #eff6ff;
+  color: var(--primary-blue);
+}
+.unidade-icone.upa,
+.unidade-icone.pronto_socorro {
+  background-color: var(--status-bad-bg);
+  color: var(--status-bad);
+}
+
+.unidade-body { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+
+.unidade-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.unidade-distancia {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary-blue);
+}
+
+.unidade-tipo { font-size: 12px; font-weight: 600; color: var(--text-gray); }
+
+.unidade-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-gray);
+  line-height: 1.4;
+}
+
+.unidade-acoes { display: flex; gap: 8px; margin-top: 8px; }
+
+.unidade-acao {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background-color: var(--white);
+  color: var(--text-dark);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.unidade-acao:hover { border-color: var(--primary-blue); color: var(--primary-blue); }
+
+/* Crédito da fonte dos dados — o CNES é público, mas exige citação. */
+.rede-fonte {
+  font-size: 11px;
+  color: var(--text-gray);
+  line-height: 1.5;
+  margin-top: 16px;
+  text-align: center;
+}
+
+/* ============================================================
+   Cabeçalho de seção com ação à direita (ex.: título + olhinho)
+   ============================================================ */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.section-header .section-title,
+.section-header .header-title { margin-bottom: 0; }
+
+/* Botão do "olhinho" — mostra/esconde os dados sensíveis da tela. */
+.privacidade-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  border: 1px solid #e5e7eb;
+  background-color: var(--white);
+  color: var(--text-gray);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.privacidade-btn:hover {
+  border-color: var(--primary-blue);
+  color: var(--primary-blue);
+}
+
+/* Valor substituído pela máscara: fica cinza e não é selecionável, para não
+   dar a impressão de que dá para copiar o dado escondido. */
+.valor-oculto {
+  color: var(--text-gray);
+  letter-spacing: 0.14em;
+  user-select: none;
+}
+
+/* Aviso da senha do PDF de exames. */
+.pdf-nota {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-gray);
+  line-height: 1.5;
+  margin: -12px 0 20px;
+}
+
+/* ============================================================
+   Detalhes em azul
+   Camada que acrescenta as bordas, os filetes e os fundos azuis
+   por cima do desenho básico definido acima. Fica separada no fim
+   do arquivo, e não misturada regra a regra, para dar para ver de
+   relance tudo o que é acabamento visual.
+   Cuidado com a especificidade ao mexer aqui: as regras contam com
+   estar depois no arquivo para vencer as de cima, e quem usa cor
+   com significado (.vacina-item.tomada, .card.border-red) precisa
+   de exceção explícita.
+   ============================================================ */
+:root {
+  --bg-gray: #eef4fd;
+  --borda-azul: #dbeafe;
+  --borda-azul-forte: #bfdbfe;
+  --divisor-azul: #e8f0fe;
+}
+
+:root .app-container {
+  border: 1px solid var(--borda-azul-forte);
+  box-shadow: 0 25px 50px -12px rgba(37, 99, 235, 0.25);
+}
+
+/* Borda azul nos blocos brancos que antes flutuavam só com sombra. */
+:root .card,
+:root .action-btn,
+:root .list-action-btn,
+:root .consulta-item,
+:root .unidade-item,
+:root .record-card,
+:root .tabs-wrapper,
+:root .vacina-item,
+:root .privacidade-btn,
+:root .unidade-acao,
+:root .escopo-opcao,
+:root .rede-filtro,
+:root .vacina-pessoa-pill,
+:root .btn-secondary,
+:root .chat-window,
+:root .modal-box {
+  border: 1px solid var(--borda-azul);
+}
+
+/* Exceções: cartões que já usam a cor para dizer alguma coisa (situação da
+   vacina, alergia em vermelho) mantêm a borda semântica. */
+:root .vacina-item.tomada { border-color: #bbf7d0; }
+:root .vacina-item.pendente { border-color: #fde68a; }
+:root .card.border-red { border-color: #fecaca; }
+:root .codigo-card { border: 2px solid var(--primary-blue); }
+
+/* O azul mais forte fica para o estado de foco/hover, não para o repouso. */
+:root .patient-summary:hover,
+:root .list-action-btn:hover,
+:root .consulta-item:hover,
+:root button.record-card:hover {
+  border-color: var(--primary-blue);
+}
+
+/* Filete azul à esquerda dos títulos de seção. */
+:root .section-title {
+  padding-left: 10px;
+  border-left: 3px solid var(--primary-blue);
+  line-height: 1.3;
+}
+:root .section-title.text-red { border-left-color: var(--status-bad); }
+
+/* Cartão do topo do perfil ganha um filete azul na borda de cima. */
+:root .profile-header { border-top: 3px solid var(--primary-blue); }
+:root .profile-avatar {
+  background-color: #eff6ff;
+  border-color: var(--borda-azul);
+  color: var(--primary-blue);
+}
+
+/* Ícones que eram cinza passam a ser azuis. */
+:root .icon-box-gray {
+  background-color: #eff6ff;
+  color: var(--primary-blue);
+}
+
+:root .bottom-nav {
+  border-top: 2px solid var(--borda-azul-forte);
+  box-shadow: 0 -4px 12px -2px rgba(37, 99, 235, 0.12);
+}
+
+:root .input-field {
+  background-color: #f8fbff;
+  border-color: var(--borda-azul);
+}
+:root .input-field:focus {
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+:root .btn-primary { box-shadow: 0 4px 10px -2px rgba(37, 99, 235, 0.4); }
+
+:root .empty-state { border-color: var(--borda-azul-forte); }
+
+/* Divisores internos em azul bem claro no lugar do cinza. */
+:root .info-row,
+:root .exam-card-header,
+:root .detail-card-header,
+:root .aviso-item,
+:root .faq-item,
+:root .modal-header,
+:root .chat-input-area {
+  border-color: var(--divisor-azul);
+}
+
+:root .timeline-container { border-left-color: var(--borda-azul-forte); }
+
+/* Selo de situação com o olhinho fechado — cinza, sem entregar o resultado. */
+.status-badge.oculto {
+  background-color: var(--bg-gray);
+  color: var(--text-gray);
+  letter-spacing: 0.1em;
+  user-select: none;
+}
+
+/* Rótulo de grupo dentro do menu "Mais" (ex.: "Privacidade"). */
+.more-menu-grupo {
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+}
+
+/* Barra inferior com 4 abas: os rótulos não podem quebrar em duas linhas. */
+.nav-item span { white-space: nowrap; }
+
+/* Histórico de acessos — quem fez a ação, dentro do item da linha do tempo. */
+.acesso-log-quem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  background-color: var(--white);
+  border: 1px solid var(--borda-azul);
+  border-radius: var(--border-radius);
+}
+
+/* Revogação é ação do paciente, não do médico: ponto vermelho na linha. */
+.timeline-dot.revogado { background-color: var(--status-bad); }
+
+/* Itens do menu "Mais" em uma linha só: "Portal de Privacidade" e "Histórico
+   de acessos" quebravam em duas e desalinhavam a lista. */
+.more-menu-item span { white-space: nowrap; }
+
+/* O ícone da nota não pode ser espremido pelo flex ao lado do texto longo. */
+.acesso-nota svg { flex-shrink: 0; margin-top: 2px; }

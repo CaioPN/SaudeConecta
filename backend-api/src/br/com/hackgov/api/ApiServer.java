@@ -27,6 +27,8 @@ import br.com.hackgov.dao.ExameDAO;
 import br.com.hackgov.dao.MedicoDAO;
 import br.com.hackgov.dao.PacienteDAO;
 import br.com.hackgov.dao.ProntuarioDAO;
+import br.com.hackgov.dao.UnidadeSaudeDAO;
+import br.com.hackgov.modelos.AcessoLog;
 import br.com.hackgov.modelos.AcessoTemporario;
 import br.com.hackgov.modelos.Alergia;
 import br.com.hackgov.modelos.Aviso;
@@ -38,9 +40,11 @@ import br.com.hackgov.modelos.ItemExame;
 import br.com.hackgov.modelos.Medicacao;
 import br.com.hackgov.modelos.Medico;
 import br.com.hackgov.modelos.Paciente;
+import br.com.hackgov.modelos.UnidadeSaude;
 import br.com.hackgov.util.ChatIA;
 import br.com.hackgov.util.CodigoAcesso;
 import br.com.hackgov.util.Json;
+import br.com.hackgov.util.Localizacao;
 import br.com.hackgov.util.Jwt;
 import br.com.hackgov.util.SenhaUtil;
 
@@ -65,6 +69,7 @@ import br.com.hackgov.util.SenhaUtil;
  *   GET    /api/exames            coletas de sangue e exames de imagem
  *   GET    /api/prontuario        alergias, condições e medicações
  *   GET    /api/avisos            avisos do Dashboard (derivados dos dados)
+ *   GET    /api/rede-saude        UBS, UPAs e prontos-socorros mais próximos
  *   POST   /api/chat              pergunta livre do chatbot (IA)
  *
  * Em todas elas o paciente vem do JWT, nunca da requisição — assim um usuário
@@ -82,11 +87,15 @@ public class ApiServer {
     private static final ExameDAO exameDAO = new ExameDAO();
     private static final ProntuarioDAO prontuarioDAO = new ProntuarioDAO();
     private static final AvisoDAO avisoDAO = new AvisoDAO();
+    private static final UnidadeSaudeDAO unidadeSaudeDAO = new UnidadeSaudeDAO();
     private static final AcessoDAO acessoDAO = new AcessoDAO();
     private static final MedicoDAO medicoDAO = new MedicoDAO();
 
     /** Validade padrão do código/token do médico, em minutos. */
     private static final int VALIDADE_ACESSO_MINUTOS = 30;
+
+    /** Quantas linhas da trilha de auditoria a tela do paciente recebe. */
+    private static final int LIMITE_HISTORICO_ACESSOS = 100;
 
     /** Limite de códigos errados por IP dentro da janela, contra força bruta. */
     private static final int TENTATIVAS_MAXIMAS = 10;
@@ -109,6 +118,7 @@ public class ApiServer {
         server.createContext("/api/exames", comCors(ApiServer::exames));
         server.createContext("/api/prontuario", comCors(ApiServer::prontuario));
         server.createContext("/api/avisos", comCors(ApiServer::avisos));
+        server.createContext("/api/rede-saude", comCors(ApiServer::redeSaude));
         server.createContext("/api/chat", comCors(ApiServer::chat));
         server.createContext("/api/acessos", comCors(ApiServer::acessos));
         server.createContext("/api/medico", comCors(ApiServer::medico));
@@ -519,6 +529,68 @@ public class ApiServer {
         }
     }
 
+    /**
+     * GET /api/rede-saude — UBS, UPAs e prontos-socorros perto do paciente.
+     *
+     * O município sai sempre do CEP cadastrado (é ele que diz qual rede
+     * municipal atende o paciente). Já o ponto usado para medir a distância
+     * aceita ?lat= e ?lon=, que o navegador manda quando o paciente autoriza a
+     * localização — sem isso, o cálculo usa as coordenadas do próprio CEP.
+     *
+     * A resposta também devolve "origem", para a tela poder dizer de onde as
+     * distâncias foram medidas.
+     */
+    private static void redeSaude(HttpExchange ex) throws IOException {
+        if (!"GET".equals(ex.getRequestMethod())) { enviarErro(ex, 405, "Método não permitido."); return; }
+        Integer userId = autenticar(ex);
+        if (userId == null) return;
+
+        try {
+            Paciente p = pacienteDAO.buscarPorId(userId);
+            if (p == null) {
+                enviarErro(ex, 404, "Paciente não encontrado.");
+                return;
+            }
+
+            Localizacao.Lugar lugar = Localizacao.buscarPorCep(p.getCep());
+            if (lugar == null) {
+                enviarErro(ex, 422,
+                        "Não foi possível localizar sua cidade pelo CEP. "
+                      + "Confira o endereço no seu perfil.");
+                return;
+            }
+
+            // GPS do navegador tem prioridade; o CEP é o plano B.
+            Double lat = numeroDaQuery(ex, "lat");
+            Double lon = numeroDaQuery(ex, "lon");
+            boolean porGps = Localizacao.coordenadaValida(lat, lon);
+            if (!porGps) {
+                lat = lugar.getLatitude();
+                lon = lugar.getLongitude();
+            }
+
+            List<Object> lista = new ArrayList<>();
+            for (UnidadeSaude u : unidadeSaudeDAO.buscarProximas(
+                    lugar.getCodigoMunicipio(), lat, lon)) {
+                lista.add(unidadeJson(u));
+            }
+
+            Map<String, Object> origem = new LinkedHashMap<>();
+            origem.put("tipo", porGps ? "gps" : (lat != null ? "cep" : "nenhuma"));
+            origem.put("cidade", lugar.getCidade());
+            origem.put("estado", lugar.getEstado());
+
+            Map<String, Object> resp = new LinkedHashMap<>();
+            resp.put("origem", origem);
+            resp.put("unidades", lista);
+            enviarJson(ex, 200, resp);
+
+        } catch (SQLException e) {
+            System.out.println("[ERRO rede-saude] " + e.getMessage());
+            enviarErro(ex, 500, "Erro ao buscar a rede de saúde.");
+        }
+    }
+
     /** GET /api/prontuario — alergias, condições e medicações do paciente logado. */
     private static void prontuario(HttpExchange ex) throws IOException {
         if (!"GET".equals(ex.getRequestMethod())) { enviarErro(ex, 405, "Método não permitido."); return; }
@@ -583,6 +655,8 @@ public class ApiServer {
                 gerarAcesso(ex, userId);
             } else if ("GET".equals(metodo) && "/api/acessos".equals(path)) {
                 listarAcessos(ex, userId);
+            } else if ("GET".equals(metodo) && "/api/acessos/log".equals(path)) {
+                listarHistoricoAcessos(ex, userId);
             } else if ("DELETE".equals(metodo) && path.startsWith("/api/acessos/")) {
                 revogarAcesso(ex, userId, path.substring("/api/acessos/".length()));
             } else {
@@ -630,6 +704,24 @@ public class ApiServer {
         }
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("acessos", arr);
+        enviarJson(ex, 200, resp);
+    }
+
+    /**
+     * GET /api/acessos/log — trilha de auditoria do paciente do JWT.
+     *
+     * Responde à pergunta da LGPD "quem viu os meus dados e quando". Só devolve
+     * o que aconteceu nos acessos do próprio paciente: o filtro é feito no SQL,
+     * pelo dono do acesso, e não pelo id que viesse da URL.
+     */
+    private static void listarHistoricoAcessos(HttpExchange ex, int userId)
+            throws IOException, SQLException {
+        List<Object> arr = new ArrayList<>();
+        for (AcessoLog log : acessoDAO.listarLogPorPaciente(userId, LIMITE_HISTORICO_ACESSOS)) {
+            arr.add(acessoLogJson(log));
+        }
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("registros", arr);
         enviarJson(ex, 200, resp);
     }
 
@@ -1004,6 +1096,36 @@ public class ApiServer {
         return m;
     }
 
+    /**
+     * Uma unidade de saúde do jeito que a tela precisa: endereço já montado em
+     * uma linha e distância arredondada em uma casa decimal. Distância negativa
+     * significa "não deu para calcular" — a tela omite o número nesse caso.
+     */
+    private static Map<String, Object> unidadeJson(UnidadeSaude u) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("codigo_cnes", u.getCodigoCnes());
+        m.put("nome", u.getNome());
+        m.put("tipo", u.getTipo());
+        m.put("endereco", enderecoEmLinha(u));
+        m.put("bairro", u.getBairro());
+        m.put("telefone", u.getTelefone());
+        m.put("turno", u.getTurno());
+        m.put("latitude", u.getLatitude());
+        m.put("longitude", u.getLongitude());
+        m.put("distancia_km", u.getDistanciaKm() < 0
+                ? null
+                : Math.round(u.getDistanciaKm() * 10) / 10.0);
+        return m;
+    }
+
+    /** Junta logradouro e número em "Rua Tal, 123", pulando o que estiver vazio. */
+    private static String enderecoEmLinha(UnidadeSaude u) {
+        String rua = u.getLogradouro();
+        if (rua == null || rua.isBlank()) return null;
+        String numero = u.getNumero();
+        return (numero == null || numero.isBlank()) ? rua : rua + ", " + numero;
+    }
+
     private static Map<String, Object> consultaJson(Consulta c) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", c.getIdConsulta());
@@ -1055,6 +1177,18 @@ public class ApiServer {
         m.put("usado_em", a.getUsadoEm());
         m.put("revogado_em", a.getRevogadoEm());
         m.put("medico", medicoJson(a.getMedico()));
+        return m;
+    }
+
+    private static Map<String, Object> acessoLogJson(AcessoLog log) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", log.getIdLog());
+        m.put("acesso_id", log.getIdAcesso());
+        m.put("acao", log.getAcao());
+        m.put("detalhe", log.getDetalhe());
+        m.put("criado_em", log.getCriadoEm());
+        m.put("escopo", log.getEscopo());
+        m.put("medico", medicoJson(log.getMedico()));
         return m;
     }
 
@@ -1164,6 +1298,27 @@ public class ApiServer {
             if (!"dependenteId".equals(par.substring(0, igual))) continue;
             try {
                 return Integer.valueOf(par.substring(igual + 1).trim());
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Lê um número decimal da query string (usado por ?lat= e ?lon=).
+     * Devolve null quando o parâmetro não veio ou não é um número.
+     */
+    private static Double numeroDaQuery(HttpExchange ex, String nome) {
+        String query = ex.getRequestURI().getQuery();
+        if (query == null || query.isEmpty()) return null;
+
+        for (String par : query.split("&")) {
+            int igual = par.indexOf('=');
+            if (igual <= 0) continue;
+            if (!nome.equals(par.substring(0, igual))) continue;
+            try {
+                return Double.valueOf(par.substring(igual + 1).trim());
             } catch (NumberFormatException e) {
                 return null;
             }

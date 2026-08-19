@@ -1,17 +1,29 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronLeft, Image as ImageIcon, Droplet, Download, Calendar, Building2, Stethoscope, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, Image as ImageIcon, Droplet, Download, Calendar, Building2, Stethoscope, AlertTriangle, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import { useAuth } from '../context/AuthContext';
+import { usePrivacidade } from '../context/PrivacidadeContext';
+import BotaoPrivacidade from '../components/BotaoPrivacidade';
+import { mascararTexto } from '../utils/privacidade';
 import ResultRow from '../components/ResultRow';
 import InfoField from '../components/InfoField';
 import StatusBadge from '../components/StatusBadge';
 import { buscarExames } from '../services/exames';
 import { situacaoItem, textoReferencia, formatarData, totalAlterados } from '../utils/exames';
 
+// Senha do PDF: os 4 primeiros dígitos do CPF do paciente. Devolve null quando
+// o cadastro não tem CPF válido — nesse caso o arquivo sai sem proteção e a
+// tela avisa, em vez de gerar um PDF com senha que o paciente não conhece.
+function senhaDoPaciente(paciente) {
+  const digitos = String(paciente?.cpf || '').replace(/\D/g, '');
+  return digitos.length >= 4 ? digitos.slice(0, 4) : null;
+}
+
 export default function Exams() {
   const navigate = useNavigate();
   const { paciente } = useAuth();
+  const { oculto } = usePrivacidade();
   const [tab, setTab] = useState('sangue');
   const [coletas, setColetas] = useState([]);
   const [imagem, setImagem] = useState([]);
@@ -39,7 +51,23 @@ export default function Exams() {
 
   // Gera e baixa um PDF com o histórico de exames do paciente.
   const baixarPDF = () => {
-    const doc = new jsPDF();
+    const senha = senhaDoPaciente(paciente);
+
+    // Sendo dado de saúde, o arquivo sai criptografado: sem a senha o leitor de
+    // PDF nem abre o documento. A senha do dono vai igual à do paciente porque,
+    // em branco, ela abriria o arquivo sozinha e a proteção não valeria nada.
+    const doc = new jsPDF(
+      senha
+        ? {
+            encryption: {
+              userPassword: senha,
+              ownerPassword: senha,
+              userPermissions: ['print', 'copy'],
+            },
+          }
+        : {}
+    );
+
     const nome = paciente?.nome || 'Paciente';
     const hoje = new Date().toLocaleDateString('pt-BR');
     let y = 20;
@@ -140,6 +168,7 @@ export default function Exams() {
   };
 
   const temExames = coletas.length > 0 || imagem.length > 0;
+  const protegido = senhaDoPaciente(paciente) !== null;
 
   return (
     <div className="screen-container">
@@ -147,15 +176,27 @@ export default function Exams() {
         <ChevronLeft size={20} /> Voltar
       </button>
 
-      <div className="flex items-center justify-between mb-6">
+      <div className="section-header">
         <h2 className="header-title">Exames</h2>
-        {temExames && (
-          <button onClick={baixarPDF} className="pdf-download-btn">
-            <Download size={18} />
-            <span>Baixar PDF</span>
-          </button>
-        )}
+        <div className="flex items-center gap-4">
+          <BotaoPrivacidade rotulo="resultados" />
+          {temExames && (
+            <button onClick={baixarPDF} className="pdf-download-btn">
+              <Download size={18} />
+              <span>Baixar PDF</span>
+            </button>
+          )}
+        </div>
       </div>
+
+      {temExames && (
+        <p className="pdf-nota">
+          <Lock size={13} />
+          {protegido
+            ? 'O PDF baixado abre com senha: os 4 primeiros dígitos do seu CPF.'
+            : 'Sem CPF no cadastro, o PDF é baixado sem senha de proteção.'}
+        </p>
+      )}
 
       <div className="tabs-wrapper">
         <button onClick={() => setTab('sangue')} className={`tab-btn ${tab === 'sangue' ? 'active' : ''}`}>
@@ -194,14 +235,18 @@ export default function Exams() {
                       </p>
                     )}
                   </div>
-                  <StatusBadge
-                    status={alterados > 0 ? 'alterado' : 'normal'}
-                    texto={
-                      alterados > 0
-                        ? `${alterados} ${alterados === 1 ? 'alterado' : 'alterados'}`
-                        : 'Tudo normal'
-                    }
-                  />
+                  {oculto ? (
+                    <span className="status-badge oculto">•••</span>
+                  ) : (
+                    <StatusBadge
+                      status={alterados > 0 ? 'alterado' : 'normal'}
+                      texto={
+                        alterados > 0
+                          ? `${alterados} ${alterados === 1 ? 'alterado' : 'alterados'}`
+                          : 'Tudo normal'
+                      }
+                    />
+                  )}
                 </div>
 
                 {coleta.itens.map((item) => (
@@ -240,7 +285,9 @@ export default function Exams() {
               {exame.laudo && (
                 <>
                   <p className="exam-laudo-label">Conclusão do laudo</p>
-                  <p className="record-card">{exame.laudo}</p>
+                  <p className={`record-card ${oculto ? 'valor-oculto' : ''}`}>
+                    {oculto ? mascararTexto(exame.laudo) : exame.laudo}
+                  </p>
                   <p className="exam-aviso">
                     <AlertTriangle size={13} /> Resumo informativo — não substitui o laudo oficial.
                   </p>

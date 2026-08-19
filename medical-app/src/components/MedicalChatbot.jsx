@@ -9,25 +9,39 @@ const BASE_CONHECIMENTO = [
     {
         chaves: ['agendar', 'agendamento', 'consulta', 'marcar', 'médico', 'medico'],
         resposta:
-            'Suas consultas ficam em "Início" → "Agendamentos", separadas entre as próximas e as anteriores. ' +
+            'Suas consultas ficam em "Início" → "Consultas" (ou em "Minha Saúde"), separadas entre as próximas e as anteriores. ' +
             'Toque em uma delas para ver o local, o profissional, o resumo e a conduta.',
     },
     {
         chaves: ['exame', 'exames', 'resultado', 'sangue', 'hemograma', 'imagem', 'laudo'],
         resposta:
-            'Seus exames ficam em "Exames/Registros" → "Exames". Você pode ver os resultados de sangue e de imagem, ' +
-            'e ainda baixar um relatório em PDF com todo o histórico pelo botão "Baixar PDF".',
+            'Seus exames ficam em "Minha Saúde" → "Exames". Você pode ver os resultados de sangue e de imagem, ' +
+            'e ainda baixar um relatório em PDF com todo o histórico pelo botão "Baixar PDF". ' +
+            'O PDF abre com senha: os 4 primeiros dígitos do seu CPF.',
+    },
+    {
+        chaves: ['pdf', 'baixar pdf', 'relatorio', 'relatório', 'senha do pdf', 'arquivo'],
+        resposta:
+            'O botão "Baixar PDF", na tela de Exames, gera um relatório com todas as coletas e os exames de imagem. ' +
+            'O arquivo é protegido: para abri-lo, digite os 4 primeiros dígitos do seu CPF.',
+    },
+    {
+        chaves: ['ocultar', 'esconder', 'olhinho', 'olho', 'mascarar', 'bolinhas', 'por cima do ombro'],
+        resposta:
+            'O botão do olhinho aparece no topo do seu perfil, do prontuário, dos exames e dos avisos. ' +
+            'Fechado, ele troca os dados sensíveis por bolinhas; um toque mostra tudo de novo. ' +
+            'Os dados aparecem normalmente quando o app é aberto.',
     },
     {
         chaves: ['dependente', 'dependentes', 'familiar', 'filho', 'filha', 'família', 'familia'],
         resposta:
-            'Você gerencia dependentes em "Exames/Registros" → "Dependentes". Lá é possível adicionar, listar ' +
+            'Você gerencia dependentes em "Minha Saúde" → "Dependentes". Lá é possível adicionar, listar ' +
             'e remover familiares vinculados à sua conta.',
     },
     {
         chaves: ['prontuário', 'prontuario', 'histórico', 'historico', 'alergia', 'condição', 'condicao'],
         resposta:
-            'No seu prontuário ("Dados da Consulta") você encontra alergias, condições de saúde e os registros ' +
+            'No seu prontuário ("Minha Saúde" → "Prontuário") você encontra alergias, condições de saúde e os registros ' +
             'recentes das suas consultas.',
     },
     {
@@ -39,8 +53,23 @@ const BASE_CONHECIMENTO = [
     {
         chaves: ['vacina', 'vacinação', 'vacinacao', 'imunização', 'imunizacao'],
         resposta:
-            'A Carteira de Vacinação fica em "Exames/Registros" → "Carteira de Vacinação". Ela é montada pelo calendário ' +
+            'A Carteira de Vacinação fica em "Minha Saúde" → "Carteira de Vacinação". Ela é montada pelo calendário ' +
             'do PNI a partir da data de nascimento, e o seletor do topo alterna entre você e cada dependente.',
+    },
+    {
+        chaves: ['ubs', 'upa', 'posto de saude', 'posto de saúde', 'rede de saude', 'rede de saúde',
+                 'unidade', 'unidades', 'mais perto', 'mais próximo', 'mais proximo', 'onde fico'],
+        resposta:
+            'Na aba "Rede" da barra inferior você vê as UBS, UPAs e prontos-socorros da sua cidade, do mais perto ' +
+            'para o mais longe, com endereço, telefone e horário. A distância sai da sua localização (se você ' +
+            'autorizar) ou do CEP do seu cadastro, e o botão "Como chegar" abre a rota no seu app de mapas.',
+    },
+    {
+        chaves: ['quem viu', 'quem acessou', 'historico de acesso', 'histórico de acesso',
+                 'auditoria', 'trilha', 'log'],
+        resposta:
+            'Em "Mais" → "Histórico de acessos" você vê cada vez que um profissional entrou com um código ' +
+            'seu: o nome, o CRM, o que ele fez e quando. O registro é automático e não pode ser apagado.',
     },
     {
         chaves: ['privacidade', 'dados', 'lgpd', 'termo', 'termos'],

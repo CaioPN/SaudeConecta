@@ -4,6 +4,9 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { usePrivacidade } from '../context/PrivacidadeContext';
+import BotaoPrivacidade from '../components/BotaoPrivacidade';
+import { mascarar } from '../utils/privacidade';
 
 // Calcula a idade a partir da data de nascimento (formato ISO).
 function calcularIdade(dataNascimento) {
@@ -59,13 +62,19 @@ function montarEndereco(p) {
 }
 
 // Uma linha de "rótulo + valor" com ícone, usada na lista de dados cadastrais.
-function InfoRow({ icon: Icon, label, value }) {
+// Marcada como sensível, ela obedece ao olhinho e mostra a máscara no lugar.
+function InfoRow({ icon: Icon, label, value, sensivel = false }) {
+  const { oculto } = usePrivacidade();
+  const escondido = sensivel && oculto;
+
   return (
     <div className="info-row">
       <div className="info-icon"><Icon size={18} /></div>
       <div>
         <p className="info-label">{label}</p>
-        <p className="info-value">{value || '—'}</p>
+        <p className={`info-value ${escondido ? 'valor-oculto' : ''}`}>
+          {escondido ? mascarar(value) : (value || '—')}
+        </p>
       </div>
     </div>
   );
@@ -96,20 +105,23 @@ export default function Profile() {
         <p className="text-sm text-muted">{detalhes || 'Dados do paciente'}</p>
       </div>
 
-      <h3 className="section-title">Dados Cadastrais</h3>
+      <div className="section-header">
+        <h3 className="section-title">Dados Cadastrais</h3>
+        <BotaoPrivacidade rotulo="meus dados" />
+      </div>
       <div className="card">
-        <InfoRow icon={Mail} label="E-mail" value={paciente?.email} />
-        <InfoRow icon={Phone} label="Telefone" value={formatarTelefone(paciente?.telefone)} />
-        <InfoRow icon={IdCard} label="CPF" value={formatarCPF(paciente?.cpf)} />
-        <InfoRow icon={Calendar} label="Data de Nascimento" value={formatarData(paciente?.data_nascimento)} />
+        <InfoRow icon={Mail} label="E-mail" value={paciente?.email} sensivel />
+        <InfoRow icon={Phone} label="Telefone" value={formatarTelefone(paciente?.telefone)} sensivel />
+        <InfoRow icon={IdCard} label="CPF" value={formatarCPF(paciente?.cpf)} sensivel />
+        <InfoRow icon={Calendar} label="Data de Nascimento" value={formatarData(paciente?.data_nascimento)} sensivel />
         <InfoRow icon={Venus} label="Gênero" value={paciente?.genero} />
-        <InfoRow icon={Droplet} label="Tipo Sanguíneo" value={paciente?.tipo_sanguineo} />
+        <InfoRow icon={Droplet} label="Tipo Sanguíneo" value={paciente?.tipo_sanguineo} sensivel />
       </div>
 
       <h3 className="section-title">Endereço</h3>
       <div className="card">
-        <InfoRow icon={MapPin} label="Endereço" value={endereco} />
-        <InfoRow icon={MapPin} label="CEP" value={formatarCEP(paciente?.cep)} />
+        <InfoRow icon={MapPin} label="Endereço" value={endereco} sensivel />
+        <InfoRow icon={MapPin} label="CEP" value={formatarCEP(paciente?.cep)} sensivel />
       </div>
     </div>
   );

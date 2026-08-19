@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ChevronLeft, KeyRound, ShieldCheck, Eye, PenLine, Ban, Clock, Copy, Check } from 'lucide-react';
+import { ChevronLeft, KeyRound, ShieldCheck, BookOpen, PenLine, Ban, Clock, Copy, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import StatusBadge from '../components/StatusBadge';
 import { gerarAcesso, listarAcessos, revogarAcesso, situacaoAcesso } from '../services/acessos';
@@ -142,7 +142,7 @@ export default function AcessoMedico() {
           className={`escopo-opcao ${escopo === 'leitura' ? 'active' : ''}`}
           onClick={() => setEscopo('leitura')}
         >
-          <Eye size={18} />
+          <BookOpen size={18} />
           <span className="escopo-titulo">Somente leitura</span>
           <span className="escopo-desc">O médico vê seu resumo clínico, mas não altera nada.</span>
         </button>

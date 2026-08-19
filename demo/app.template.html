@@ -1,0 +1,1891 @@
+<title>Saúde Conecta</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<style>
+/* ============================================================
+   1) app.css do medical-app, copiado tal e qual pelo gerar.mjs.
+   Não edite aqui: mexa em medical-app/src/app.css e gere de novo.
+   ============================================================ */
+/* __APP_CSS__ */
+
+/* ============================================================
+   2) Ajustes só da demonstração
+   O app real roda dentro do navegador do celular; aqui ele é
+   visto quase sempre num monitor, então o frame ganha altura
+   fixa e só o miolo rola — assim a barra inferior fica parada.
+   ============================================================ */
+:root { color-scheme: light; }
+
+/* O flow-root impede que a margem do frame escape do body e crie uma
+   segunda barra de rolagem por cima da do conteúdo. */
+body {
+  display: flow-root;
+  background-color: var(--bg-gray);
+  color: var(--text-dark);
+  min-height: 100vh;
+}
+
+.app-container { height: 100vh; }
+.app-content { min-height: 0; }
+.app-content .login-wrapper { min-height: 100%; }
+
+@media (min-width: 640px) {
+  .app-container {
+    height: calc(100vh - 84px);
+    min-height: 0;
+    max-height: 900px;
+  }
+}
+
+/* Selo de demonstração: canto superior direito do frame, discreto, para
+   ninguém confundir a apresentação com o app em produção. */
+.demo-selo {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 120;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  background-color: rgba(37, 99, 235, 0.9);
+  color: var(--white);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+/* Nota fixa no rodapé do login e do cadastro. */
+.demo-nota {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 20px;
+  padding: 12px 14px;
+  border: 1px dashed var(--borda-azul-forte);
+  border-radius: var(--border-radius);
+  background-color: #f8fbff;
+  font-size: 12px;
+  color: var(--text-gray);
+  line-height: 1.5;
+  text-align: left;
+}
+.demo-nota svg { flex-shrink: 0; margin-top: 2px; color: var(--primary-blue); }
+
+/* Aviso de ação que existe só no app real (baixar PDF, ligar para a UBS). */
+.demo-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  z-index: 300;
+  transform: translateX(-50%);
+  max-width: 360px;
+  padding: 12px 18px;
+  border-radius: 9999px;
+  background-color: rgba(17, 24, 39, 0.92);
+  color: #f8fafc;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: center;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.35);
+  animation: demoToast 0.2s ease-out;
+}
+@keyframes demoToast {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* Foco visível: o app original conta com o padrão do navegador, que o
+   reset da página de publicação apaga em alguns botões. */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--primary-blue);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+</style>
+
+<div class="app-container">
+  <span class="demo-selo">Demonstração</span>
+  <div class="app-content" id="conteudo"></div>
+  <div class="bottom-nav" id="barra" hidden></div>
+  <div class="chatbot-wrapper" id="chatbot" hidden></div>
+</div>
+
+<script>
+/* ============================================================
+   Saúde Conecta — versão de demonstração (HTML puro)
+
+   Mesmo desenho e mesmas telas do app React, mas sem back-end: os
+   dados abaixo são fictícios e vivem só na memória da página. Nada
+   é gravado, nada sai daqui. Serve para mostrar a navegação e as
+   telas a quem não consegue rodar o projeto (Java + MySQL + Vite).
+
+   Organização, na ordem do arquivo:
+     1. ícones (SVG do lucide, gerados por gerar-icones.mjs)
+     2. dados fictícios
+     3. utilidades (datas, exames, máscaras do "olhinho")
+     4. estado da demonstração
+     5. telas
+     6. barra inferior, chatbot e roteador
+   ============================================================ */
+
+/* ---------- 1. Ícones ---------- */
+/* __ICONES__ */
+
+// Devolve o SVG de um ícone do mapa acima, no mesmo traço do lucide-react.
+function ic(nome, tamanho, classe) {
+  const corpo = LUCIDE[nome];
+  if (!corpo) return '';
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="' + (tamanho || 20) + '" height="' + (tamanho || 20) +
+    '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
+    'stroke-linejoin="round" class="' + (classe || '') + '" aria-hidden="true">' + corpo + '</svg>';
+}
+
+// Um assunto, um ícone — espelha medical-app/src/utils/icones.js.
+const ICONES = {
+  inicio: 'home', saude: 'heartPulse', rede: 'mapPin', mais: 'menu',
+  prontuario: 'fileText', exames: 'activity', consultas: 'calendar',
+  vacinas: 'syringe', dependentes: 'users',
+  acessoMedico: 'keyRound', historicoAcessos: 'history', privacidade: 'lock',
+  seguranca: 'shieldCheck', perfil: 'user', duvidas: 'helpCircle',
+  termos: 'scrollText', sair: 'logOut',
+};
+
+/* ---------- 2. Dados fictícios ---------- */
+
+// Paciente da demonstração. CPF, telefone e endereço são inventados.
+const PACIENTE = {
+  id: 1,
+  nome: 'Gabriel Almeida Santos',
+  email: 'gabriel@exemplo.com.br',
+  telefone: '11987654321',
+  cpf: '12345678900',
+  data_nascimento: '1994-04-12',
+  genero: 'Masculino',
+  tipo_sanguineo: 'O+',
+  cep: '01310100',
+  rua: 'Avenida Paulista',
+  numero: '1578',
+  bairro: 'Bela Vista',
+  cidade: 'São Paulo',
+  estado: 'SP',
+};
+
+const DEPENDENTES_INICIAIS = [
+  { id: 1, nome: 'Helena Almeida Santos', cpf: '98765432100', data_nascimento: '2025-11-20', genero: 'Feminino', tipo_sanguineo: 'A+' },
+  { id: 2, nome: 'Miguel Almeida Santos', cpf: '45678912300', data_nascimento: '2016-02-09', genero: 'Masculino', tipo_sanguineo: 'O+' },
+];
+
+// Consultas — a mesma história clínica do seed de apresentação.
+const CONSULTAS = [
+  { id: 8, data: '2026-12-01', hora: '08:30', medico: 'Dra. Ana Souza', especialidade: 'Clínico Geral', crm: '123456-SP', local: 'UBS Jardim América, Consultório 2', motivo: 'Check-up anual', status: 'agendada' },
+  { id: 7, data: '2026-10-05', hora: '09:30', medico: 'Dra. Beatriz Nunes', especialidade: 'Dermatologista', crm: '778901-SP', local: 'Clínica Derma Paulista, Sala 7', motivo: 'Avaliação de lesão de pele', status: 'agendada' },
+  { id: 6, data: '2026-08-20', hora: '14:30', medico: 'Dr. Rafael Lima', especialidade: 'Cardiologista', crm: '445120-SP', local: 'Instituto do Coração, Sala 15', motivo: 'Retorno cardiológico', status: 'agendada' },
+  {
+    id: 5, data: '2026-07-14', hora: '11:00', medico: 'Dra. Ana Souza', especialidade: 'Clínico Geral', crm: '123456-SP',
+    local: 'UBS Jardim América, Consultório 2', motivo: 'Retorno com resultados', status: 'realizada',
+    resumo: 'Melhora do cansaço após a reposição de ferro. Hemoglobina e ferritina normalizadas; vitamina D ainda abaixo da referência.',
+    conduta: 'Manter a vitamina D3 por mais três meses e repetir a dosagem. Suspender o sulfato ferroso.',
+  },
+  {
+    id: 4, data: '2026-05-06', hora: '14:00', medico: 'Dr. Rafael Lima', especialidade: 'Cardiologista', crm: '445120-SP',
+    local: 'Instituto do Coração, Sala 15', motivo: 'Palpitações ocasionais', status: 'realizada',
+    resumo: 'Palpitações de curta duração, sem dor torácica ou desmaio. Ecocardiograma sem alterações estruturais.',
+    conduta: 'Reduzir cafeína e melhorar a higiene do sono. Retorno em três meses para reavaliação.',
+  },
+  {
+    id: 3, data: '2026-02-18', hora: '10:15', medico: 'Dra. Ana Souza', especialidade: 'Clínico Geral', crm: '123456-SP',
+    local: 'UBS Jardim América, Consultório 2', motivo: 'Cansaço e queda de rendimento', status: 'realizada',
+    resumo: 'Queixa de cansaço há cerca de dois meses. Exame físico com discreta palidez de mucosas.',
+    conduta: 'Solicitados hemograma, ferritina, vitamina D e ultrassom de abdome. Retorno com os resultados.',
+  },
+  {
+    id: 2, data: '2025-09-22', hora: '16:00', medico: 'Dr. Paulo Menezes', especialidade: 'Ortopedista', crm: '332118-SP',
+    local: 'Clínica Ortopédica Vila Mariana', motivo: 'Dor no joelho direito', status: 'realizada',
+    resumo: 'Dor anterior no joelho direito há três semanas, após aumento da carga de corrida. Sem instabilidade nem derrame articular.',
+    conduta: 'Solicitada ressonância do joelho direito. Repouso da corrida por 15 dias e início de fisioterapia.',
+  },
+  {
+    id: 1, data: '2025-03-10', hora: '09:00', medico: 'Dra. Ana Souza', especialidade: 'Clínico Geral', crm: '123456-SP',
+    local: 'UBS Jardim América, Consultório 2', motivo: 'Check-up anual', status: 'realizada',
+    resumo: 'Paciente assintomático. Exame físico sem alterações e pressão arterial de 118/76 mmHg.',
+    conduta: 'Solicitados exames laboratoriais de rotina. Manter atividade física regular.',
+  },
+];
+
+// Coletas de sangue, da mais recente para a mais antiga.
+const COLETAS = [
+  {
+    id: 3, data: '2026-07-16', local: 'Laboratório Central — UBS Jardim América',
+    solicitante: 'Dra. Ana Souza', crm: 'CRM 123456-SP',
+    itens: [
+      { id: 17, nome: 'Hemoglobina', valor: 14.1, unidade: 'g/dL', min: 13, max: 17 },
+      { id: 18, nome: 'Ferritina', valor: 46, unidade: 'ng/mL', min: 30, max: 400 },
+      { id: 19, nome: 'Vitamina D (25-OH)', valor: 28, unidade: 'ng/mL', min: 30, max: 100 },
+      { id: 20, nome: 'Glicose (jejum)', valor: 89, unidade: 'mg/dL', min: 70, max: 99 },
+      { id: 21, nome: 'Colesterol total', valor: 181, unidade: 'mg/dL', min: 0, max: 200 },
+      { id: 22, nome: 'LDL', valor: 112, unidade: 'mg/dL', min: 0, max: 130 },
+      { id: 23, nome: 'TSH', valor: 1.9, unidade: 'µUI/mL', min: 0.4, max: 4.5 },
+      { id: 24, nome: 'Creatinina', valor: 0.98, unidade: 'mg/dL', min: 0.7, max: 1.3 }
+    ],
+  },
+  {
+    id: 2, data: '2026-02-20', local: 'Laboratório Central — UBS Jardim América',
+    solicitante: 'Dra. Ana Souza', crm: 'CRM 123456-SP',
+    itens: [
+      { id: 9, nome: 'Hemoglobina', valor: 12.8, unidade: 'g/dL', min: 13, max: 17 },
+      { id: 10, nome: 'Ferritina', valor: 18, unidade: 'ng/mL', min: 30, max: 400 },
+      { id: 11, nome: 'Vitamina D (25-OH)', valor: 21, unidade: 'ng/mL', min: 30, max: 100 },
+      { id: 12, nome: 'Glicose (jejum)', valor: 94, unidade: 'mg/dL', min: 70, max: 99 },
+      { id: 13, nome: 'Colesterol total', valor: 196, unidade: 'mg/dL', min: 0, max: 200 },
+      { id: 14, nome: 'LDL', valor: 128, unidade: 'mg/dL', min: 0, max: 130 },
+      { id: 15, nome: 'TSH', valor: 2.1, unidade: 'µUI/mL', min: 0.4, max: 4.5 },
+      { id: 16, nome: 'Creatinina', valor: 1.02, unidade: 'mg/dL', min: 0.7, max: 1.3 }
+    ],
+  },
+  {
+    id: 1, data: '2025-03-12', local: 'Laboratório Central — UBS Jardim América',
+    solicitante: 'Dra. Ana Souza', crm: 'CRM 123456-SP',
+    itens: [
+      { id: 1, nome: 'Hemoglobina', valor: 15.2, unidade: 'g/dL', min: 13, max: 17 },
+      { id: 2, nome: 'Leucócitos', valor: 6800, unidade: '/mm³', min: 4000, max: 11000 },
+      { id: 3, nome: 'Plaquetas', valor: 245000, unidade: '/mm³', min: 150000, max: 450000 },
+      { id: 4, nome: 'Glicose (jejum)', valor: 88, unidade: 'mg/dL', min: 70, max: 99 },
+      { id: 5, nome: 'Colesterol total', valor: 178, unidade: 'mg/dL', min: 0, max: 200 },
+      { id: 6, nome: 'HDL', valor: 54, unidade: 'mg/dL', min: 40, max: 100 },
+      { id: 7, nome: 'Triglicerídeos', valor: 112, unidade: 'mg/dL', min: 0, max: 150 },
+      { id: 8, nome: 'Creatinina', valor: 0.95, unidade: 'mg/dL', min: 0.7, max: 1.3 }
+    ],
+  },
+];
+
+const EXAMES_IMAGEM = [
+  {
+    id: 101, data: '2026-05-06', nome: 'Ecocardiograma transtorácico',
+    local: 'Instituto do Coração — Setor de Métodos Gráficos', solicitante: 'Dr. Rafael Lima',
+    laudo: 'Função sistólica do ventrículo esquerdo preservada (fração de ejeção de 62%). Câmaras cardíacas de dimensões normais e valvas sem alterações significativas.',
+  },
+  {
+    id: 102, data: '2026-02-20', nome: 'Ultrassonografia de abdome total',
+    local: 'Hospital São Camilo — Setor de Imagem', solicitante: 'Dra. Ana Souza',
+    laudo: 'Fígado, vias biliares, pâncreas, rins e baço com dimensões e ecotextura normais. Ausência de cálculos.',
+  },
+  {
+    id: 103, data: '2025-09-25', nome: 'Ressonância magnética do joelho direito',
+    local: 'Hospital São Camilo — Setor de Imagem', solicitante: 'Dr. Paulo Menezes',
+    laudo: 'Discreto edema no tendão patelar, compatível com tendinopatia por sobrecarga. Meniscos e ligamentos cruzados sem sinais de lesão.',
+  },
+];
+
+const PRONTUARIO = {
+  alergias: [{ id: 1, descricao: 'Dipirona' }, { id: 2, descricao: 'Frutos do mar (camarão)' }],
+  condicoes: [{ id: 1, descricao: 'Rinite alérgica' }, { id: 2, descricao: 'Deficiência de vitamina D' }],
+  medicacoes: [
+    { id: 1, nome: 'Vitamina D3', dosagem: '2.000 UI', posologia: '1 cápsula por dia, após o almoço' },
+    { id: 2, nome: 'Loratadina', dosagem: '10mg', posologia: '1 comprimido nas crises de rinite' },
+  ],
+};
+
+// Avisos do Dashboard. No app eles saem do AvisoDAO; aqui já vêm prontos,
+// com a mesma redação e as mesmas severidades.
+const AVISOS = [
+  { tipo: 'resultado', severidade: 'alta', titulo: '1 resultado fora da faixa na última coleta', detalhe: 'Vitamina D (25-OH): 28 ng/mL — referência de 30 a 100 ng/mL. Leve o resultado à próxima consulta.' },
+  { tipo: 'consulta', severidade: 'media', titulo: 'Consulta em 2 dias', detalhe: 'Retorno cardiológico com Dr. Rafael Lima em 20/08/2026, às 14:30, no Instituto do Coração.' },
+  { tipo: 'campanha', severidade: 'baixa', titulo: 'Campanha Nacional de Multivacinação', detalhe: 'Crianças e adolescentes menores de 15 anos. A campanha vai até 01/09/2026.' },
+  { tipo: 'exame', severidade: 'baixa', titulo: 'Seu último exame foi há 1 mês', detalhe: 'Coleta de sangue em 16/07/2026, no Laboratório Central — UBS Jardim América.' },
+];
+
+// Unidades da Rede de Saúde. No app elas vêm do CNES e são ordenadas por
+// distância; aqui são um recorte fixo da região da Avenida Paulista.
+const UNIDADES = [
+  { id: 1, tipo: 'ubs', nome: 'UBS Bela Vista', endereco: 'Rua Santo Antônio, 1010', bairro: 'Bela Vista', turno: 'Manhã e tarde', telefone: '1132881234', distancia: 0.9 },
+  { id: 2, tipo: 'upa', nome: 'UPA 24h Vergueiro', endereco: 'Rua Vergueiro, 2033', bairro: 'Vila Mariana', turno: '24 horas', telefone: '1155741234', distancia: 1.8 },
+  { id: 3, tipo: 'ubs', nome: 'UBS Jardim América', endereco: 'Rua Groenlândia, 550', bairro: 'Jardim América', turno: 'Manhã e tarde', telefone: '1130625678', distancia: 2.1 },
+  { id: 4, tipo: 'pronto_socorro', nome: 'Pronto-Socorro Municipal da Consolação', endereco: 'Rua Frei Caneca, 1398', bairro: 'Consolação', turno: '24 horas', telefone: '1132591000', distancia: 2.4 },
+  { id: 5, tipo: 'ubs', nome: 'UBS Cerqueira César', endereco: 'Rua Padre João Manuel, 222', bairro: 'Cerqueira César', turno: 'Manhã, tarde e noite', telefone: '1130814321', distancia: 2.7 },
+  { id: 6, tipo: 'pronto_socorro', nome: 'Pronto-Socorro do Hospital das Clínicas', endereco: 'Avenida Dr. Enéas de Carvalho Aguiar, 255', bairro: 'Cerqueira César', turno: '24 horas', telefone: '1126610000', distancia: 3.2 },
+  { id: 7, tipo: 'ubs', nome: 'UBS Vila Mariana', endereco: 'Rua Sena Madureira, 1108', bairro: 'Vila Mariana', turno: 'Manhã e tarde', telefone: '1150844567', distancia: 3.9 },
+  { id: 8, tipo: 'upa', nome: 'UPA 24h Cidade Ademar', endereco: 'Avenida Cupecê, 4020', bairro: 'Cidade Ademar', turno: '24 horas', telefone: '1155628900', distancia: 9.6 },
+];
+
+// Trilha de auditoria: o que um médico já fez com um código do paciente.
+const HISTORICO_ACESSOS = [
+  { id: 4, acao: 'registrou_exame', criadoEm: '2026-07-16T09:12:00', medico: 'Dra. Ana Souza', crm: '123456-SP', especialidade: 'Clínico Geral', escopo: 'escrita', detalhe: 'Coleta de sangue com 8 resultados' },
+  { id: 3, acao: 'registrou_consulta', criadoEm: '2026-07-14T11:41:00', medico: 'Dra. Ana Souza', crm: '123456-SP', especialidade: 'Clínico Geral', escopo: 'escrita', detalhe: 'Retorno com resultados' },
+  { id: 2, acao: 'leu_prontuario', criadoEm: '2026-07-14T11:05:00', medico: 'Dra. Ana Souza', crm: '123456-SP', especialidade: 'Clínico Geral', escopo: 'escrita' },
+  { id: 1, acao: 'entrou', criadoEm: '2026-07-14T11:04:00', medico: 'Dra. Ana Souza', crm: '123456-SP', especialidade: 'Clínico Geral', escopo: 'escrita' },
+];
+
+const ACESSOS_INICIAIS = [
+  { id: 2, medico: 'Dra. Ana Souza', crm: '123456-SP', escopo: 'escrita', criadoEm: '2026-07-14T11:00:00', usadoEm: '2026-07-14T11:04:00', expiraEm: '2026-07-14T11:30:00', revogadoEm: null },
+  { id: 1, medico: 'Dr. Rafael Lima', crm: '445120-SP', escopo: 'leitura', criadoEm: '2026-05-06T13:55:00', usadoEm: '2026-05-06T14:02:00', expiraEm: '2026-05-06T14:25:00', revogadoEm: null },
+];
+
+/* ---------- 3. Regras e textos copiados do app ----------
+   Os blocos abaixo são injetados pelo gerar.mjs a partir dos arquivos
+   originais do medical-app (só o `export` é removido). Assim a
+   demonstração usa exatamente as mesmas regras de exame, de máscara,
+   de linha do tempo, o mesmo calendário do PNI e o mesmo texto do FAQ. */
+
+/* __UTILS_EXAMES__ */
+/* __UTILS_PRIVACIDADE__ */
+/* __UTILS_PRONTUARIO__ */
+/* __VACINAS__ */
+/* __FAQ__ */
+
+/* ---------- Utilidades da própria demonstração ---------- */
+
+// Escapa o texto que entra no HTML. Todo dado exibido passa por aqui.
+function esc(valor) {
+  if (valor === null || valor === undefined) return '';
+  return String(valor)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// Idade em anos completos a partir de uma data ISO.
+function calcularIdade(dataIso) {
+  if (!dataIso) return null;
+  const nasc = new Date(dataIso + 'T00:00:00');
+  if (Number.isNaN(nasc.getTime())) return null;
+  const hoje = new Date();
+  let idade = hoje.getFullYear() - nasc.getFullYear();
+  const m = hoje.getMonth() - nasc.getMonth();
+  if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) idade--;
+  return idade;
+}
+
+function formatarDataBR(data) {
+  if (!data) return '—';
+  const m = String(data).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? m[3] + '/' + m[2] + '/' + m[1] : data;
+}
+
+function formatarCPF(cpf) {
+  const d = String(cpf || '').replace(/\D/g, '');
+  return d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : (cpf || '—');
+}
+
+function formatarTelefone(tel) {
+  const d = String(tel || '').replace(/\D/g, '');
+  if (d.length === 11) return d.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+  if (d.length === 10) return d.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+  return tel || '—';
+}
+
+function formatarCEP(cep) {
+  const d = String(cep || '').replace(/\D/g, '');
+  return d.length === 8 ? d.replace(/(\d{5})(\d{3})/, '$1-$2') : (cep || '—');
+}
+
+// "12/03/2026 às 14:30" — usado no histórico de acessos.
+function dataHoraLonga(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
+    ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+// "14/07 11:00" — usado na lista de acessos concedidos.
+function dataHoraCurta(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso
+    : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+// Selo de situação (exames, consultas, acessos).
+const ROTULOS_STATUS = {
+  normal: 'Normal', limite: 'Limite', alterado: 'Alterado',
+  agendada: 'Agendada', realizada: 'Realizada', pendente: 'Pendente',
+};
+function selo(status, texto) {
+  return '<span class="status-badge ' + status + '">' + esc(texto || ROTULOS_STATUS[status] || status) + '</span>';
+}
+
+// Par rótulo + valor das telas de detalhe (componente InfoField).
+function campo(icone, rotulo, valor) {
+  return '<div class="info-field">' +
+    '<div class="info-field-icon">' + ic(icone, 18) + '</div>' +
+    '<div class="info-field-body"><span class="info-field-label">' + esc(rotulo) + '</span>' +
+    '<span class="info-field-value">' + esc(valor) + '</span></div></div>';
+}
+
+// Botão de voltar padrão das telas internas.
+function botaoVoltar(destino) {
+  return '<button class="back-btn" data-voltar="' + (destino || '') + '">' +
+    ic('chevronLeft', 20) + ' Voltar</button>';
+}
+
+// O "olhinho" (components/BotaoPrivacidade.jsx).
+function botaoPrivacidade(rotulo) {
+  const acao = (estado.oculto ? 'Mostrar ' : 'Ocultar ') + rotulo;
+  return '<button type="button" class="privacidade-btn" data-acao="olhinho" aria-pressed="' +
+    (!estado.oculto) + '" aria-label="' + esc(acao) + '" title="' + esc(acao) + '">' +
+    ic(estado.oculto ? 'eyeOff' : 'eye', 16) +
+    '<span>' + (estado.oculto ? 'Mostrar' : 'Ocultar') + '</span></button>';
+}
+
+// Aviso do que só existe no app completo (baixar PDF, ligar, abrir o mapa).
+let toastTimer = null;
+function avisar(texto) {
+  const anterior = document.querySelector('.demo-toast');
+  if (anterior) anterior.remove();
+  const caixa = document.createElement('div');
+  caixa.className = 'demo-toast';
+  caixa.setAttribute('role', 'status');
+  caixa.textContent = texto;
+  document.body.appendChild(caixa);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { caixa.remove(); }, 4000);
+}
+
+/* ---------- 4. Estado da demonstração ---------- */
+
+const estado = {
+  autenticado: false,
+  oculto: false,             // "olhinho" fechado esconde os dados sensíveis
+  menuAberto: false,
+  abaExames: 'sangue',
+  faqAberta: null,
+  filtroRede: 'todas',
+  pessoaVacina: 'titular',
+  escopoAcesso: 'escrita',
+  dependentes: DEPENDENTES_INICIAIS.slice(),
+  acessos: ACESSOS_INICIAIS.slice(),
+  codigoNovo: null,          // { codigo, escopo, expiraEm }
+  erroTela: null,
+  chatAberto: false,
+  chatMensagens: [{ texto: 'Olá! Sou o assistente do Saúde Conecta. Como posso te ajudar hoje?', de: 'bot' }],
+  chatDigitando: false,
+  medico: null,              // sessão do portal do médico
+  abaMedico: 'consulta',
+};
+
+// Rotas que já foram visitadas, para o "Voltar" funcionar como no app.
+const pilha = [];
+
+/* ---------- 5. Telas ---------- */
+
+// --- Login ---
+function telaLogin() {
+  const hora = new Date().getHours();
+  const saudacao = hora >= 5 && hora < 12 ? 'Bom dia!' : hora >= 12 && hora < 18 ? 'Boa tarde!' : 'Boa noite!';
+
+  return '<div class="login-wrapper">' +
+    '<img src="__LOGO_DATA_URI__" alt="Saúde Conecta" class="logo-image" style="margin-bottom:16px" />' +
+    '<div class="login-greeting"><h2>' + saudacao + '</h2>' +
+    '<p>Olá, seja bem-vindo(a) à Saúde Conecta.</p></div>' +
+
+    '<form class="card" style="width:100%" data-form="login">' +
+      '<div class="input-group"><label class="input-label" for="login-email">E-mail</label>' +
+      '<input id="login-email" type="email" class="input-field" value="' + esc(PACIENTE.email) + '" /></div>' +
+
+      '<div class="input-group">' +
+        '<div class="label-row"><label class="input-label" for="login-senha">Senha</label>' +
+        '<button type="button" class="forgot-password-link" data-acao="sem-senha">Esqueceu a senha?</button></div>' +
+        '<div class="password-input-wrapper">' +
+          '<input id="login-senha" type="password" class="input-field" value="demonstracao" style="padding-right:44px" />' +
+          '<button type="button" class="password-toggle-btn" data-acao="ver-senha">' + ic('eye', 20) + '</button>' +
+        '</div>' +
+      '</div>' +
+
+      '<button type="submit" class="btn-primary">ACESSAR CONTA</button>' +
+      '<button type="button" class="bio-btn" data-acao="biometria">' + ic('fingerprint', 24) +
+      '<span>Usar Biometria</span></button>' +
+    '</form>' +
+
+    '<div class="login-footer">Não tem uma conta? ' +
+    '<button type="button" class="login-footer-link" data-ir="/cadastro">Clique aqui.</button></div>' +
+
+    '<p class="demo-nota">' + ic('info', 14) +
+    '<span><strong>Demonstração do Saúde Conecta.</strong> Não há servidor por trás desta página: ' +
+    'qualquer e-mail e senha entram, e todos os dados exibidos são fictícios. ' +
+    'Para ver o portal do profissional de saúde, use o item “Portal do médico” no menu “Mais”.</span></p>' +
+
+    '</div>';
+}
+
+// --- Cadastro ---
+const TIPOS_SANGUINEOS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+
+function opcoes(lista) {
+  return '<option value="" selected disabled>Selecione</option>' +
+    lista.map(function (v) { return '<option>' + esc(v) + '</option>'; }).join('');
+}
+
+function telaCadastro() {
+  return '<div class="screen-container">' +
+    botaoVoltar('/') +
+    '<h2 class="header-title mb-6">Criar Conta</h2>' +
+    '<form class="card" data-form="cadastro">' +
+      '<h3 class="section-title">Dados Pessoais</h3>' +
+      '<div class="input-group"><label class="input-label">Nome Completo</label>' +
+      '<input type="text" class="input-field" placeholder="Digite seu nome" /></div>' +
+      '<div class="input-group"><label class="input-label">E-mail</label>' +
+      '<input type="email" class="input-field" placeholder="exemplo@email.com" /></div>' +
+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">' +
+        '<div class="input-group"><label class="input-label">CPF</label>' +
+        '<input type="text" maxlength="11" class="input-field" placeholder="11 dígitos" /></div>' +
+        '<div class="input-group"><label class="input-label">Telefone</label>' +
+        '<input type="text" maxlength="11" class="input-field" placeholder="DDD + número" /></div>' +
+      '</div>' +
+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">' +
+        '<div class="input-group"><label class="input-label">Data de Nascimento</label>' +
+        '<input type="date" class="input-field" /></div>' +
+        '<div class="input-group"><label class="input-label">Gênero</label>' +
+        '<select class="input-field">' + opcoes(['Masculino', 'Feminino', 'Outro', 'Prefiro não informar']) + '</select></div>' +
+      '</div>' +
+
+      '<div class="input-group"><label class="input-label">Tipo Sanguíneo</label>' +
+      '<select class="input-field">' + opcoes(TIPOS_SANGUINEOS) + '</select></div>' +
+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">' +
+        '<div class="input-group"><label class="input-label">Senha</label>' +
+        '<input type="password" class="input-field" placeholder="••••••••" /></div>' +
+        '<div class="input-group"><label class="input-label">Confirmar Senha</label>' +
+        '<input type="password" class="input-field" placeholder="••••••••" /></div>' +
+      '</div>' +
+
+      '<h3 class="section-title">Endereço</h3>' +
+      '<div class="input-group"><label class="input-label">CEP</label>' +
+      '<input type="text" maxlength="8" class="input-field" placeholder="00000000" /></div>' +
+      '<div style="display:grid;grid-template-columns:2fr 1fr;gap:16px">' +
+        '<div class="input-group"><label class="input-label">Rua</label>' +
+        '<input type="text" class="input-field" placeholder="Nome da rua" /></div>' +
+        '<div class="input-group"><label class="input-label">Número</label>' +
+        '<input type="text" class="input-field" placeholder="Nº" /></div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">' +
+        '<div class="input-group"><label class="input-label">Cidade</label>' +
+        '<input type="text" class="input-field" placeholder="Cidade" /></div>' +
+        '<div class="input-group"><label class="input-label">Estado</label>' +
+        '<input type="text" maxlength="2" class="input-field" placeholder="UF" /></div>' +
+      '</div>' +
+
+      '<h3 class="section-title">Consentimentos</h3>' +
+      '<div class="flex-col gap-4">' +
+        '<div class="consent-item"><label class="consent-row"><input type="checkbox" />' +
+        '<span>Li e aceito os <button type="button" class="consent-link" data-ir="/terms">Termos de Uso</button>.</span></label></div>' +
+        '<div class="consent-item"><label class="consent-row"><input type="checkbox" />' +
+        '<span>Concordo com o <button type="button" class="consent-link" data-ir="/privacy">Uso dos Dados</button> e a Política de Privacidade.</span></label></div>' +
+      '</div>' +
+
+      '<button type="submit" class="btn-primary" style="margin-top:24px">Finalizar Cadastro</button>' +
+
+      '<p class="demo-nota">' + ic('info', 14) +
+      '<span>Nesta demonstração o cadastro não grava nada: ao enviar, você entra direto na conta de exemplo.</span></p>' +
+    '</form>' +
+  '</div>';
+}
+
+// --- Início (Dashboard) ---
+const ICONES_AVISO = { consulta: 'calendar', campanha: 'syringe', resultado: 'activity', exame: 'flask' };
+
+const ATALHOS = [
+  { rota: '/appointment', icone: ICONES.consultas, label: 'Consultas' },
+  { rota: '/exams', icone: ICONES.exames, label: 'Exames' },
+  { rota: '/vacinas', icone: ICONES.vacinas, label: 'Vacinas' },
+  { rota: '/acesso-medico', icone: ICONES.acessoMedico, label: 'Acesso do médico' },
+];
+
+function telaDashboard() {
+  const primeiroNome = PACIENTE.nome.split(' ')[0];
+  const total = estado.dependentes.length;
+
+  const avisos = AVISOS.map(function (a) {
+    // Campanha de vacinação é informação pública — não segue o olhinho.
+    const escondido = estado.oculto && a.tipo !== 'campanha';
+    return '<div class="aviso-item ' + a.severidade + '">' +
+      '<div class="aviso-icone">' + ic(ICONES_AVISO[a.tipo] || 'flask', 18) + '</div>' +
+      '<div class="aviso-texto">' +
+        '<p class="aviso-titulo' + (escondido ? ' valor-oculto' : '') + '">' +
+        esc(escondido ? mascararTexto(a.titulo) : a.titulo) + '</p>' +
+        '<p class="aviso-detalhe' + (escondido ? ' valor-oculto' : '') + '">' +
+        esc(escondido ? mascararTexto(a.detalhe) : a.detalhe) + '</p>' +
+      '</div></div>';
+  }).join('');
+
+  return '<div class="screen-container">' +
+    '<header class="mb-6"><h1 class="header-title">Olá, ' + esc(primeiroNome) + '!</h1>' +
+    '<p class="header-subtitle">Resumo de hoje</p></header>' +
+
+    '<div class="card patient-summary" data-ir="/dependentes" role="button" tabindex="0">' +
+      '<div><h2 class="text-sm font-bold text-muted">Meus dependentes</h2>' +
+      '<p class="header-title text-primary mt-1">' + total +
+      ' <span class="text-sm font-bold text-muted">' + (total === 1 ? 'Ativo' : 'Ativos') + '</span></p></div>' +
+      '<div class="icon-box">' + ic(ICONES.dependentes, 24) + '</div>' +
+    '</div>' +
+
+    '<div class="section-header"><h3 class="section-title text-red">Avisos</h3>' +
+    botaoPrivacidade('avisos') + '</div>' +
+    '<div class="card">' + avisos + '</div>' +
+
+    '<h3 class="section-title">Ações Rápidas</h3>' +
+    '<div class="quick-actions-grid">' +
+      ATALHOS.map(function (a) {
+        return '<button class="action-btn" data-ir="' + a.rota + '">' +
+          '<div class="icon-box icon-box-gray">' + ic(a.icone, 24) + '</div>' +
+          '<span class="font-bold text-sm">' + esc(a.label) + '</span></button>';
+      }).join('') +
+    '</div>' +
+  '</div>';
+}
+
+// --- Minha Saúde (índice dos registros) ---
+const REGISTROS = [
+  { rota: '/record', icone: ICONES.prontuario, titulo: 'Prontuário', descricao: 'Alergias, condições, medicações e histórico' },
+  { rota: '/exams', icone: ICONES.exames, titulo: 'Exames', descricao: 'Resultados de sangue e de imagem' },
+  { rota: '/appointment', icone: ICONES.consultas, titulo: 'Consultas', descricao: 'Próximas e anteriores' },
+  { rota: '/vacinas', icone: ICONES.vacinas, titulo: 'Carteira de Vacinação', descricao: 'Doses tomadas e pendentes' },
+  { rota: '/dependentes', icone: ICONES.dependentes, titulo: 'Dependentes', descricao: 'Familiares vinculados à conta' },
+];
+
+function telaMinhaSaude() {
+  return '<div class="screen-container">' +
+    botaoVoltar() +
+    '<h2 class="header-title">Minha Saúde</h2>' +
+    '<p class="header-subtitle mb-6">Seus registros, ' + esc(PACIENTE.nome.split(' ')[0]) + '</p>' +
+    '<div class="flex-col gap-4">' +
+      REGISTROS.map(function (item) {
+        return '<button class="list-action-btn" data-ir="' + item.rota + '">' +
+          '<div class="icon-box icon-box-lg">' + ic(item.icone, 26) + '</div>' +
+          '<div><h4 class="font-bold">' + esc(item.titulo) + '</h4>' +
+          '<p class="text-sm text-muted">' + esc(item.descricao) + '</p></div></button>';
+      }).join('') +
+    '</div></div>';
+}
+
+// --- Meu perfil ---
+function linhaInfo(icone, rotulo, valor, sensivel) {
+  const escondido = sensivel && estado.oculto;
+  return '<div class="info-row"><div class="info-icon">' + ic(icone, 18) + '</div>' +
+    '<div><p class="info-label">' + esc(rotulo) + '</p>' +
+    '<p class="info-value' + (escondido ? ' valor-oculto' : '') + '">' +
+    esc(escondido ? mascarar(valor) : (valor || '—')) + '</p></div></div>';
+}
+
+function telaPerfil() {
+  const idade = calcularIdade(PACIENTE.data_nascimento);
+  const detalhes = idade + ' anos • ID: #' + PACIENTE.id;
+  const endereco = [PACIENTE.rua + ', ' + PACIENTE.numero, PACIENTE.bairro,
+    PACIENTE.cidade + ' - ' + PACIENTE.estado].join(' • ');
+
+  return '<div class="screen-container">' +
+    botaoVoltar() +
+    '<div class="card profile-header">' +
+      '<div class="profile-avatar">' + ic('user', 40) + '</div>' +
+      '<h2 class="header-title" style="font-size:20px">' + esc(PACIENTE.nome) + '</h2>' +
+      '<p class="text-sm text-muted">' + esc(detalhes) + '</p>' +
+    '</div>' +
+
+    '<div class="section-header"><h3 class="section-title">Dados Cadastrais</h3>' +
+    botaoPrivacidade('meus dados') + '</div>' +
+    '<div class="card">' +
+      linhaInfo('mail', 'E-mail', PACIENTE.email, true) +
+      linhaInfo('phone', 'Telefone', formatarTelefone(PACIENTE.telefone), true) +
+      linhaInfo('idCard', 'CPF', formatarCPF(PACIENTE.cpf), true) +
+      linhaInfo('calendar', 'Data de Nascimento', formatarDataBR(PACIENTE.data_nascimento), true) +
+      linhaInfo('venus', 'Gênero', PACIENTE.genero, false) +
+      linhaInfo('droplet', 'Tipo Sanguíneo', PACIENTE.tipo_sanguineo, true) +
+    '</div>' +
+
+    '<h3 class="section-title">Endereço</h3>' +
+    '<div class="card">' +
+      linhaInfo('mapPin', 'Endereço', endereco, true) +
+      linhaInfo('mapPin', 'CEP', formatarCEP(PACIENTE.cep), true) +
+    '</div></div>';
+}
+
+// --- Prontuário ---
+const ICONES_LINHA = { consulta: 'stethoscope', exame: 'droplet' };
+
+function telaProntuario() {
+  const eventos = montarLinhaDoTempo(CONSULTAS, COLETAS, EXAMES_IMAGEM);
+
+  const bloco = function (classe, cor, icone, titulo, itens) {
+    const corpo = itens.length === 0
+      ? '<p class="text-sm text-muted">Nenhuma registrada</p>'
+      : itens.map(function (i) {
+          return '<p class="font-bold' + (estado.oculto ? ' valor-oculto' : '') + '">' +
+            esc(estado.oculto ? mascararTexto(i.descricao) : i.descricao) + '</p>';
+        }).join('');
+    return '<div class="card card-sm ' + classe + '" style="margin-bottom:0">' +
+      '<div class="flex items-center gap-4 ' + cor + ' mb-2">' + ic(icone, 18) +
+      '<span class="font-bold text-sm">' + titulo + '</span></div>' + corpo + '</div>';
+  };
+
+  const medicacoes = PRONTUARIO.medicacoes.map(function (m) {
+    return '<div class="medicacao-item">' +
+      '<div class="icon-box icon-box-gray">' + ic('pill', 18) + '</div><div>' +
+      '<p class="font-bold' + (estado.oculto ? ' valor-oculto' : '') + '">' +
+      esc(estado.oculto ? mascararTexto(m.nome) : m.nome + ' ' + m.dosagem) + '</p>' +
+      '<p class="text-xs text-muted' + (estado.oculto ? ' valor-oculto' : '') + '">' +
+      esc(estado.oculto ? mascararTexto(m.posologia) : m.posologia) + '</p></div></div>';
+  }).join('');
+
+  const linha = eventos.map(function (e) {
+    const descricao = e.descricao
+      ? '<button class="record-card" data-ir="' + e.rota + '">' +
+        (estado.oculto
+          ? '<span class="valor-oculto">' + mascararTexto(e.descricao) + '</span>'
+          : '<span class="' + (e.alerta ? 'text-red font-bold' : '') + '">' + esc(e.descricao) + '</span>') +
+        '</button>'
+      : '';
+    return '<div class="timeline-item">' +
+      '<div class="timeline-dot ' + e.tipo + '">' + ic(ICONES_LINHA[e.tipo] || 'stethoscope', 10) + '</div>' +
+      '<div class="timeline-head">' +
+        '<h4 class="font-bold' + (estado.oculto ? ' valor-oculto' : '') + '">' +
+        esc(estado.oculto ? mascararTexto(e.titulo) : e.titulo) + '</h4>' +
+        '<span class="text-xs text-muted flex items-center">' + ic('clock', 12) +
+        '<span style="margin-left:4px">' + esc(e.dataFormatada) + '</span></span>' +
+      '</div>' +
+      '<p class="text-xs text-muted">' + esc(e.subtitulo) + '</p>' + descricao +
+    '</div>';
+  }).join('');
+
+  return '<div class="screen-container">' +
+    botaoVoltar() +
+    '<div class="section-header"><div><h2 class="header-title">Prontuário</h2>' +
+    '<p class="header-subtitle">' + esc(PACIENTE.nome) + '</p></div>' +
+    botaoPrivacidade('prontuário') + '</div>' +
+
+    '<h3 class="section-title">Visão Geral</h3>' +
+    '<div class="quick-actions-grid mb-6">' +
+      bloco('border-red', 'text-red', 'alertCircle', 'Alergias', PRONTUARIO.alergias) +
+      bloco('border-blue', 'text-blue', 'heart', 'Condições', PRONTUARIO.condicoes) +
+    '</div>' +
+
+    '<h3 class="section-title">Medicações em uso</h3>' +
+    '<div class="card">' + medicacoes + '</div>' +
+
+    '<h3 class="section-title">Histórico</h3>' +
+    '<div class="timeline-container">' + linha + '</div>' +
+  '</div>';
+}
+
+// --- Exames ---
+// Linha de resultado com a régua da faixa de referência (ResultRow.jsx).
+function linhaResultado(item) {
+  const situacao = situacaoItem(item);
+  const posicao = posicaoNaFaixa(item);
+  const marcador = estado.oculto ? ''
+    : '<div class="result-regua-marcador ' + situacao + '" style="left:' + posicao + '%"></div>';
+
+  return '<div class="result-row">' +
+    '<div class="result-row-top"><span class="result-nome">' + esc(item.nome) + '</span>' +
+    '<span class="result-valor' + (estado.oculto ? ' valor-oculto' : '') + '">' +
+    esc(estado.oculto ? mascararValor() : item.valor.toLocaleString('pt-BR')) +
+    '<span class="result-unidade"> ' + esc(item.unidade) + '</span></span></div>' +
+
+    '<div class="result-regua" aria-hidden="true">' +
+    '<div class="result-regua-faixa" style="left:' + FAIXA_INICIO + '%;width:' + (FAIXA_FIM - FAIXA_INICIO) + '%"></div>' +
+    marcador + '</div>' +
+
+    '<div class="result-row-bottom">' +
+    '<span class="result-referencia">Referência: ' + esc(textoReferencia(item)) + '</span>' +
+    (estado.oculto ? '<span class="status-badge oculto">•••</span>' : selo(situacao)) +
+    '</div></div>';
+}
+
+function telaExames() {
+  const sangue = estado.abaExames === 'sangue';
+
+  const conteudo = sangue
+    ? COLETAS.map(function (coleta) {
+        const alterados = totalAlterados(coleta);
+        const situacao = estado.oculto
+          ? '<span class="status-badge oculto">•••</span>'
+          : selo(alterados > 0 ? 'alterado' : 'normal',
+              alterados > 0 ? alterados + (alterados === 1 ? ' alterado' : ' alterados') : 'Tudo normal');
+        return '<div class="card exam-card">' +
+          '<div class="exam-card-header"><div>' +
+            '<h3 class="exam-card-title">' + ic('calendar', 16) + ' ' + esc(formatarData(coleta.data)) + '</h3>' +
+            '<p class="exam-card-meta">' + ic('building', 13) + ' ' + esc(coleta.local) + '</p>' +
+            '<p class="exam-card-meta">' + ic('stethoscope', 13) + ' Solicitado por ' +
+            esc(coleta.solicitante) + ' · ' + esc(coleta.crm) + '</p>' +
+          '</div>' + situacao + '</div>' +
+          coleta.itens.map(linhaResultado).join('') +
+        '</div>';
+      }).join('')
+    : EXAMES_IMAGEM.map(function (exame) {
+        return '<div class="card exam-card">' +
+          '<div class="exam-card-header"><h3 class="exam-card-title">' +
+          ic('image', 16) + ' ' + esc(exame.nome) + '</h3></div>' +
+          campo('calendar', 'Realizado em', formatarData(exame.data)) +
+          campo('building', 'Local', exame.local) +
+          campo('stethoscope', 'Solicitado por', exame.solicitante) +
+          '<p class="exam-laudo-label">Conclusão do laudo</p>' +
+          '<p class="record-card' + (estado.oculto ? ' valor-oculto' : '') + '">' +
+          esc(estado.oculto ? mascararTexto(exame.laudo) : exame.laudo) + '</p>' +
+          '<p class="exam-aviso">' + ic('alertTriangle', 13) +
+          ' Resumo informativo — não substitui o laudo oficial.</p>' +
+        '</div>';
+      }).join('');
+
+  return '<div class="screen-container">' +
+    botaoVoltar() +
+    '<div class="section-header"><h2 class="header-title">Exames</h2>' +
+      '<div class="flex items-center gap-4">' + botaoPrivacidade('resultados') +
+      '<button class="pdf-download-btn" data-acao="pdf">' + ic('download', 18) +
+      '<span>Baixar PDF</span></button></div>' +
+    '</div>' +
+
+    '<p class="pdf-nota">' + ic('lock', 13) +
+    ' O PDF baixado abre com senha: os 4 primeiros dígitos do seu CPF.</p>' +
+
+    '<div class="tabs-wrapper">' +
+      '<button class="tab-btn' + (sangue ? ' active' : '') + '" data-aba-exames="sangue">' +
+      ic('droplet', 18) + '<span>Exames de Sangue</span></button>' +
+      '<button class="tab-btn' + (!sangue ? ' active' : '') + '" data-aba-exames="imagem">' +
+      ic('image', 18) + '<span>Exames de Imagem</span></button>' +
+    '</div>' + conteudo +
+  '</div>';
+}
+
+// --- Consultas ---
+function itemConsulta(c) {
+  return '<button class="consulta-item" data-ir="/appointment/' + c.id + '">' +
+    '<div class="consulta-item-data"><span class="consulta-item-dia">' + c.data.slice(8, 10) + '</span>' +
+    '<span class="consulta-item-mes">' + mesAbreviado(c.data) + '</span></div>' +
+    '<div class="consulta-item-body">' +
+      '<div class="consulta-item-top"><span class="font-bold">' + esc(c.medico) + '</span>' + selo(c.status) + '</div>' +
+      '<span class="consulta-item-espec">' + esc(c.especialidade) + '</span>' +
+      '<span class="consulta-item-meta">' + ic('calendar', 12) + ' ' + esc(c.hora) + ' · ' +
+      ic('mapPin', 12) + ' ' + esc(c.local) + '</span>' +
+    '</div>' + ic('chevronRight', 18, 'text-muted') + '</button>';
+}
+
+function telaConsultas() {
+  // A lista vem da mais recente para a mais antiga; as próximas ficam em ordem
+  // crescente para a consulta mais perto de acontecer vir primeiro.
+  const proximas = CONSULTAS.filter(function (c) { return c.status === 'agendada'; }).slice().reverse();
+  const anteriores = CONSULTAS.filter(function (c) { return c.status !== 'agendada'; });
+
+  return '<div class="screen-container">' +
+    botaoVoltar() +
+    '<h2 class="header-title mb-2">Consultas</h2>' +
+    '<p class="text-sm text-muted mb-6">Seus agendamentos e atendimentos anteriores</p>' +
+    '<h3 class="section-title">Próximas</h3>' + proximas.map(itemConsulta).join('') +
+    '<h3 class="section-title" style="margin-top:24px">Anteriores</h3>' + anteriores.map(itemConsulta).join('') +
+  '</div>';
+}
+
+function telaConsulta(id) {
+  const c = CONSULTAS.filter(function (x) { return String(x.id) === String(id); })[0];
+  if (!c) {
+    return '<div class="screen-container">' + botaoVoltar('/appointment') +
+      '<p class="empty-state">Consulta não encontrada.</p></div>';
+  }
+  const realizada = c.status === 'realizada';
+
+  return '<div class="screen-container">' +
+    botaoVoltar('/appointment') +
+    '<h2 class="header-title mb-6">Detalhes da Consulta</h2>' +
+
+    '<div class="card mb-6">' +
+      '<div class="detail-card-header">' +
+        '<div class="icon-box icon-box-lg">' + ic('user', 28) + '</div>' +
+        '<div style="flex:1"><h3 class="font-bold" style="font-size:18px">' + esc(c.medico) + '</h3>' +
+        '<p class="text-sm font-bold text-primary">' + esc(c.especialidade) + '</p></div>' + selo(c.status) +
+      '</div>' +
+      campo('calendar', 'Data e hora', formatarData(c.data) + ' • ' + c.hora) +
+      campo('mapPin', 'Local', c.local) +
+      campo('info', 'Motivo', c.motivo) +
+    '</div>' +
+
+    (realizada
+      ? '<h3 class="section-title">Registro do atendimento</h3><div class="card mb-6">' +
+        campo('fileText', 'Resumo', c.resumo) + campo('clock', 'Conduta', c.conduta) + '</div>'
+      : '') +
+
+    '<div class="flex-col gap-4">' +
+      (realizada
+        ? '<button class="btn-secondary" data-ir="/exams">' + ic('droplet', 18) + ' Ver exames</button>'
+        : '<button class="btn-primary" data-acao="remarcar">Remarcar</button>') +
+    '</div></div>';
+}
+
+// --- Dependentes ---
+function telaDependentes() {
+  const lista = estado.dependentes.length === 0
+    ? '<div class="card card-sm" style="display:flex;align-items:center;gap:12px">' +
+      '<div class="icon-box icon-box-gray">' + ic('users', 22) + '</div>' +
+      '<p class="text-sm text-muted">Nenhum dependente cadastrado ainda.</p></div>'
+    : estado.dependentes.map(function (d) {
+        return '<div class="card card-sm border-blue" style="display:flex;justify-content:space-between;align-items:center">' +
+          '<div><h4 class="font-bold">' + esc(d.nome) + '</h4>' +
+          '<p class="text-sm text-muted">' + calcularIdade(d.data_nascimento) + ' anos • ' +
+          esc(d.genero) + ' • ' + esc(d.tipo_sanguineo) + '</p>' +
+          '<p class="text-xs text-muted">CPF: ' + esc(formatarCPF(d.cpf)) + '</p></div>' +
+          '<button class="icon-box icon-box-gray" style="cursor:pointer;border:none" ' +
+          'title="Remover dependente" aria-label="Remover ' + esc(d.nome) + '" ' +
+          'data-remover-dependente="' + d.id + '">' + ic('trash', 18) + '</button></div>';
+      }).join('');
+
+  return '<div class="screen-container">' +
+    botaoVoltar() +
+    '<h2 class="header-title mb-6">Dependentes</h2>' +
+    '<p class="text-sm text-muted" style="margin-top:-16px;margin-bottom:24px">' +
+    'Cadastre familiares vinculados à sua conta. Eles não possuem acesso próprio.</p>' +
+
+    '<div class="card"><h3 class="section-title">Novo Dependente</h3>' +
+      '<form data-form="dependente">' +
+        '<div class="input-group" style="margin-bottom:16px"><label class="input-label">Nome Completo</label>' +
+        '<input name="nome" type="text" class="input-field" placeholder="Nome do dependente" required /></div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">' +
+          '<div class="input-group" style="margin-bottom:0"><label class="input-label">CPF</label>' +
+          '<input name="cpf" type="text" maxlength="11" class="input-field" placeholder="11 dígitos" required /></div>' +
+          '<div class="input-group" style="margin-bottom:0"><label class="input-label">Data de Nascimento</label>' +
+          '<input name="nascimento" type="date" class="input-field" required /></div>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">' +
+          '<div class="input-group" style="margin-bottom:0"><label class="input-label">Gênero</label>' +
+          '<select name="genero" class="input-field" required>' +
+          opcoes(['Masculino', 'Feminino', 'Outro', 'Prefiro não informar']) + '</select></div>' +
+          '<div class="input-group" style="margin-bottom:0"><label class="input-label">Tipo Sanguíneo</label>' +
+          '<select name="sangue" class="input-field" required>' + opcoes(TIPOS_SANGUINEOS) + '</select></div>' +
+        '</div>' +
+        (estado.erroTela ? '<p style="color:#ef4444;font-size:14px;margin-bottom:16px">' + esc(estado.erroTela) + '</p>' : '') +
+        '<button type="submit" class="btn-primary">Adicionar Dependente</button>' +
+      '</form></div>' +
+
+    '<h3 class="section-title">Meus Dependentes</h3>' + lista +
+  '</div>';
+}
+
+// --- Carteira de Vacinação ---
+function classePorGenero(pessoa) {
+  if (pessoa.titular) return '';
+  const genero = (pessoa.genero || '').trim().toLowerCase();
+  if (genero === 'masculino') return 'menino';
+  if (genero === 'feminino') return 'menina';
+  return '';
+}
+
+function itemVacina(v) {
+  const tomada = v.status === 'tomada';
+  return '<div class="vacina-item ' + v.status + '">' +
+    '<div class="vacina-status-icon ' + v.status + '">' + ic(tomada ? 'check' : 'clock', 16) + '</div>' +
+    '<div class="vacina-info">' +
+      '<div class="vacina-top"><span class="vacina-nome">' + esc(v.vacina) + '</span>' +
+      '<span class="vacina-periodo">' + esc(v.periodo) + '</span></div>' +
+      '<span class="vacina-dose">' + esc(v.dose) + '</span>' +
+      (v.protege ? '<span class="vacina-protege">Protege contra: ' + esc(v.protege) + '</span>' : '') +
+      '<span class="vacina-data">' +
+      (tomada
+        ? (v.dataPrevista ? 'Aplicada em ' + esc(v.dataPrevista) : 'Aplicada — em dia')
+        : 'Prevista para ' + esc(v.dataPrevista)) +
+      '</span>' +
+    '</div></div>';
+}
+
+function telaVacinas() {
+  const pessoas = [{ id: 'titular', nome: PACIENTE.nome, data_nascimento: PACIENTE.data_nascimento, titular: true }]
+    .concat(estado.dependentes.map(function (d) {
+      return { id: d.id, nome: d.nome, data_nascimento: d.data_nascimento, genero: d.genero, titular: false };
+    }));
+
+  const pessoa = pessoas.filter(function (p) { return String(p.id) === String(estado.pessoaVacina); })[0] || pessoas[0];
+  const idade = calcularIdade(pessoa.data_nascimento);
+  // O titular usa o calendário adulto; dependentes de até 12 anos, o infantil.
+  const adulto = pessoa.titular || (idade != null && idade >= 13);
+  const carteira = montarCarteira(pessoa.data_nascimento, { adulto: adulto });
+
+  const tomadas = carteira.filter(function (v) { return v.status === 'tomada'; });
+  const pendentes = carteira.filter(function (v) { return v.status === 'pendente'; });
+  const percentual = carteira.length ? Math.round((tomadas.length / carteira.length) * 100) : 0;
+
+  const seletor = pessoas.map(function (p) {
+    return '<button class="vacina-pessoa-pill' + (String(p.id) === String(pessoa.id) ? ' active' : '') + '" ' +
+      'data-pessoa-vacina="' + p.id + '">' +
+      '<span class="vacina-pessoa-icone ' + classePorGenero(p) + '">' + ic(p.titular ? 'user' : 'baby', 15) + '</span>' +
+      esc(p.titular ? p.nome.split(' ')[0] + ' (você)' : p.nome.split(' ')[0]) + '</button>';
+  }).join('');
+
+  return '<div class="screen-container vacinas-screen">' +
+    '<div class="vacinas-topo">' +
+      botaoVoltar() +
+      '<h2 class="header-title mb-2">Carteira de Vacinação</h2>' +
+      '<p class="text-sm text-muted mb-6">Calendário Nacional de Vacinação (SUS)</p>' +
+      '<div class="vacina-pessoa-selector">' + seletor + '</div>' +
+      '<div class="card"><div class="vacina-resumo">' +
+        '<div class="icon-box">' + ic('shieldCheck', 26) + '</div>' +
+        '<div style="flex:1"><div class="flex justify-between items-center mb-2">' +
+        '<span class="font-bold">' + (idade != null ? idade + (idade === 1 ? ' ano' : ' anos') : 'Titular da conta') + '</span>' +
+        '<span class="text-sm text-muted">' + tomadas.length + ' de ' + carteira.length + ' em dia</span></div>' +
+        '<div class="vacina-progress-bg"><div class="vacina-progress-fill" style="width:' + percentual + '%"></div></div>' +
+        '</div></div></div>' +
+    '</div>' +
+
+    '<div class="vacinas-lista">' +
+      (pendentes.length
+        ? '<h3 class="section-title">Próximas doses</h3>' + pendentes.map(itemVacina).join('')
+        : '') +
+      '<h3 class="section-title" style="margin-top:' + (pendentes.length ? '24px' : '0') + '">' +
+      (adulto ? 'Vacinas em dia' : 'Doses já aplicadas') + '</h3>' +
+      tomadas.map(itemVacina).join('') +
+    '</div></div>';
+}
+
+// --- Rede de Saúde ---
+const TIPOS_UNIDADE = {
+  ubs: { rotulo: 'UBS', icone: 'hospital' },
+  upa: { rotulo: 'UPA', icone: 'ambulance' },
+  pronto_socorro: { rotulo: 'Pronto-socorro', icone: 'heartPulse' },
+};
+
+const FILTROS_REDE = [
+  { id: 'todas', rotulo: 'Todas' },
+  { id: 'ubs', rotulo: 'UBS' },
+  { id: 'upa', rotulo: 'UPA' },
+  { id: 'pronto_socorro', rotulo: 'Pronto-socorro' },
+];
+
+// Abaixo de 1 km mostra em metros, que é mais concreto para quem vai a pé.
+function formatarDistancia(km) {
+  if (km == null) return null;
+  return km < 1 ? Math.round(km * 1000) + ' m' : km.toFixed(1).replace('.', ',') + ' km';
+}
+
+function itemUnidade(u) {
+  const tipo = TIPOS_UNIDADE[u.tipo] || TIPOS_UNIDADE.ubs;
+  return '<div class="unidade-item">' +
+    '<div class="unidade-icone ' + u.tipo + '">' + ic(tipo.icone, 20) + '</div>' +
+    '<div class="unidade-body">' +
+      '<div class="unidade-top"><span class="font-bold">' + esc(u.nome) + '</span>' +
+      '<span class="unidade-distancia">' + esc(formatarDistancia(u.distancia)) + '</span></div>' +
+      '<span class="unidade-tipo">' + tipo.rotulo + '</span>' +
+      '<span class="unidade-meta">' + ic('mapPin', 12) + esc(u.endereco + ' - ' + u.bairro) + '</span>' +
+      '<span class="unidade-meta">' + ic('clock', 12) + ' ' + esc(u.turno) + '</span>' +
+      '<div class="unidade-acoes">' +
+        '<button class="unidade-acao" data-acao="mapa">' + ic('navigation', 14) + ' Como chegar</button>' +
+        '<button class="unidade-acao" data-acao="ligar">' + ic('phone', 14) + ' Ligar</button>' +
+      '</div>' +
+    '</div></div>';
+}
+
+function telaRedeSaude() {
+  const lista = estado.filtroRede === 'todas'
+    ? UNIDADES
+    : UNIDADES.filter(function (u) { return u.tipo === estado.filtroRede; });
+
+  const filtros = FILTROS_REDE.map(function (f) {
+    return '<button class="rede-filtro' + (estado.filtroRede === f.id ? ' active' : '') +
+      '" data-filtro-rede="' + f.id + '">' + f.rotulo + '</button>';
+  }).join('');
+
+  return '<div class="screen-container">' +
+    botaoVoltar() +
+    '<h2 class="header-title mb-2">Rede de Saúde</h2>' +
+    '<p class="text-sm text-muted mb-6">São Paulo - SP · distâncias a partir do CEP do seu cadastro</p>' +
+    '<div class="rede-filtros">' + filtros + '</div>' +
+    (lista.length ? lista.map(itemUnidade).join('') : '<p class="empty-state">Nenhuma unidade desse tipo por perto.</p>') +
+    '<p class="rede-fonte">Fonte: CNES — Cadastro Nacional de Estabelecimentos de Saúde, ' +
+    'dados abertos do Ministério da Saúde. Nesta demonstração a lista é um recorte fixo de São Paulo.</p>' +
+  '</div>';
+}
+
+// --- Acesso do médico ---
+const ROTULO_SITUACAO = {
+  'aguardando': 'Aguardando o médico', 'em-uso': 'Em uso',
+  'expirado': 'Expirado', 'revogado': 'Revogado',
+};
+// A cor do selo reaproveita os status já existentes.
+const STATUS_BADGE_ACESSO = {
+  'aguardando': 'agendada', 'em-uso': 'normal', 'expirado': 'pendente', 'revogado': 'alterado',
+};
+
+function situacaoAcesso(a) {
+  if (a.revogadoEm) return 'revogado';
+  if (new Date(a.expiraEm) <= new Date()) return 'expirado';
+  return a.usadoEm ? 'em-uso' : 'aguardando';
+}
+
+// Minutos e segundos até `iso`; null quando já passou.
+function tempoRestante(iso) {
+  const ms = new Date(iso) - new Date();
+  if (ms <= 0) return null;
+  const total = Math.floor(ms / 1000);
+  return String(Math.floor(total / 60)).padStart(2, '0') + ':' + String(total % 60).padStart(2, '0');
+}
+
+function telaAcessoMedico() {
+  const restante = estado.codigoNovo ? tempoRestante(estado.codigoNovo.expiraEm) : null;
+
+  const cartaoCodigo = (estado.codigoNovo && restante)
+    ? '<div class="card codigo-card">' +
+        '<span class="codigo-label">Código do atendimento</span>' +
+        '<strong class="codigo-valor">' + esc(estado.codigoNovo.codigo) + '</strong>' +
+        '<div class="codigo-rodape">' +
+          '<span class="codigo-timer">' + ic('clock', 14) + ' expira em <span id="timer-codigo">' + restante + '</span></span>' +
+          '<button class="codigo-copiar" data-acao="copiar-codigo">' + ic('copy', 14) + ' Copiar</button>' +
+        '</div>' +
+        '<p class="codigo-aviso">Anote agora: por segurança o código não fica guardado e não pode ser consultado depois.</p>' +
+      '</div>'
+    : '';
+
+  const lista = estado.acessos.length === 0
+    ? '<p class="empty-state">Você ainda não concedeu nenhum acesso.</p>'
+    : estado.acessos.map(function (a) {
+        const situacao = situacaoAcesso(a);
+        const ativo = situacao === 'aguardando' || situacao === 'em-uso';
+        return '<div class="card acesso-item">' +
+          '<div class="acesso-item-topo"><div>' +
+            '<p class="font-bold">' + esc(a.medico || 'Ainda não utilizado') + '</p>' +
+            '<p class="text-xs text-muted">' + (a.crm ? 'CRM ' + esc(a.crm) + ' · ' : '') +
+            (a.escopo === 'escrita' ? 'Leitura e registro' : 'Somente leitura') + '</p>' +
+          '</div>' + selo(STATUS_BADGE_ACESSO[situacao], ROTULO_SITUACAO[situacao]) + '</div>' +
+          '<p class="text-xs text-muted">Gerado em ' + dataHoraCurta(a.criadoEm) +
+          (a.usadoEm ? ' · usado em ' + dataHoraCurta(a.usadoEm) : '') +
+          (a.revogadoEm ? ' · revogado em ' + dataHoraCurta(a.revogadoEm) : '') + '</p>' +
+          (ativo ? '<button class="acesso-revogar" data-revogar="' + a.id + '">' +
+            ic('ban', 14) + ' Revogar agora</button>' : '') +
+        '</div>';
+      }).join('');
+
+  return '<div class="screen-container">' +
+    botaoVoltar() +
+    '<h2 class="header-title mb-2">Acesso do médico</h2>' +
+    '<p class="text-sm text-muted mb-6">Gere um código e mostre ao profissional durante o atendimento. ' +
+    'Ele usa o código no portal do médico para ver seu resumo clínico e registrar o que foi feito na consulta.</p>' +
+
+    cartaoCodigo +
+
+    '<h3 class="section-title">Novo acesso</h3>' +
+    '<div class="escopo-opcoes">' +
+      '<button class="escopo-opcao' + (estado.escopoAcesso === 'leitura' ? ' active' : '') + '" data-escopo="leitura">' +
+      ic('bookOpen', 18) + '<span class="escopo-titulo">Somente leitura</span>' +
+      '<span class="escopo-desc">O médico vê seu resumo clínico, mas não altera nada.</span></button>' +
+      '<button class="escopo-opcao' + (estado.escopoAcesso === 'escrita' ? ' active' : '') + '" data-escopo="escrita">' +
+      ic('penLine', 18) + '<span class="escopo-titulo">Leitura e registro</span>' +
+      '<span class="escopo-desc">O médico também registra a consulta e os exames.</span></button>' +
+    '</div>' +
+
+    '<button class="btn-primary" data-acao="gerar-codigo">' + ic('keyRound', 18) + ' Gerar código</button>' +
+
+    '<p class="acesso-nota">' + ic('shieldCheck', 14) +
+    ' O código vale por 30 minutos, serve para um único médico e pode ser revogado a qualquer momento. ' +
+    'Seu CPF, e-mail e endereço nunca são compartilhados.</p>' +
+
+    '<h3 class="section-title" style="margin-top:24px">Acessos concedidos</h3>' + lista +
+  '</div>';
+}
+
+// --- Histórico de acessos ---
+const ACOES_LOG = {
+  entrou: { texto: 'Entrou com o seu código', icone: 'keyRound', cor: 'consulta' },
+  leu_prontuario: { texto: 'Consultou o seu resumo clínico', icone: 'bookOpen', cor: 'consulta' },
+  registrou_consulta: { texto: 'Registrou uma consulta', icone: 'calendar', cor: 'consulta' },
+  registrou_exame: { texto: 'Registrou um exame', icone: 'activity', cor: 'exame' },
+  revogado: { texto: 'Você revogou o acesso', icone: 'ban', cor: 'revogado' },
+};
+
+function telaHistoricoAcessos() {
+  const registros = HISTORICO_ACESSOS.map(function (r) {
+    const info = ACOES_LOG[r.acao] || { texto: 'Ação registrada', icone: 'shieldCheck', cor: 'consulta' };
+    const quem = [r.crm ? 'CRM ' + r.crm : '', r.especialidade].filter(Boolean).join(' · ');
+    return '<div class="timeline-item">' +
+      '<div class="timeline-dot ' + info.cor + '">' + ic(info.icone, 10) + '</div>' +
+      '<div class="timeline-head"><h4 class="font-bold">' + info.texto + '</h4></div>' +
+      '<p class="text-xs text-muted">' + esc(dataHoraLonga(r.criadoEm)) + '</p>' +
+      '<div class="acesso-log-quem">' +
+        '<p class="font-bold text-sm">' + esc(r.medico || 'Você') + '</p>' +
+        '<p class="text-xs text-muted">' + esc(quem) + (quem ? ' · ' : '') +
+        (r.escopo === 'escrita' ? 'Leitura e registro' : 'Somente leitura') + '</p>' +
+        (r.detalhe
+          ? '<p class="text-xs text-muted' + (estado.oculto ? ' valor-oculto' : '') + '">' +
+            esc(estado.oculto ? mascararTexto(r.detalhe) : r.detalhe) + '</p>'
+          : '') +
+      '</div></div>';
+  }).join('');
+
+  return '<div class="screen-container">' +
+    botaoVoltar() +
+    '<div class="section-header"><div><h2 class="header-title">Histórico de acessos</h2>' +
+    '<p class="header-subtitle">Quem abriu os seus dados, e quando</p></div>' +
+    botaoPrivacidade('histórico') + '</div>' +
+
+    '<p class="acesso-nota mb-6">' + ic('shieldCheck', 14) +
+    ' Cada vez que um profissional usa um código gerado por você, a ação fica registrada aqui. ' +
+    'O registro é automático e não pode ser apagado pelo médico nem por você.</p>' +
+
+    '<div class="timeline-container">' + registros + '</div>' +
+  '</div>';
+}
+
+// --- Dúvidas frequentes ---
+const ICONES_FAQ = {
+  geral: 'info', conta: 'keyRound', dependentes: 'users', consultas: 'stethoscope',
+  rede: 'mapPin', vacinas: 'syringe', medico: 'userCheck', privacidade: 'lock',
+};
+
+function telaFaq() {
+  const categorias = FAQ.map(function (categoria) {
+    const perguntas = categoria.perguntas.map(function (item, indice) {
+      const chave = categoria.id + '-' + indice;
+      const aberta = estado.faqAberta === chave;
+      return '<div class="faq-item' + (aberta ? ' aberta' : '') + '">' +
+        '<button type="button" class="faq-pergunta" data-faq="' + chave + '" aria-expanded="' + aberta + '">' +
+        '<span>' + esc(item.p) + '</span>' + ic('chevronDown', 18, 'faq-seta') + '</button>' +
+        (aberta ? '<p class="faq-resposta">' + esc(item.r) + '</p>' : '') +
+      '</div>';
+    }).join('');
+
+    return '<div class="card" style="margin-bottom:16px">' +
+      '<div class="faq-categoria">' + ic(ICONES_FAQ[categoria.id] || 'info', 18) +
+      '<h3 class="faq-categoria-titulo">' + esc(categoria.titulo) + '</h3></div>' + perguntas + '</div>';
+  }).join('');
+
+  return '<div class="screen-container">' +
+    botaoVoltar() +
+    '<div class="flex items-center gap-4 mb-2">' +
+    '<div class="icon-box">' + ic('helpCircle', 24) + '</div>' +
+    '<h2 class="header-title">Dúvidas Frequentes</h2></div>' +
+    '<p class="header-subtitle mb-6">Toque em uma pergunta para ver a resposta</p>' + categorias +
+
+    '<div class="card border-blue">' +
+      '<div class="flex items-center gap-4 text-blue mb-2">' + ic('messageCircle', 18) +
+      '<span class="font-bold text-sm">Não encontrou o que procurava?</span></div>' +
+      '<p class="text-sm text-muted">Pergunte ao assistente virtual pelo botão azul no canto da tela, ' +
+      'ou escreva para <strong>suporte@saudeconecta.com.br</strong>.</p>' +
+    '</div></div>';
+}
+
+// --- Termos de Uso e Portal de Privacidade ---
+function telaTermos() {
+  return '<div class="screen-container">' + botaoVoltar() +
+    '<div class="flex items-center gap-4 mb-2"><div class="icon-box">' + ic('fileText', 24) + '</div>' +
+    '<h2 class="header-title">Termos de Uso</h2></div>' +
+    '<p class="header-subtitle mb-6">Última atualização: 09 de junho de 2026</p>' +
+    '<div class="card">' + TEXTO_TERMOS + '</div></div>';
+}
+
+function telaPrivacidade() {
+  return '<div class="screen-container">' + botaoVoltar() +
+    '<div class="flex items-center gap-4 mb-2"><div class="icon-box">' + ic('lock', 24) + '</div>' +
+    '<h2 class="header-title">Portal de Privacidade</h2></div>' +
+    '<p class="header-subtitle mb-6">Em conformidade com a LGPD (Lei nº 13.709/2018)</p>' +
+    '<div class="card border-blue" style="margin-bottom:16px">' +
+      '<div class="flex items-center gap-4 text-blue mb-2">' + ic('shieldCheck', 18) +
+      '<span class="font-bold text-sm">Seu compromisso com a sua privacidade</span></div>' +
+      '<p class="text-sm text-muted">Levamos a proteção dos seus dados de saúde a sério. Esta política ' +
+      'explica quais dados coletamos, como os utilizamos e quais são os seus direitos.</p>' +
+    '</div>' +
+    '<div class="card">' + TEXTO_PRIVACIDADE + '</div></div>';
+}
+
+// --- Portal do médico (fora do app do paciente) ---
+function telaPortalMedico() {
+  const cabecalho = '<header class="portal-header">' +
+    '<div class="icon-box">' + ic('stethoscope', 22) + '</div>' +
+    '<div><h2 class="header-title">Portal do Médico</h2>' +
+    '<p class="text-sm text-muted">Saúde Conecta · acesso autorizado pelo paciente</p></div></header>';
+
+  if (!estado.medico) {
+    const codigoAtivo = estado.codigoNovo && tempoRestante(estado.codigoNovo.expiraEm)
+      ? '<p class="demo-nota">' + ic('keyRound', 14) +
+        '<span>Você gerou o código <strong>' + esc(estado.codigoNovo.codigo) +
+        '</strong> na tela “Acesso do médico”. Digite-o abaixo para ver o portal pelo lado do profissional.</span></p>'
+      : '<p class="demo-nota">' + ic('info', 14) +
+        '<span>Gere um código em “Acesso do médico”, no menu “Mais”, e informe-o aqui. ' +
+        'Nesta demonstração qualquer código de 6 caracteres é aceito.</span></p>';
+
+    return '<div class="screen-container">' + cabecalho +
+      '<p class="text-sm text-muted mb-6">Peça ao paciente o código gerado no aplicativo dele e ' +
+      'informe seus dados profissionais para abrir o prontuário.</p>' +
+      '<form class="card" data-form="medico-entrar">' +
+        '<div class="input-group"><label class="input-label">Código do paciente</label>' +
+        '<input name="codigo" class="input-field codigo-input" maxlength="6" placeholder="ABC123" required /></div>' +
+        '<div class="input-group"><label class="input-label">Seu nome</label>' +
+        '<input name="nome" class="input-field" value="Dra. Ana Souza" required /></div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">' +
+          '<div class="input-group"><label class="input-label">CRM</label>' +
+          '<input name="crm" class="input-field" value="123456-SP" required /></div>' +
+          '<div class="input-group"><label class="input-label">Especialidade</label>' +
+          '<input name="especialidade" class="input-field" value="Clínico Geral" required /></div>' +
+        '</div>' +
+        (estado.erroTela ? '<p class="form-erro">' + esc(estado.erroTela) + '</p>' : '') +
+        '<button type="submit" class="btn-primary">' + ic('logIn', 18) + ' Abrir prontuário</button>' +
+      '</form>' +
+      '<button class="btn-secondary" data-ir="/">Voltar ao app do paciente</button>' +
+    '</div>';
+  }
+
+  const restante = tempoRestante(estado.medico.expiraEm);
+  if (!restante) {
+    return '<div class="screen-container">' + cabecalho + '<div class="card">' +
+      '<p class="empty-state">Este acesso terminou (expirou ou foi revogado pelo paciente).</p>' +
+      '<button class="btn-primary" style="margin-top:16px" data-acao="medico-sair">Entrar com outro código</button>' +
+      '</div></div>';
+  }
+
+  const idade = calcularIdade(PACIENTE.data_nascimento);
+  const escrita = estado.medico.escopo === 'escrita';
+  const consulta = estado.abaMedico === 'consulta';
+
+  const formulario = escrita
+    ? '<div class="tabs-wrapper">' +
+        '<button class="tab-btn' + (consulta ? ' active' : '') + '" data-aba-medico="consulta">' +
+        ic('stethoscope', 18) + '<span>Consulta</span></button>' +
+        '<button class="tab-btn' + (!consulta ? ' active' : '') + '" data-aba-medico="exame">' +
+        ic('droplet', 18) + '<span>Exame</span></button>' +
+      '</div>' +
+      (consulta
+        ? '<form class="card" data-form="medico-consulta">' +
+            '<div class="input-group"><label class="input-label">Motivo</label>' +
+            '<input class="input-field" placeholder="Ex.: Retorno com resultados" required /></div>' +
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">' +
+              '<div class="input-group"><label class="input-label">Data</label>' +
+              '<input type="date" class="input-field" required /></div>' +
+              '<div class="input-group"><label class="input-label">Hora</label>' +
+              '<input type="time" class="input-field" required /></div>' +
+            '</div>' +
+            '<div class="input-group"><label class="input-label">Local</label>' +
+            '<input class="input-field" placeholder="Unidade e consultório" required /></div>' +
+            '<div class="input-group"><label class="input-label">Resumo</label>' +
+            '<textarea class="input-field" rows="3" placeholder="O que foi observado no atendimento"></textarea></div>' +
+            '<div class="input-group"><label class="input-label">Conduta</label>' +
+            '<textarea class="input-field" rows="2" placeholder="Orientações e prescrições"></textarea></div>' +
+            '<button class="btn-primary" type="submit">Registrar consulta</button>' +
+          '</form>'
+        : '<form class="card" data-form="medico-exame">' +
+            '<div class="input-group"><label class="input-label">Laboratório</label>' +
+            '<input class="input-field" placeholder="Nome do laboratório" required /></div>' +
+            '<div class="item-exame-form">' +
+              '<div class="item-exame-linha"><input class="input-field" placeholder="Exame (ex.: Hemoglobina)" required /></div>' +
+              '<div class="item-exame-linha"><input class="input-field" type="number" step="any" placeholder="Valor" required />' +
+              '<input class="input-field" placeholder="Unidade" /></div>' +
+              '<div class="item-exame-linha"><input class="input-field" type="number" step="any" placeholder="Ref. mín." required />' +
+              '<input class="input-field" type="number" step="any" placeholder="Ref. máx." required /></div>' +
+            '</div>' +
+            '<button type="button" class="btn-secondary" data-acao="mais-resultado">' + ic('plus', 16) + ' Adicionar resultado</button>' +
+            '<button class="btn-primary" type="submit" style="margin-top:16px">Registrar coleta</button>' +
+          '</form>')
+    : '<p class="acesso-nota">' + ic('shieldCheck', 14) +
+      ' Este acesso é somente leitura — o paciente não autorizou o registro de novos dados.</p>';
+
+  const listaSimples = function (classe, cor, icone, titulo, itens) {
+    return '<div class="card card-sm ' + classe + '" style="margin-bottom:0">' +
+      '<div class="flex items-center gap-4 ' + cor + ' mb-2">' + ic(icone, 18) +
+      '<span class="font-bold text-sm">' + titulo + '</span></div>' +
+      itens.map(function (i) { return '<p class="font-bold">' + esc(i.descricao) + '</p>'; }).join('') + '</div>';
+  };
+
+  return '<div class="screen-container">' + cabecalho +
+    '<div class="sessao-barra">' +
+      '<span class="sessao-timer">' + ic('clock', 14) + ' Acesso expira em <span id="timer-sessao">' + restante + '</span></span>' +
+      '<button class="sessao-sair" data-acao="medico-sair">' + ic('logOut', 14) + ' Encerrar</button>' +
+    '</div>' +
+
+    '<div class="card"><h3 class="font-bold" style="font-size:18px">' + esc(PACIENTE.nome) + '</h3>' +
+    '<p class="text-sm text-muted">' + idade + ' anos · ' + esc(PACIENTE.genero) +
+    ' · Tipo sanguíneo <strong>' + esc(PACIENTE.tipo_sanguineo) + '</strong></p></div>' +
+
+    '<div class="quick-actions-grid mb-6">' +
+      listaSimples('border-red', 'text-red', 'alertCircle', 'Alergias', PRONTUARIO.alergias) +
+      listaSimples('border-blue', 'text-blue', 'heart', 'Condições', PRONTUARIO.condicoes) +
+    '</div>' +
+
+    '<div class="card"><h3 class="section-title">Medicações em uso</h3>' +
+      PRONTUARIO.medicacoes.map(function (m) {
+        return '<div class="medicacao-item"><div class="icon-box icon-box-gray">' + ic('pill', 18) + '</div>' +
+          '<p class="text-sm font-bold">' + esc(m.nome + ' ' + m.dosagem + ' — ' + m.posologia) + '</p></div>';
+      }).join('') +
+    '</div>' + formulario +
+
+    '<p class="acesso-nota">' + ic('lock', 14) +
+    ' O resumo enviado ao profissional nunca inclui CPF, e-mail, telefone ou endereço do paciente.</p>' +
+  '</div>';
+}
+
+/* ---------- 6. Barra inferior, chatbot e roteador ---------- */
+
+// Abas da barra inferior. `rotas` lista o que pertence à aba além do destino,
+// para a aba acender também nas telas filhas.
+const ABAS = [
+  { label: 'Início', icone: ICONES.inicio, destino: '/dashboard', rotas: [] },
+  { label: 'Minha Saúde', icone: ICONES.saude, destino: '/patient',
+    rotas: ['/record', '/exams', '/appointment', '/vacinas', '/dependentes'] },
+  { label: 'Rede', icone: ICONES.rede, destino: '/rede-saude', rotas: [] },
+];
+
+// Telas sem barra inferior: login, cadastro e o portal do médico.
+const SEM_BARRA = ['/', '/cadastro', '/medico'];
+
+function itemMenu(rota, icone, texto, classe) {
+  return '<button class="more-menu-item ' + (classe || '') + '" data-ir="' + rota + '">' +
+    ic(icone, 20) + '<span>' + texto + '</span></button>';
+}
+
+function renderBarra(rota) {
+  const barra = document.getElementById('barra');
+  if (SEM_BARRA.indexOf(rota) !== -1) {
+    barra.hidden = true;
+    barra.innerHTML = '';
+    return;
+  }
+  barra.hidden = false;
+
+  const menu = estado.menuAberto
+    ? '<div class="more-menu-overlay">' +
+        itemMenu('/profile', ICONES.perfil, 'Meu perfil') +
+        itemMenu('/faq', ICONES.duvidas, 'Dúvidas frequentes') +
+        '<div class="more-menu-divider"></div><p class="more-menu-grupo">Privacidade</p>' +
+        itemMenu('/acesso-medico', ICONES.acessoMedico, 'Acesso do médico') +
+        itemMenu('/acessos-log', ICONES.historicoAcessos, 'Histórico de acessos') +
+        itemMenu('/privacy', ICONES.privacidade, 'Portal de Privacidade') +
+        itemMenu('/terms', ICONES.termos, 'Termos de Uso') +
+        '<div class="more-menu-divider"></div><p class="more-menu-grupo">Demonstração</p>' +
+        itemMenu('/medico', 'stethoscope', 'Portal do médico') +
+        '<div class="more-menu-divider"></div>' +
+        '<button class="more-menu-item logout" data-acao="sair">' + ic(ICONES.sair, 20) + '<span>Sair</span></button>' +
+      '</div>'
+    : '';
+
+  const abas = ABAS.map(function (aba) {
+    const ativa = [aba.destino].concat(aba.rotas).some(function (r) {
+      return rota === r || rota.indexOf(r + '/') === 0;
+    });
+    return '<button class="nav-item' + (ativa ? ' active' : '') + '" data-ir="' + aba.destino + '">' +
+      ic(aba.icone, 24) + '<span>' + aba.label + '</span></button>';
+  }).join('');
+
+  barra.innerHTML = menu + abas +
+    '<button class="nav-item' + (estado.menuAberto ? ' active' : '') + '" data-acao="menu">' +
+    ic(ICONES.mais, 24) + '<span>Mais</span></button>';
+}
+
+/* --- Assistente virtual ---
+   Só a camada local de regras. No app real, o que a base não conhece vai
+   para o Gemini pelo backend; aqui não há servidor, então o assistente
+   avisa em vez de fingir que consultou a IA. */
+/* __CHATBOT_BASE__ */
+
+// Tira acentos e caixa: o casamento não pode depender de "vacinação" vs "vacinacao".
+function normalizar(texto) {
+  return texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+// Vence a entrada com MAIS palavras-chave presentes, não a primeira que casar.
+function buscarNaBase(texto) {
+  const t = normalizar(texto);
+  let melhor = null;
+  let melhorPontos = 0;
+  BASE_CONHECIMENTO.forEach(function (entrada) {
+    const pontos = entrada.chaves.filter(function (chave) { return t.indexOf(normalizar(chave)) !== -1; }).length;
+    if (pontos > melhorPontos) { melhorPontos = pontos; melhor = entrada; }
+  });
+  return melhor ? melhor.resposta : null;
+}
+
+const RESPOSTA_FALLBACK =
+  'Ainda não sei responder isso com certeza. 🤔 Posso ajudar com: agendar consultas, exames, ' +
+  'dependentes, prontuário, senha/acesso e privacidade. (Nesta demonstração respondo só pela base ' +
+  'de regras local — no app completo a pergunta seguiria para a IA.)';
+
+function renderChatbot(rota) {
+  const caixa = document.getElementById('chatbot');
+  if (SEM_BARRA.indexOf(rota) !== -1) {
+    caixa.hidden = true;
+    caixa.innerHTML = '';
+    return;
+  }
+  caixa.hidden = false;
+
+  if (!estado.chatAberto) {
+    caixa.innerHTML = '<button class="chatbot-fab" data-acao="abrir-chat" aria-label="Abrir o assistente virtual">' +
+      ic('messageCircle', 28) + '</button>';
+    return;
+  }
+
+  const mensagens = estado.chatMensagens.map(function (m) {
+    return '<div class="chat-message-row ' + m.de + '">' +
+      '<div class="chat-bubble ' + m.de + '">' + esc(m.texto) + '</div></div>';
+  }).join('');
+
+  const digitando = estado.chatDigitando
+    ? '<div class="chat-message-row bot"><div class="chat-bubble bot typing-indicator">' +
+      '<span></span><span></span><span></span></div></div>'
+    : '';
+
+  const sugestoes = estado.chatMensagens.length === 1
+    ? '<div class="chat-suggestions">' + SUGESTOES.map(function (s) {
+        return '<button class="chat-suggestion-btn" data-sugestao="' + esc(s) + '">' + esc(s) + '</button>';
+      }).join('') + '</div>'
+    : '';
+
+  caixa.innerHTML =
+    '<div class="chat-window">' +
+      '<div class="chat-header"><div class="chat-header-info">' +
+        '<div class="chat-bot-icon">' + ic('bot', 20) + '</div>' +
+        '<div class="chat-bot-status"><span class="chat-bot-name">Assistente Saúde Conecta</span>' +
+        '<span class="chat-status-indicator"><span class="status-dot"></span>' +
+        '<span class="status-text">Online</span></span></div>' +
+      '</div>' +
+      '<button class="chat-close-btn" data-acao="fechar-chat" aria-label="Fechar o assistente">' + ic('x', 18) + '</button></div>' +
+
+      '<div class="chat-body" id="chat-body">' + mensagens + digitando + sugestoes + '</div>' +
+
+      '<form class="chat-input-area" data-form="chat">' +
+        '<input class="chat-input" id="chat-input" placeholder="Digite sua dúvida..." autocomplete="off" />' +
+        '<button class="chat-send-btn" type="submit" aria-label="Enviar">' + ic('send', 18) + '</button>' +
+      '</form>' +
+    '</div>' +
+    '<button class="chatbot-fab" data-acao="fechar-chat" aria-label="Fechar o assistente">' + ic('x', 26) + '</button>';
+
+  const corpo = document.getElementById('chat-body');
+  if (corpo) corpo.scrollTop = corpo.scrollHeight;
+}
+
+function enviarPergunta(texto) {
+  const limpo = (texto || '').trim();
+  if (!limpo || estado.chatDigitando) return;
+  estado.chatMensagens.push({ texto: limpo, de: 'user' });
+  estado.chatDigitando = true;
+  renderChatbot(rotaAtual());
+  setTimeout(function () {
+    estado.chatMensagens.push({ texto: buscarNaBase(limpo) || RESPOSTA_FALLBACK, de: 'bot' });
+    estado.chatDigitando = false;
+    renderChatbot(rotaAtual());
+    const campo = document.getElementById('chat-input');
+    if (campo) campo.focus();
+  }, 900);
+}
+
+/* --- Roteador --- */
+
+function rotaAtual() {
+  const bruta = location.hash.replace(/^#/, '');
+  return bruta || '/';
+}
+
+function ir(rota) {
+  if (rotaAtual() !== rota) pilha.push(rotaAtual());
+  estado.menuAberto = false;
+  estado.erroTela = null;
+  location.hash = '#' + rota;
+}
+
+function voltar(destino) {
+  if (destino) { ir(destino); return; }
+  const anterior = pilha.pop();
+  location.hash = '#' + (anterior || '/dashboard');
+}
+
+const ROTAS = {
+  '/': telaLogin,
+  '/cadastro': telaCadastro,
+  '/dashboard': telaDashboard,
+  '/patient': telaMinhaSaude,
+  '/profile': telaPerfil,
+  '/record': telaProntuario,
+  '/exams': telaExames,
+  '/appointment': telaConsultas,
+  '/dependentes': telaDependentes,
+  '/vacinas': telaVacinas,
+  '/rede-saude': telaRedeSaude,
+  '/acesso-medico': telaAcessoMedico,
+  '/acessos-log': telaHistoricoAcessos,
+  '/medico': telaPortalMedico,
+  '/terms': telaTermos,
+  '/privacy': telaPrivacidade,
+  '/faq': telaFaq,
+};
+
+const LIVRES = ['/', '/cadastro', '/medico'];
+
+// Desenha a tela da rota atual. `manterRolagem` é usado quando só o estado
+// mudou (olhinho, aba, filtro) e a página não deve pular para o topo.
+function render(manterRolagem) {
+  let rota = rotaAtual();
+
+  // Sem sessão, só as telas livres abrem — como no app, que exige o JWT.
+  if (LIVRES.indexOf(rota) === -1 && !estado.autenticado) {
+    location.hash = '#/';
+    return;
+  }
+
+  const conteudo = document.getElementById('conteudo');
+  const rolagem = conteudo.scrollTop;
+
+  const detalhe = rota.match(/^\/appointment\/(\d+)$/);
+  const html = detalhe ? telaConsulta(detalhe[1]) : (ROTAS[rota] || telaDashboard)();
+
+  conteudo.innerHTML = html;
+  conteudo.scrollTop = manterRolagem ? rolagem : 0;
+
+  renderBarra(rota);
+  renderChatbot(rota);
+}
+
+/* --- Cliques (delegação num só ouvinte) --- */
+
+document.addEventListener('click', function (evento) {
+  const alvo = evento.target.closest('[data-ir],[data-voltar],[data-acao],[data-aba-exames],' +
+    '[data-faq],[data-filtro-rede],[data-pessoa-vacina],[data-escopo],[data-revogar],' +
+    '[data-remover-dependente],[data-sugestao],[data-aba-medico]');
+
+  // Clicar fora fecha o menu "Mais".
+  if (!alvo || (!alvo.dataset.acao && alvo.dataset.acao !== 'menu')) {
+    if (estado.menuAberto && !evento.target.closest('.bottom-nav')) {
+      estado.menuAberto = false;
+      renderBarra(rotaAtual());
+    }
+  }
+  if (!alvo) return;
+
+  const d = alvo.dataset;
+
+  if (d.ir !== undefined) { ir(d.ir); return; }
+  if (d.voltar !== undefined) { voltar(d.voltar); return; }
+  if (d.abaExames) { estado.abaExames = d.abaExames; render(false); return; }
+  if (d.abaMedico) { estado.abaMedico = d.abaMedico; render(true); return; }
+  if (d.filtroRede) { estado.filtroRede = d.filtroRede; render(true); return; }
+  if (d.pessoaVacina) { estado.pessoaVacina = d.pessoaVacina; render(false); return; }
+  if (d.escopo) { estado.escopoAcesso = d.escopo; render(true); return; }
+  if (d.faq) { estado.faqAberta = estado.faqAberta === d.faq ? null : d.faq; render(true); return; }
+  if (d.sugestao) { enviarPergunta(d.sugestao); return; }
+
+  if (d.removerDependente) {
+    estado.dependentes = estado.dependentes.filter(function (x) { return String(x.id) !== d.removerDependente; });
+    if (String(estado.pessoaVacina) === d.removerDependente) estado.pessoaVacina = 'titular';
+    render(true);
+    return;
+  }
+
+  if (d.revogar) {
+    estado.acessos = estado.acessos.map(function (a) {
+      return String(a.id) === d.revogar ? Object.assign({}, a, { revogadoEm: new Date().toISOString() }) : a;
+    });
+    if (estado.codigoNovo && String(estado.codigoNovo.id) === d.revogar) estado.codigoNovo = null;
+    // Revogar corta o acesso na hora, mesmo com o médico de tela aberta.
+    if (estado.medico && String(estado.medico.id) === d.revogar) estado.medico = null;
+    render(true);
+    return;
+  }
+
+  switch (d.acao) {
+    case 'menu':
+      estado.menuAberto = !estado.menuAberto;
+      renderBarra(rotaAtual());
+      break;
+
+    case 'olhinho':
+      estado.oculto = !estado.oculto;
+      render(true);
+      break;
+
+    case 'ver-senha': {
+      const campo = document.getElementById('login-senha');
+      const mostrar = campo.type === 'password';
+      campo.type = mostrar ? 'text' : 'password';
+      alvo.innerHTML = ic(mostrar ? 'eyeOff' : 'eye', 20);
+      break;
+    }
+
+    case 'sem-senha':
+      avisar('A redefinição de senha ainda não existe no app — o botão é decorativo também no original.');
+      break;
+
+    case 'biometria':
+      avisar('A biometria depende do aparelho e não faz parte da demonstração.');
+      break;
+
+    case 'pdf':
+      avisar('No app completo este botão baixa um PDF protegido pelos 4 primeiros dígitos do seu CPF.');
+      break;
+
+    case 'mapa':
+      avisar('No app completo, "Como chegar" abre a rota no aplicativo de mapas do aparelho.');
+      break;
+
+    case 'ligar':
+      avisar('No app completo, "Ligar" abre o discador do celular com o número da unidade.');
+      break;
+
+    case 'remarcar':
+      avisar('O reagendamento ainda não existe no app — a tela de consultas só lista os atendimentos.');
+      break;
+
+    case 'mais-resultado':
+      avisar('No app completo este botão acrescenta mais uma linha de resultado à coleta.');
+      break;
+
+    case 'gerar-codigo': {
+      // Seis caracteres, sem as letras e os números que se confundem à mão.
+      const alfabeto = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let codigo = '';
+      for (let i = 0; i < 6; i++) codigo += alfabeto[Math.floor(Math.random() * alfabeto.length)];
+      const id = Date.now();
+      const expiraEm = new Date(Date.now() + 30 * 60000).toISOString();
+      estado.codigoNovo = { id: id, codigo: codigo, escopo: estado.escopoAcesso, expiraEm: expiraEm };
+      estado.acessos = [{
+        id: id, medico: null, crm: null, escopo: estado.escopoAcesso,
+        criadoEm: new Date().toISOString(), usadoEm: null, expiraEm: expiraEm, revogadoEm: null,
+      }].concat(estado.acessos);
+      render(false);
+      break;
+    }
+
+    case 'copiar-codigo':
+      if (estado.codigoNovo && navigator.clipboard) {
+        navigator.clipboard.writeText(estado.codigoNovo.codigo).then(
+          function () { avisar('Código copiado.'); },
+          function () { avisar('Não foi possível copiar. Anote o código da tela.'); }
+        );
+      } else {
+        avisar('Não foi possível copiar. Anote o código da tela.');
+      }
+      break;
+
+    case 'abrir-chat':
+      estado.chatAberto = true;
+      renderChatbot(rotaAtual());
+      break;
+
+    case 'fechar-chat':
+      estado.chatAberto = false;
+      renderChatbot(rotaAtual());
+      break;
+
+    case 'medico-sair':
+      estado.medico = null;
+      estado.erroTela = null;
+      render(false);
+      break;
+
+    case 'sair':
+      // Sair de verdade: a sessão e os dados da demonstração voltam ao início.
+      estado.autenticado = false;
+      estado.menuAberto = false;
+      estado.oculto = false;
+      estado.chatAberto = false;
+      estado.medico = null;
+      estado.codigoNovo = null;
+      location.hash = '#/';
+      break;
+  }
+});
+
+/* --- Formulários --- */
+
+document.addEventListener('submit', function (evento) {
+  const form = evento.target.closest('[data-form]');
+  if (!form) return;
+  evento.preventDefault();
+
+  switch (form.dataset.form) {
+    case 'login':
+      estado.autenticado = true;
+      ir('/dashboard');
+      break;
+
+    case 'cadastro':
+      estado.autenticado = true;
+      avisar('Cadastro simulado: nada foi gravado. Você entrou na conta de exemplo.');
+      ir('/dashboard');
+      break;
+
+    case 'dependente': {
+      const dados = new FormData(form);
+      const cpf = String(dados.get('cpf') || '').replace(/\D/g, '');
+      if (cpf.length !== 11) {
+        estado.erroTela = 'O CPF deve ter exatamente 11 dígitos numéricos!';
+        render(true);
+        return;
+      }
+      estado.erroTela = null;
+      estado.dependentes = estado.dependentes.concat([{
+        id: Date.now(),
+        nome: dados.get('nome'),
+        cpf: cpf,
+        data_nascimento: dados.get('nascimento'),
+        genero: dados.get('genero'),
+        tipo_sanguineo: dados.get('sangue'),
+      }]);
+      render(true);
+      break;
+    }
+
+    case 'medico-entrar': {
+      const dados = new FormData(form);
+      const codigo = String(dados.get('codigo') || '').trim();
+      if (codigo.length !== 6) {
+        estado.erroTela = 'Código inválido ou expirado.';
+        render(false);
+        return;
+      }
+      // O escopo vem do código que o paciente gerou; sem código na mão, a
+      // demonstração abre o acesso completo para dar para ver os dois lados.
+      const gerado = estado.codigoNovo && estado.codigoNovo.codigo === codigo.toUpperCase()
+        ? estado.codigoNovo : null;
+      estado.erroTela = null;
+      estado.medico = {
+        id: gerado ? gerado.id : null,
+        escopo: gerado ? gerado.escopo : 'escrita',
+        expiraEm: new Date(Date.now() + 30 * 60000).toISOString(),
+      };
+      if (gerado) {
+        estado.acessos = estado.acessos.map(function (a) {
+          return a.id === gerado.id
+            ? Object.assign({}, a, { medico: dados.get('nome'), crm: dados.get('crm'), usadoEm: new Date().toISOString() })
+            : a;
+        });
+      }
+      render(false);
+      break;
+    }
+
+    case 'medico-consulta':
+      avisar('Consulta registrada na demonstração — nada foi gravado no prontuário.');
+      form.reset();
+      break;
+
+    case 'medico-exame':
+      avisar('Coleta registrada na demonstração — nada foi gravado no prontuário.');
+      form.reset();
+      break;
+
+    case 'chat': {
+      const campo = document.getElementById('chat-input');
+      const texto = campo.value;
+      campo.value = '';
+      enviarPergunta(texto);
+      break;
+    }
+  }
+});
+
+/* --- Contagem regressiva dos acessos temporários --- */
+// Atualiza só o texto do relógio: recarregar a tela inteira a cada segundo
+// atrapalharia quem estivesse preenchendo o formulário do médico.
+setInterval(function () {
+  const doCodigo = document.getElementById('timer-codigo');
+  if (doCodigo && estado.codigoNovo) {
+    const restante = tempoRestante(estado.codigoNovo.expiraEm);
+    if (restante) doCodigo.textContent = restante;
+    else render(true);
+  }
+  const daSessao = document.getElementById('timer-sessao');
+  if (daSessao && estado.medico) {
+    const restante = tempoRestante(estado.medico.expiraEm);
+    if (restante) daSessao.textContent = restante;
+    else render(true);
+  }
+}, 1000);
+
+window.addEventListener('hashchange', function () { render(false); });
+
+if (!location.hash) location.hash = '#/';
+render(false);
+</script>

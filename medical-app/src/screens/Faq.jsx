@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   ChevronLeft, ChevronDown, HelpCircle, Info, KeyRound, Users,
-  Stethoscope, Syringe, UserCheck, Lock, MessageCircle,
+  Stethoscope, Syringe, UserCheck, Lock, MessageCircle, MapPin,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { FAQ } from '../content/FaqContent';
@@ -12,6 +12,7 @@ const ICONES = {
   conta: KeyRound,
   dependentes: Users,
   consultas: Stethoscope,
+  rede: MapPin,
   vacinas: Syringe,
   medico: UserCheck,
   privacidade: Lock,

@@ -1,6 +1,7 @@
 package br.com.hackgov.dao;
 
 import br.com.hackgov.db.Conexao;
+import br.com.hackgov.modelos.AcessoLog;
 import br.com.hackgov.modelos.AcessoTemporario;
 import br.com.hackgov.modelos.Medico;
 
@@ -158,6 +159,57 @@ public class AcessoDAO {
                         rs.getString("detalhe"),
                         texto(rs.getTimestamp("criado_em")),
                     });
+                }
+            }
+        }
+        return lista;
+    }
+
+    /**
+     * SELECT — trilha de auditoria de TODOS os acessos de um paciente, da ação
+     * mais recente para a mais antiga.
+     *
+     * O filtro é pelo paciente dono do acesso (a.paciente_id), não pelo id do
+     * log: é o que garante que ninguém leia a auditoria de outra pessoa. O
+     * limite existe porque a tela mostra um histórico, não um relatório — a
+     * trilha completa continua no banco.
+     */
+    public List<AcessoLog> listarLogPorPaciente(int idPaciente, int limite) throws SQLException {
+        String sql = "SELECT l.id, l.acesso_id, l.acao, l.detalhe, l.criado_em, a.escopo, "
+                + "       m.id AS medico_id, m.nome AS medico_nome, m.especialidade, m.crm "
+                + "FROM acessos_log l "
+                + "JOIN acessos_temporarios a ON a.id = l.acesso_id "
+                + "LEFT JOIN medicos m ON m.id = a.medico_id "
+                + "WHERE a.paciente_id = ? "
+                + "ORDER BY l.criado_em DESC, l.id DESC "
+                + "LIMIT ?";
+
+        List<AcessoLog> lista = new ArrayList<>();
+        try (Connection con = Conexao.abrir();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, idPaciente);
+            ps.setInt(2, limite);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    AcessoLog log = new AcessoLog();
+                    log.setIdLog(rs.getInt("id"));
+                    log.setIdAcesso(rs.getInt("acesso_id"));
+                    log.setAcao(rs.getString("acao"));
+                    log.setDetalhe(rs.getString("detalhe"));
+                    log.setCriadoEm(texto(rs.getTimestamp("criado_em")));
+                    log.setEscopo(rs.getString("escopo"));
+
+                    int idMedico = rs.getInt("medico_id");
+                    if (!rs.wasNull()) {
+                        Medico m = new Medico();
+                        m.setIdMedico(idMedico);
+                        m.setNome(rs.getString("medico_nome"));
+                        m.setEspecialidade(rs.getString("especialidade"));
+                        m.setCrm(rs.getString("crm"));
+                        log.setMedico(m);
+                    }
+                    lista.add(log);
                 }
             }
         }

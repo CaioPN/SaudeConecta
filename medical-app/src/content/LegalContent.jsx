@@ -76,7 +76,10 @@ export function PrivacyContent() {
         Coletamos os dados que você fornece ao se cadastrar e usar o app: dados de
         identificação (nome, CPF, e-mail, telefone, data de nascimento), dados de saúde
         (tipo sanguíneo, alergias, prontuário, exames) e dados de dependentes que você
-        venha a cadastrar.
+        venha a cadastrar. Na tela "Rede de Saúde", se você autorizar, usamos a
+        localização do aparelho apenas para ordenar as unidades por distância naquele
+        momento — ela não é armazenada nem enviada a terceiros; sem essa autorização,
+        a distância é calculada a partir do CEP do seu cadastro.
       </p>
 
       <h3 className="section-title">2. Como Utilizamos seus Dados</h3>

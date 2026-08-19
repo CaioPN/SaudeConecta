@@ -28,6 +28,25 @@ export async function listarAcessos() {
   }));
 }
 
+/**
+ * GET /api/acessos/log — trilha de auditoria: o que cada médico fez com o seu
+ * acesso, do mais recente para o mais antigo.
+ */
+export async function listarHistoricoAcessos() {
+  const { data } = await api.get('/acessos/log');
+  return (data.registros || []).map((r) => ({
+    id: r.id,
+    acessoId: r.acesso_id,
+    acao: r.acao,
+    detalhe: r.detalhe,
+    criadoEm: r.criado_em,
+    escopo: r.escopo,
+    medico: r.medico?.nome || null,
+    crm: r.medico?.crm || null,
+    especialidade: r.medico?.especialidade || null,
+  }));
+}
+
 /** DELETE /api/acessos/{id} — revoga o acesso; vale imediatamente. */
 export async function revogarAcesso(id) {
   const { data } = await api.delete(`/acessos/${id}`);

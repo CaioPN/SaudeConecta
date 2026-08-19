@@ -61,7 +61,7 @@ export const FAQ = [
       },
       {
         p: 'Como adiciono um dependente?',
-        r: 'Vá em "Exames/Registros" → "Dependentes" e toque no botão de adicionar. Você informa nome, CPF, data de nascimento, gênero e tipo sanguíneo.',
+        r: 'Vá em "Minha Saúde" → "Dependentes" e toque no botão de adicionar. Você informa nome, CPF, data de nascimento, gênero e tipo sanguíneo.',
       },
       {
         p: 'O dependente tem login próprio?',
@@ -75,11 +75,11 @@ export const FAQ = [
     perguntas: [
       {
         p: 'Onde vejo as minhas consultas?',
-        r: 'Na tela inicial, toque em "Agendamentos". As consultas ficam separadas entre as próximas (ainda por acontecer) e as anteriores. Tocando em uma delas você vê o local, o profissional, o resumo e a conduta.',
+        r: 'Na tela inicial, toque em "Consultas", ou vá em "Minha Saúde" → "Consultas". As consultas ficam separadas entre as próximas (ainda por acontecer) e as anteriores. Tocando em uma delas você vê o local, o profissional, o resumo e a conduta.',
       },
       {
         p: 'Onde ficam os meus exames?',
-        r: 'Em "Exames/Registros" → "Exames". Os exames de sangue aparecem agrupados por coleta e os de imagem trazem o laudo.',
+        r: 'Em "Minha Saúde" → "Exames". Os exames de sangue aparecem agrupados por coleta e os de imagem trazem o laudo.',
       },
       {
         p: 'Como leio o resultado de um exame de sangue?',
@@ -93,6 +93,40 @@ export const FAQ = [
         p: 'Quem coloca os meus exames e consultas no app?',
         r: 'O profissional de saúde que atende você, usando o código de acesso temporário que você gera no aplicativo.',
       },
+      {
+        p: 'Como baixo os meus exames em PDF?',
+        r: 'Na tela de Exames, toque em "Baixar PDF". O arquivo traz todas as coletas de sangue, com valores e faixas de referência, e a lista dos exames de imagem.',
+      },
+      {
+        p: 'O PDF dos exames tem senha?',
+        r: 'Tem. Para abrir o arquivo, digite os 4 primeiros dígitos do seu CPF. Como o PDF sai do aplicativo e pode acabar no WhatsApp ou no e-mail, ele vai protegido para que só você (e quem você autorizar) consiga ler. Se o seu cadastro estiver sem CPF, o arquivo é gerado sem senha e a tela avisa.',
+      },
+    ],
+  },
+  {
+    id: 'rede',
+    titulo: 'Rede de saúde',
+    perguntas: [
+      {
+        p: 'Onde encontro a UBS ou a UPA mais perto de mim?',
+        r: 'Toque em "Rede", na barra inferior. O app lista as unidades públicas da sua cidade — UBS, UPAs e prontos-socorros —, da mais perto para a mais longe, com endereço, telefone e horário de atendimento. Os botões filtram por tipo de unidade.',
+      },
+      {
+        p: 'De onde vêm essas informações?',
+        r: 'Do CNES (Cadastro Nacional de Estabelecimentos de Saúde), a base oficial do Ministério da Saúde. O app guarda uma cópia local e a renova periodicamente, por isso um telefone ou horário pode estar desatualizado se a unidade mudou há poucos dias.',
+      },
+      {
+        p: 'Como o app sabe a distância até a unidade?',
+        r: 'Se você autorizar o acesso à localização, a distância é medida de onde você está; caso contrário, ela sai do CEP do seu cadastro — o texto abaixo do título diz qual dos dois foi usado. É a distância em linha reta, então o trajeto de rua costuma ser um pouco maior.',
+      },
+      {
+        p: 'A minha localização fica guardada?',
+        r: 'Não. Ela é usada apenas para ordenar a lista naquele momento e não é gravada no seu cadastro nem enviada para outro lugar. A cidade pesquisada vem sempre do CEP do seu perfil.',
+      },
+      {
+        p: 'Consigo marcar atendimento por aqui?',
+        r: 'Ainda não. A tela mostra a unidade, o endereço e o telefone: o agendamento é feito diretamente com a unidade. O botão "Como chegar" abre a rota no aplicativo de mapas do seu aparelho.',
+      },
     ],
   },
   {
@@ -105,7 +139,7 @@ export const FAQ = [
       },
       {
         p: 'Posso ver a carteira de um dependente?',
-        r: 'Sim. Em "Exames/Registros" → "Carteira de Vacinação", use o seletor no topo da tela para alternar entre você e cada dependente.',
+        r: 'Sim. Em "Minha Saúde" → "Carteira de Vacinação", use o seletor no topo da tela para alternar entre você e cada dependente.',
       },
       {
         p: 'Onde vejo as campanhas de vacinação abertas?',
@@ -154,6 +188,14 @@ export const FAQ = [
       {
         p: 'O assistente virtual tem acesso ao meu prontuário?',
         r: 'Não. Ele responde dúvidas sobre o aplicativo e recebe apenas a pergunta que você digita. Nenhum exame, consulta ou dado pessoal seu é enviado para fora.',
+      },
+      {
+        p: 'Como sei quem viu os meus dados?',
+        r: 'Em "Mais" → "Histórico de acessos". A tela lista, do mais recente para o mais antigo, cada vez que um profissional entrou com um código gerado por você: o nome dele, o CRM, o que fez (consultou o resumo, registrou uma consulta ou um exame) e a data e a hora. O registro é automático — nem o médico nem você conseguem apagá-lo.',
+      },
+      {
+        p: 'Dá para esconder os meus dados na tela?',
+        r: 'Sim. O botão do olhinho, no topo do perfil, do prontuário, dos exames e dos avisos, troca os dados sensíveis por bolinhas — útil quando alguém está olhando por cima do seu ombro. Os dados aparecem normalmente ao abrir o app; um toque esconde, outro mostra de novo.',
       },
       {
         p: 'Como peço a correção ou a exclusão dos meus dados?',
