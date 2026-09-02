@@ -38,13 +38,19 @@ backend-api/          API Java (pacote br.com.hackgov)
     modelos/            POJOs — Paciente, Dependente, Familiar, Medico,
                         Consulta, Prontuario, HistoricoMedico, Medicacao,
                         Alergia, Notificacao, Exame, ItemExame,
-                        AcessoTemporario, AcessoLog, RegistroAuditoria, Aviso
+                        AcessoTemporario, AcessoLog, RegistroAuditoria, Aviso,
+                        UnidadeSaude, DoseVacina
     principal/Principal menu de console antigo (não serve o front)
     util/               Json (parser próprio), Jwt, SenhaUtil,
                         CodigoAcesso, ChatIA, CarteiraVacinal (regras da
                         carteira), CnesApi, Localizacao
-database/             scripts SQL (schema, seeds)
+database/             scripts SQL (schema com migração no fim, seeds)
+  gerar-calendario.mjs  reescreve o calendário do PNI no seed a partir do JS
 demo/                 versão HTML de demonstração (arquivo único, sem build)
+  app.template.html   marcação das telas, escrita à mão
+  gerar.mjs           recorta os originais e monta o index.html
+  gerar-icones.mjs    extrai os SVG do lucide para icones.js
+  testar.mjs          teste de fumaça: roda cada tela num DOM de mentira
 medical-app/          front-end React + Vite
   public/
   src/
@@ -62,7 +68,8 @@ medical-app/          front-end React + Vite
       AuthContext.jsx   estado de autenticação global
       PrivacidadeContext.jsx  estado do "olhinho" (global, não persistido)
       PessoasContext.jsx  de quem são os dados na tela (idem, não persistido)
-    data/             dados estáticos (calendário de vacinas do PNI)
+    data/             vacinas.js — calendário do PNI. Hoje serve à DEMO e ao
+                      seed; o app lê o calendário do banco (calendario_vacinal)
     utils/            regras puras (faixa de referência, datas, linha do tempo)
                       icones.js — um ícone por assunto, usado por todas as telas
                       privacidade.js — máscaras do "olhinho"
@@ -75,7 +82,10 @@ medical-app/          front-end React + Vite
       HistoricoAcessos.jsx  (trilha do médico + a do próprio paciente)
       PortalMedico.jsx  (médico usa o código — fora do app do paciente)
       Privacy.jsx, Terms.jsx, Faq.jsx
-    services/         chamadas HTTP para a API (uma por assunto)
+    services/         chamadas HTTP para a API (uma por assunto) — api (axios
+                      com o JWT), avisos, consultas, exames, prontuario,
+                      vacinas, familiares, notificacoes, acessos, auditoria,
+                      medico, redeSaude, senha, perfil, chatbot
     App.jsx, main.jsx, app.css
   index.html, package.json
 ```
@@ -381,8 +391,11 @@ sem lógica de banco).
   - O **calendário do PNI foi para o banco**. Ele tem dois leitores — a tela e
     o `AvisoDAO`, que conta as doses atrasadas — e duas cópias, uma em JS e
     outra em Java, sairiam do ar uma da outra no primeiro ajuste do Ministério.
-    O seed é gerado a partir de `data/vacinas.js`, que continua existindo só
-    para a demonstração (que não tem backend).
+    O seed é **gerado** a partir de `data/vacinas.js` por
+    `node database/gerar-calendario.mjs --gravar`, que reescreve o bloco entre
+    os marcadores `<calendario-vacinal>` do `seed.sql`. A lista JS continua
+    sendo a fonte porque a demonstração (sem backend) também precisa dela:
+    mexa no JS e rode o gerador, nunca o contrário.
   - `vacinas_aplicadas` **não tem chave única**, e isso é limitação do MySQL:
     `dependente_id` é NULL no titular, NULLs não colidem em índice único, e a
     coluna gerada que resolveria isso é proibida junto com `ON DELETE CASCADE`.
@@ -526,7 +539,9 @@ sem lógica de banco).
   tomou".
 - O calendário do PNI existe em dois lugares: a tabela `calendario_vacinal`
   (usada pelo app) e `data/vacinas.js` (usado pela demonstração, que não tem
-  backend). O seed é gerado a partir do arquivo JS, mas a sincronia é manual.
+  backend). O gerador (`database/gerar-calendario.mjs`) mantém o seed em dia a
+  partir do JS, mas ninguém obriga a rodá-lo — não há verificação automática de
+  que o banco e o arquivo estão iguais.
 - O chatbot **não conhece os dados do paciente** — ele explica o app e orienta,
   mas não responde "quando foi meu último exame?". Fazer isso exigiria mandar
   dado clínico para o modelo, o que o nível gratuito do Gemini não permite (usa
@@ -590,6 +605,25 @@ sem lógica de banco).
   banco, o acesso é reconferido no banco a cada requisição (para a revogação
   valer na hora), o escopo de escrita é opcional e o resumo enviado ao médico
   nunca inclui CPF, e-mail, telefone ou endereço.
+- **Dado de terceiro é opt-in.** Contato de emergência é nome e telefone de
+  outra pessoa, que nunca consentiu com nada aqui: ele só sai do app quando o
+  paciente marca a opção, uma vez por código gerado — nunca por padrão.
+- **Alterar dado de identificação não é edição de cadastro.** Nome, CPF, data
+  de nascimento, gênero e tipo sanguíneo não são editáveis pela tela: são o que
+  identifica a pessoa no atendimento, e tipo sanguíneo errado num
+  pronto-socorro é o pior erro possível neste app. O e-mail fica de fora pelo
+  outro motivo — é a chave do login e da recuperação de senha.
+- **Hash de senha e hash de código são coisas diferentes.** Senha usa PBKDF2
+  com salt (`SenhaUtil`), porque a conferência é contra a linha do dono, que já
+  se conhece pelo e-mail. Código de acesso usa SHA-256 puro (`CodigoAcesso`),
+  porque ele é PROCURADO por igualdade de hash e um salt por linha tornaria a
+  busca impossível. Não unifique os dois.
+- **Migração de schema vai no fim do `schema.sql`.** `CREATE TABLE IF NOT
+  EXISTS` não altera tabela que já existe, e o MySQL não tem `ADD COLUMN IF NOT
+  EXISTS` — o arquivo termina com um procedimento que confere o
+  INFORMATION_SCHEMA antes de alterar. Coluna nova entra nos dois lugares: na
+  definição da tabela (para instalação limpa) e numa linha `CALL
+  sc_adicionar_coluna(...)` (para quem já tem o banco).
 
 ## Como rodar
 
@@ -632,14 +666,26 @@ constante `PORTA`). O `br.com.hackgov.principal.Principal` é o menu de console
 antigo, executado pelo `executar.bat` — não é ele que serve o front.
 
 Banco (uma vez, ou quando o schema mudar) — no Windows o `--default-character-set`
-é obrigatório, senão o mysql.exe grava os acentos corrompidos:
+é obrigatório, senão o mysql.exe grava os acentos corrompidos. Os dois scripts
+são **idempotentes**: dá para rodar quantas vezes quiser, e é assim que as
+colunas novas chegam a um banco que já existe (ver a seção de migração no fim
+do `schema.sql`):
 
 ```bash
 mysql -u root -p --default-character-set=utf8mb4 < database/schema.sql
 mysql -u root -p --default-character-set=utf8mb4 < database/seed.sql
 ```
 
-Login de teste do seed: `gabriel@gmail.com` / `Teste@123`.
+Login de teste do seed: `gabriel@gmail.com` / `Teste@123`. A senha dele está
+gravada no formato **antigo** de propósito: a primeira entrada exercita a
+migração do hash para PBKDF2 (ver `SenhaUtil.precisaAtualizar`).
+
+Se o calendário de vacinação mudar, mexa em `medical-app/src/data/vacinas.js` e
+regenere o bloco do seed:
+
+```bash
+node database/gerar-calendario.mjs --gravar
+```
 
 Para a apresentação existe ainda o `database/seed-caio.sql`, com o histórico
 clínico de demonstração da conta `caioastoria@gmail.com` (consultas passadas e
@@ -650,6 +696,37 @@ o paciente já esteja cadastrado e **não toca nos dependentes**:
 mysql -u root -p --default-character-set=utf8mb4 < database/seed-caio.sql
 ```
 
+Demonstração (`demo/`), depois de mexer em qualquer arquivo que ela recorta:
+
+```bash
+node demo/gerar-icones.mjs   # só quando um ícone novo é usado na demo
+node demo/gerar.mjs          # regenera demo/index.html
+node demo/testar.mjs         # teste de fumaça: 18 telas x 3 cenários
+```
+
+O `testar.mjs` monta um DOM de mentira e chama cada tela. A demo é escrita à
+mão e não tem build nem lint, então uma função renomeada num lugar e esquecida
+em outro só apareceria na hora de mostrar o projeto para alguém.
+
+## Como conferir uma mudança de verdade
+
+Compilar não é testar. O caminho que pega o que o compilador não pega:
+
+1. `javac` e `vite build` — erro de sintaxe e import quebrado.
+2. Aplicar o `schema.sql` no MySQL. **É aqui que aparece erro de FK**: o MySQL
+   recusa `ON DELETE CASCADE` numa coluna que serve de base para coluna gerada
+   (erro 1215), e isso derrubou a chave única de `vacinas_aplicadas`.
+3. Subir a API e exercitar a rota com `curl`, conferindo o efeito no banco.
+   Foi assim que apareceram os dois erros mais sérios da última leva: o
+   `CodigoAcesso` herdando o hash salgado (que quebraria o acesso do médico
+   inteiro) e o titular adulto aparecendo com o calendário infantil em atraso.
+4. `node demo/testar.mjs` para a versão de demonstração.
+
+Cuidado ao testar por `curl` no Git Bash: acento em argumento chega corrompido
+ao banco. Para validar texto com acento, use o navegador. E os dados que o
+teste criar precisam ser apagados depois — o banco local é o mesmo da
+apresentação.
+
 ## Como me ajudar melhor
 
 - Antes de mexer, leia os arquivos relacionados — não presuma o conteúdo.
@@ -657,4 +734,7 @@ mysql -u root -p --default-character-set=utf8mb4 < database/seed-caio.sql
 - Se eu pedir uma tela nova, siga o padrão visual e a estrutura das telas
   que já existem (`Vacinas.jsx` e `Dependentes.jsx` são boas referências).
 - Ao terminar algo relevante, atualize as seções "O que já está pronto" e
-  "O que falta" deste arquivo.
+  "O que falta" deste arquivo — e o FAQ (`content/FaqContent.js`) e a base de
+  regras do chatbot (`MedicalChatbot.jsx`), que são a mesma informação escrita
+  para o paciente. Os três saem do ar um do outro com facilidade.
+- Não faça `git push`: eu decido quando publicar.
