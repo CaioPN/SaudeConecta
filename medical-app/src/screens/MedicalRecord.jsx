@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { AlertCircle, Heart, Clock, ChevronLeft, Pill, Stethoscope, Droplet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { usePessoas } from '../context/PessoasContext';
 import { usePrivacidade } from '../context/PrivacidadeContext';
 import BotaoPrivacidade from '../components/BotaoPrivacidade';
+import SeletorPessoa from '../components/SeletorPessoa';
 import { mascararTexto } from '../utils/privacidade';
 import { buscarProntuario } from '../services/prontuario';
 import { listarConsultas } from '../services/consultas';
@@ -15,25 +16,33 @@ const ICONES = { consulta: Stethoscope, exame: Droplet };
 
 export default function MedicalRecord() {
   const navigate = useNavigate();
-  const { paciente } = useAuth();
+  const { pessoa, dependenteId } = usePessoas();
   const { oculto } = usePrivacidade();
   const [prontuario, setProntuario] = useState({ alergias: [], condicoes: [], medicacoes: [] });
   const [eventos, setEventos] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
 
+  // Refaz tudo ao trocar de pessoa: as três origens precisam ser da mesma
+  // pessoa, senão a linha do tempo misturaria consultas de um com exames de outro.
   useEffect(() => {
     let ativo = true;
+    setCarregando(true);
+    setErro(null);
     // O prontuário reúne três origens: dados fixos (alergias/condições/
     // medicações), consultas e exames — que juntos formam a linha do tempo.
-    Promise.all([buscarProntuario(), listarConsultas(), buscarExames()])
+    Promise.all([
+      buscarProntuario(dependenteId),
+      listarConsultas(dependenteId),
+      buscarExames(dependenteId),
+    ])
       .then(([dados, consultas, { coletas, imagem }]) => {
         if (!ativo) return;
         setProntuario(dados);
         setEventos(montarLinhaDoTempo(consultas, coletas, imagem));
       })
       .catch(() => {
-        if (ativo) setErro('Não foi possível carregar seu prontuário.');
+        if (ativo) setErro('Não foi possível carregar o prontuário.');
       })
       .finally(() => {
         if (ativo) setCarregando(false);
@@ -41,7 +50,7 @@ export default function MedicalRecord() {
     return () => {
       ativo = false;
     };
-  }, []);
+  }, [dependenteId]);
 
   const { alergias, condicoes, medicacoes } = prontuario;
 
@@ -54,10 +63,12 @@ export default function MedicalRecord() {
       <div className="section-header">
         <div>
           <h2 className="header-title">Prontuário</h2>
-          <p className="header-subtitle">{paciente?.nome || 'Paciente'}</p>
+          <p className="header-subtitle">{pessoa.nome}</p>
         </div>
         <BotaoPrivacidade rotulo="prontuário" />
       </div>
+
+      <SeletorPessoa />
 
       {carregando && <p className="empty-state">Carregando prontuário…</p>}
       {erro && !carregando && <p className="empty-state">{erro}</p>}

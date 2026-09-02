@@ -96,4 +96,24 @@ public class DependenteDAO {
             return ps.executeUpdate() > 0;
         }
     }
+
+    /**
+     * SELECT — nome de um dependente, desde que ele seja do paciente informado.
+     * Devolve null quando não existe ou é de outra conta.
+     *
+     * Serve à trilha de auditoria (que grava o primeiro nome de quem teve o
+     * dado aberto) e ao DELETE, que precisa do nome antes de excluir.
+     */
+    public String nomeDoPaciente(int id, int idPaciente) throws SQLException {
+        String sql = "SELECT nome FROM dependentes WHERE id = ? AND paciente_id = ?";
+        try (Connection con = Conexao.abrir();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, id);
+            ps.setInt(2, idPaciente);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getString("nome") : null;
+            }
+        }
+    }
 }

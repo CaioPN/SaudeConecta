@@ -20,7 +20,7 @@ const ICONES = {
   ambulance: 'ambulance', navigation: 'navigation', phone: 'phone', bookOpen: 'book-open',
   penLine: 'pen-line', ban: 'ban', copy: 'copy', messageCircle: 'message-circle', x: 'x',
   send: 'send', bot: 'bot', info: 'info', mail: 'mail', idCard: 'id-card', venus: 'venus',
-  userCheck: 'user-check', plus: 'plus', logIn: 'log-in', arrowRight: 'arrow-right',
+  userCheck: 'user-check', plus: 'plus', logIn: 'log-in', search: 'search', arrowRight: 'arrow-right',
 };
 
 const saida = {};

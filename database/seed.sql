@@ -149,6 +149,21 @@ WHERE NOT EXISTS (
   SELECT 1 FROM medicacoes WHERE paciente_id = @pid AND nome = 'Losartana'
 );
 
+-- --- Contatos de emergência ---
+-- Quem avisar se algo acontecer com o paciente. Não entram no resumo enviado
+-- ao médico pelo acesso temporário: o telefone é de outra pessoa.
+INSERT INTO familiares (paciente_id, nome, parentesco, telefone)
+SELECT @pid, 'Marina Ferreira', 'Mãe', '11988887777'
+WHERE NOT EXISTS (
+  SELECT 1 FROM familiares WHERE paciente_id = @pid AND nome = 'Marina Ferreira'
+);
+
+INSERT INTO familiares (paciente_id, nome, parentesco, telefone)
+SELECT @pid, 'Carlos Ferreira', 'Irmão', '11977776666'
+WHERE NOT EXISTS (
+  SELECT 1 FROM familiares WHERE paciente_id = @pid AND nome = 'Carlos Ferreira'
+);
+
 -- --- Campanhas de vacinação ---
 -- Datas REAIS do calendário de estratégias nacionais de vacinação de 2026,
 -- divulgado pelo Ministério da Saúde em março/2026. Fonte:

@@ -33,10 +33,27 @@ const BASE_CONHECIMENTO = [
             'Os dados aparecem normalmente quando o app é aberto.',
     },
     {
-        chaves: ['dependente', 'dependentes', 'familiar', 'filho', 'filha', 'família', 'familia'],
+        chaves: ['dependente', 'dependentes', 'filho', 'filha', 'família', 'familia'],
         resposta:
-            'Você gerencia dependentes em "Minha Saúde" → "Dependentes". Lá é possível adicionar, listar ' +
-            'e remover familiares vinculados à sua conta.',
+            'Você gerencia dependentes em "Minha Saúde" → "Dependentes". Para VER os dados de um deles, use o ' +
+            'seletor no topo de Exames, Consultas, Prontuário e Carteira de Vacinação — a escolha vale para ' +
+            'essas telas todas ao mesmo tempo, e volta para você ao recarregar o app.',
+    },
+    {
+        chaves: ['contato de emergencia', 'contato de emergência', 'emergencia contato',
+                 'avisar', 'parentesco', 'quem avisar', 'familiar'],
+        resposta:
+            'Os contatos de emergência ficam em "Mais" → "Meu perfil", no fim da tela: nome, parentesco e ' +
+            'telefone de quem deve ser procurado. Eles são só seus — não entram no resumo que o médico recebe ' +
+            'pelo código de acesso, porque o telefone é de outra pessoa.',
+    },
+    {
+        chaves: ['notificação', 'notificacao', 'notificações', 'notificacoes', 'novidades',
+                 'aviso do medico', 'aviso do médico'],
+        resposta:
+            'Quando um profissional registra uma consulta, um exame ou um item do prontuário com um código ' +
+            'seu, aparece o bloco "Novidades" na tela inicial dizendo o que foi feito e por quem. A mensagem ' +
+            'não traz diagnóstico nem resultado — para isso você abre a tela correspondente.',
     },
     {
         chaves: ['prontuário', 'prontuario', 'histórico', 'historico', 'alergia', 'condição', 'condicao'],
@@ -45,10 +62,11 @@ const BASE_CONHECIMENTO = [
             'recentes das suas consultas.',
     },
     {
-        chaves: ['senha', 'login', 'entrar', 'esqueci', 'acesso', 'biometria'],
+        chaves: ['senha', 'login', 'entrar', 'esqueci', 'acesso', 'biometria', 'recuperar senha'],
         resposta:
             'Sua senha precisa ter ao menos 8 caracteres, com maiúscula, minúscula, número e caractere especial. ' +
-            'A redefinição pelo app ainda está em desenvolvimento: se esqueceu a senha, escreva para suporte@saudeconecta.com.br.',
+            'Se esqueceu, toque em "Esqueceu a senha?" no login: o app confere e-mail, CPF e data de nascimento ' +
+            'do seu cadastro e deixa você escolher a nova senha na hora. A troca fica no histórico de acessos.',
     },
     {
         chaves: ['vacina', 'vacinação', 'vacinacao', 'imunização', 'imunizacao'],
@@ -69,7 +87,11 @@ const BASE_CONHECIMENTO = [
                  'auditoria', 'trilha', 'log'],
         resposta:
             'Em "Mais" → "Histórico de acessos" você vê cada vez que um profissional entrou com um código ' +
-            'seu: o nome, o CRM, o que ele fez e quando. O registro é automático e não pode ser apagado.',
+            'seu: o nome, o CRM, o que ele fez e quando. O filtro "Você" mostra o outro lado — os seus ' +
+            'próprios acessos: quando entrou, quando abriu o prontuário, os exames ou as consultas, quando ' +
+            'baixou o PDF, quando mexeu nos dependentes ou nos contatos de emergência e quando pediu a ' +
+            'recuperação da senha. Se a leitura foi de um dependente, a linha diz o nome dele. O registro ' +
+            'é automático e não pode ser apagado.',
     },
     {
         chaves: ['privacidade', 'dados', 'lgpd', 'termo', 'termos'],

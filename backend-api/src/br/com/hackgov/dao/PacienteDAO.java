@@ -154,4 +154,56 @@ public class PacienteDAO {
         }
         return p;
     }
+
+    // ===================== RECUPERAÇÃO DE SENHA =====================
+
+    /**
+     * SELECT — confere a identidade de quem esqueceu a senha.
+     *
+     * Só devolve o paciente quando e-mail, CPF e data de nascimento batem os
+     * três. Não existe serviço de e-mail no projeto (seria uma dependência
+     * nova, e o backend é Java puro de propósito), então o que substitui o
+     * link enviado por e-mail é a conferência de dados que só o titular tem
+     * junto — é mais fraco que um link, e a rota que chama este método aplica
+     * limite de tentativas por IP por causa disso.
+     *
+     * A comparação da data é feita no SQL, com a coluna DATE do banco, para
+     * não depender do formato do texto que chegou na requisição.
+     */
+    public Paciente buscarParaRecuperacao(String email, String cpf, String dataNascimento)
+            throws SQLException {
+        String sql = "SELECT id, nome, email, telefone, cpf, genero, tipo_sanguineo, data_nascimento, "
+                + "cep, rua, numero, bairro, cidade, estado FROM pacientes "
+                + "WHERE email = ? AND cpf = ? AND data_nascimento = ?";
+        try (Connection con = Conexao.abrir();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setString(1, email);
+            ps.setString(2, cpf);
+            try {
+                ps.setDate(3, Date.valueOf(dataNascimento));
+            } catch (IllegalArgumentException e) {
+                return null; // data mal formatada não casa com ninguém
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return null;
+                return mapear(rs, false);
+            }
+        }
+    }
+
+    /**
+     * UPDATE — troca o hash da senha. A senha chega aqui já com hash
+     * (ver SenhaUtil); texto puro nunca passa por este método.
+     */
+    public boolean atualizarSenha(int id, String senhaHash) throws SQLException {
+        String sql = "UPDATE pacientes SET senha_hash = ? WHERE id = ?";
+        try (Connection con = Conexao.abrir();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setString(1, senhaHash);
+            ps.setInt(2, id);
+            return ps.executeUpdate() > 0;
+        }
+    }
 }

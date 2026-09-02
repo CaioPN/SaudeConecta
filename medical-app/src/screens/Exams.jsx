@@ -3,13 +3,16 @@ import { ChevronLeft, Image as ImageIcon, Droplet, Download, Calendar, Building2
 import { useNavigate } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import { useAuth } from '../context/AuthContext';
+import { usePessoas } from '../context/PessoasContext';
 import { usePrivacidade } from '../context/PrivacidadeContext';
 import BotaoPrivacidade from '../components/BotaoPrivacidade';
+import SeletorPessoa from '../components/SeletorPessoa';
 import { mascararTexto } from '../utils/privacidade';
 import ResultRow from '../components/ResultRow';
 import InfoField from '../components/InfoField';
 import StatusBadge from '../components/StatusBadge';
 import { buscarExames } from '../services/exames';
+import { registrarExportacao } from '../services/auditoria';
 import { situacaoItem, textoReferencia, formatarData, totalAlterados } from '../utils/exames';
 
 // Senha do PDF: os 4 primeiros dígitos do CPF do paciente. Devolve null quando
@@ -23,6 +26,7 @@ function senhaDoPaciente(paciente) {
 export default function Exams() {
   const navigate = useNavigate();
   const { paciente } = useAuth();
+  const { pessoa, dependenteId } = usePessoas();
   const { oculto } = usePrivacidade();
   const [tab, setTab] = useState('sangue');
   const [coletas, setColetas] = useState([]);
@@ -30,16 +34,21 @@ export default function Exams() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
 
+  // Refaz a busca ao trocar de pessoa no seletor. O estado volta ao início
+  // junto, senão os exames de quem estava selecionado antes ficariam na tela
+  // enquanto os novos não chegam.
   useEffect(() => {
     let ativo = true;
-    buscarExames()
+    setCarregando(true);
+    setErro(null);
+    buscarExames(dependenteId)
       .then(({ coletas: c, imagem: i }) => {
         if (!ativo) return;
         setColetas(c);
         setImagem(i);
       })
       .catch(() => {
-        if (ativo) setErro('Não foi possível carregar seus exames.');
+        if (ativo) setErro('Não foi possível carregar os exames.');
       })
       .finally(() => {
         if (ativo) setCarregando(false);
@@ -47,7 +56,7 @@ export default function Exams() {
     return () => {
       ativo = false;
     };
-  }, []);
+  }, [dependenteId]);
 
   // Gera e baixa um PDF com o histórico de exames do paciente.
   const baixarPDF = () => {
@@ -68,7 +77,9 @@ export default function Exams() {
         : {}
     );
 
-    const nome = paciente?.nome || 'Paciente';
+    // O relatório é de quem está selecionado no topo, mas a senha continua
+    // sendo o CPF do titular: a conta é dele, e o dependente não tem login.
+    const nome = pessoa.nome || paciente?.nome || 'Paciente';
     const hoje = new Date().toLocaleDateString('pt-BR');
     let y = 20;
 
@@ -165,6 +176,15 @@ export default function Exams() {
 
     const nomeArquivo = `exames-${nome.toLowerCase().replace(/\s+/g, '-')}.pdf`;
     doc.save(nomeArquivo);
+
+    // Exportar dado de saúde é operação auditável, e o arquivo nasce aqui no
+    // navegador: sem este aviso a API não teria como saber que ele existiu.
+    registrarExportacao({
+      coletas: coletas.length,
+      imagens: imagem.length,
+      protegido: senha !== null,
+      dependenteId,
+    });
   };
 
   const temExames = coletas.length > 0 || imagem.length > 0;
@@ -188,6 +208,8 @@ export default function Exams() {
           )}
         </div>
       </div>
+
+      <SeletorPessoa />
 
       {temExames && (
         <p className="pdf-nota">

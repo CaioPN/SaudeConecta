@@ -35,3 +35,25 @@ export async function registrarExame(token, exame) {
   const { data } = await apiMedico.post('/medico/exames', exame, auth(token));
   return data;
 }
+
+/**
+ * POST /api/medico/prontuario — lança uma alergia, uma condição acompanhada ou
+ * uma medicação em uso.
+ *
+ * @param {object} item `{ tipo: 'alergia' | 'condicao' | 'medicacao', ... }`
+ */
+export async function registrarItemProntuario(token, item) {
+  const { data } = await apiMedico.post('/medico/prontuario', item, auth(token));
+  return data;
+}
+
+/**
+ * DELETE /api/medico/prontuario/{tipo}/{id} — remove um item lançado errado.
+ *
+ * Corrigir prontuário é remover e lançar de novo: as duas operações aparecem
+ * separadas no histórico de acessos que o paciente vê.
+ */
+export async function removerItemProntuario(token, tipo, id) {
+  const { data } = await apiMedico.delete(`/medico/prontuario/${tipo}/${id}`, auth(token));
+  return data;
+}

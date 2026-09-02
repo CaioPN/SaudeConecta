@@ -4,11 +4,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -20,11 +23,14 @@ import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 
 import br.com.hackgov.dao.AcessoDAO;
+import br.com.hackgov.dao.AuditoriaDAO;
 import br.com.hackgov.dao.AvisoDAO;
 import br.com.hackgov.dao.ConsultaDAO;
 import br.com.hackgov.dao.DependenteDAO;
 import br.com.hackgov.dao.ExameDAO;
+import br.com.hackgov.dao.FamiliarDAO;
 import br.com.hackgov.dao.MedicoDAO;
+import br.com.hackgov.dao.NotificacaoDAO;
 import br.com.hackgov.dao.PacienteDAO;
 import br.com.hackgov.dao.ProntuarioDAO;
 import br.com.hackgov.dao.UnidadeSaudeDAO;
@@ -35,11 +41,14 @@ import br.com.hackgov.modelos.Aviso;
 import br.com.hackgov.modelos.Consulta;
 import br.com.hackgov.modelos.Dependente;
 import br.com.hackgov.modelos.Exame;
+import br.com.hackgov.modelos.Familiar;
 import br.com.hackgov.modelos.HistoricoMedico;
 import br.com.hackgov.modelos.ItemExame;
 import br.com.hackgov.modelos.Medicacao;
 import br.com.hackgov.modelos.Medico;
+import br.com.hackgov.modelos.Notificacao;
 import br.com.hackgov.modelos.Paciente;
+import br.com.hackgov.modelos.RegistroAuditoria;
 import br.com.hackgov.modelos.UnidadeSaude;
 import br.com.hackgov.util.ChatIA;
 import br.com.hackgov.util.CodigoAcesso;
@@ -57,6 +66,8 @@ import br.com.hackgov.util.SenhaUtil;
  *
  *   POST   /api/auth/register
  *   POST   /api/auth/login
+ *   POST   /api/auth/recuperar    confere a identidade de quem esqueceu a senha
+ *   POST   /api/auth/redefinir    grava a senha nova com o token da recuperação
  *   GET    /api/auth/me           (protegido por JWT)
  *   GET    /api/dependentes       (protegido por JWT)
  *   POST   /api/dependentes       (protegido por JWT)
@@ -70,6 +81,14 @@ import br.com.hackgov.util.SenhaUtil;
  *   GET    /api/prontuario        alergias, condições e medicações
  *   GET    /api/avisos            avisos do Dashboard (derivados dos dados)
  *   GET    /api/rede-saude        UBS, UPAs e prontos-socorros mais próximos
+ *   POST   /api/exames/exportacao registra na auditoria o download do PDF
+ *   GET    /api/auditoria         trilha de auditoria (médico + próprio paciente)
+ *   GET    /api/familiares        contatos de emergência
+ *   POST   /api/familiares        cadastra um contato
+ *   DELETE /api/familiares/{id}   remove um contato
+ *   GET    /api/notificacoes      o que aconteceu na conta enquanto ele não olhava
+ *   POST   /api/notificacoes/lidas          marca todas como lidas
+ *   POST   /api/notificacoes/{id}/lida      marca uma como lida
  *   POST   /api/chat              pergunta livre do chatbot (IA)
  *
  * Em todas elas o paciente vem do JWT, nunca da requisição — assim um usuário
@@ -90,12 +109,25 @@ public class ApiServer {
     private static final UnidadeSaudeDAO unidadeSaudeDAO = new UnidadeSaudeDAO();
     private static final AcessoDAO acessoDAO = new AcessoDAO();
     private static final MedicoDAO medicoDAO = new MedicoDAO();
+    private static final AuditoriaDAO auditoriaDAO = new AuditoriaDAO();
+    private static final FamiliarDAO familiarDAO = new FamiliarDAO();
+    private static final NotificacaoDAO notificacaoDAO = new NotificacaoDAO();
 
     /** Validade padrão do código/token do médico, em minutos. */
     private static final int VALIDADE_ACESSO_MINUTOS = 30;
 
     /** Quantas linhas da trilha de auditoria a tela do paciente recebe. */
     private static final int LIMITE_HISTORICO_ACESSOS = 100;
+
+    /** Quantas notificações a tela recebe de uma vez. */
+    private static final int LIMITE_NOTIFICACOES = 30;
+
+    /**
+     * Validade do token de redefinição de senha, em minutos. Curta de
+     * propósito: ele nasce da conferência de dados de cadastro, que é uma
+     * prova de identidade mais fraca que um link enviado por e-mail.
+     */
+    private static final int VALIDADE_RECUPERACAO_MINUTOS = 15;
 
     /** Limite de códigos errados por IP dentro da janela, contra força bruta. */
     private static final int TENTATIVAS_MAXIMAS = 10;
@@ -112,8 +144,12 @@ public class ApiServer {
 
         server.createContext("/api/auth/register", comCors(ApiServer::registrar));
         server.createContext("/api/auth/login", comCors(ApiServer::login));
+        server.createContext("/api/auth/recuperar", comCors(ApiServer::recuperarSenha));
+        server.createContext("/api/auth/redefinir", comCors(ApiServer::redefinirSenha));
         server.createContext("/api/auth/me", comCors(ApiServer::me));
         server.createContext("/api/dependentes", comCors(ApiServer::dependentes));
+        server.createContext("/api/familiares", comCors(ApiServer::familiares));
+        server.createContext("/api/notificacoes", comCors(ApiServer::notificacoes));
         server.createContext("/api/consultas", comCors(ApiServer::consultas));
         server.createContext("/api/exames", comCors(ApiServer::exames));
         server.createContext("/api/prontuario", comCors(ApiServer::prontuario));
@@ -121,6 +157,7 @@ public class ApiServer {
         server.createContext("/api/rede-saude", comCors(ApiServer::redeSaude));
         server.createContext("/api/chat", comCors(ApiServer::chat));
         server.createContext("/api/acessos", comCors(ApiServer::acessos));
+        server.createContext("/api/auditoria", comCors(ApiServer::auditoria));
         server.createContext("/api/medico", comCors(ApiServer::medico));
         server.createContext("/", comCors(ApiServer::raiz));
 
@@ -238,9 +275,17 @@ public class ApiServer {
 
             Paciente p = pacienteDAO.buscarPorEmail(email);
             if (p == null || !SenhaUtil.verificar(senha, p.getSenhaHash())) {
+                // Senha errada em conta que existe é evento de segurança: entra na
+                // trilha para o titular enxergar que tentaram entrar. E-mail que
+                // não existe não gera registro — não há dono a quem mostrar.
+                if (p != null) {
+                    auditar(ex, p.getIdPaciente(), "login_falhou", "conta", "Senha incorreta.");
+                }
                 enviarErro(ex, 401, "Email ou senha inválidos.");
                 return;
             }
+
+            auditar(ex, p.getIdPaciente(), "login", "conta", null);
 
             Map<String, Object> resp = new LinkedHashMap<>();
             resp.put("paciente", pacienteJson(p));
@@ -253,6 +298,152 @@ public class ApiServer {
             System.out.println("[ERRO login] " + e.getMessage());
             enviarErro(ex, 500, "Erro ao fazer login.");
         }
+    }
+
+    /**
+     * POST /api/auth/recuperar — primeiro passo do "esqueci minha senha".
+     *
+     * <h3>Por que não é um link por e-mail</h3>
+     * O fluxo clássico manda um link para a caixa de entrada do titular, e a
+     * prova de identidade é ter acesso àquele e-mail. Aqui não existe serviço
+     * de e-mail: mandar mensagem exigiria um servidor SMTP e uma biblioteca
+     * nova, e o backend é Java puro de propósito. O que substitui o link é a
+     * conferência de três dados do cadastro — e-mail, CPF e data de
+     * nascimento —, que é uma prova mais fraca. Por isso a rota tem limite de
+     * tentativas por IP e o token que ela devolve vale poucos minutos.
+     *
+     * A resposta não diz qual dos três campos errou, nem se o e-mail existe:
+     * seria um jeito de descobrir quem tem conta no app.
+     */
+    private static void recuperarSenha(HttpExchange ex) throws IOException {
+        if (!"POST".equals(ex.getRequestMethod())) { enviarErro(ex, 405, "Método não permitido."); return; }
+
+        String ip = ipDe(ex);
+        if (excedeuTentativas(ip)) {
+            enviarErro(ex, 429, "Muitas tentativas. Aguarde alguns minutos e tente de novo.");
+            return;
+        }
+
+        try {
+            Map<String, Object> body = lerCorpo(ex);
+            String email = campo(body, "email");
+            String cpf = apenasDigitos(campo(body, "cpf"));
+            String dataNascimento = campo(body, "dataNascimento");
+
+            if (email == null || cpf.isEmpty() || dataNascimento == null) {
+                enviarErro(ex, 400, "Informe o e-mail, o CPF e a data de nascimento do cadastro.");
+                return;
+            }
+
+            Paciente p = pacienteDAO.buscarParaRecuperacao(email, cpf, dataNascimento);
+            if (p == null) {
+                registrarTentativa(ip);
+                enviarErro(ex, 401, "Os dados informados não conferem com nenhum cadastro.");
+                return;
+            }
+
+            // O hash atual entra no token para amarrá-lo à senha vigente: assim
+            // que a senha muda, o token que sobrou de uma recuperação anterior
+            // deixa de servir, mesmo dentro da validade.
+            Paciente comHash = pacienteDAO.buscarPorEmail(email);
+            String marca = marcaDaSenha(comHash == null ? null : comHash.getSenhaHash());
+
+            auditar(ex, p.getIdPaciente(), "solicitou_senha", "conta", null);
+
+            Map<String, Object> claims = new LinkedHashMap<>();
+            claims.put("tipo", "reset");
+            claims.put("email", p.getEmail());
+            claims.put("marca", marca);
+
+            Map<String, Object> resp = new LinkedHashMap<>();
+            resp.put("token", Jwt.gerar(claims, VALIDADE_RECUPERACAO_MINUTOS * 60L));
+            // Só o primeiro nome volta, para a tela confirmar de quem é a conta
+            // sem repetir na resposta os dados que acabaram de ser digitados.
+            resp.put("nome", primeiroNome(p.getNome()));
+            resp.put("validade_minutos", VALIDADE_RECUPERACAO_MINUTOS);
+            enviarJson(ex, 200, resp);
+
+        } catch (IllegalArgumentException e) {
+            enviarErro(ex, 400, "Corpo da requisição inválido (JSON).");
+        } catch (SQLException e) {
+            System.out.println("[ERRO recuperar] " + e.getMessage());
+            enviarErro(ex, 500, "Erro ao conferir os dados do cadastro.");
+        }
+    }
+
+    /**
+     * POST /api/auth/redefinir — grava a senha nova.
+     *
+     * O paciente vem do token da recuperação, nunca do corpo: sem isso
+     * bastaria enviar o e-mail de outra pessoa para trocar a senha dela.
+     */
+    private static void redefinirSenha(HttpExchange ex) throws IOException {
+        if (!"POST".equals(ex.getRequestMethod())) { enviarErro(ex, 405, "Método não permitido."); return; }
+
+        try {
+            Map<String, Object> body = lerCorpo(ex);
+            String token = campo(body, "token");
+            String senha = campo(body, "senha");
+
+            if (token == null || senha == null) {
+                enviarErro(ex, 400, "Informe o token da recuperação e a nova senha.");
+                return;
+            }
+
+            Map<String, Object> claims = Jwt.validar(token);
+            if (claims == null || !"reset".equals(claims.get("tipo"))
+                    || !(claims.get("email") instanceof String)) {
+                enviarErro(ex, 401, "Este pedido de recuperação expirou. Comece de novo.");
+                return;
+            }
+
+            Paciente p = pacienteDAO.buscarPorEmail((String) claims.get("email"));
+            if (p == null) {
+                enviarErro(ex, 401, "Este pedido de recuperação expirou. Comece de novo.");
+                return;
+            }
+            // Token de uso único na prática: a marca é do hash antigo, então
+            // depois da primeira troca ele não confere mais.
+            if (!marcaDaSenha(p.getSenhaHash()).equals(claims.get("marca"))) {
+                enviarErro(ex, 401, "Esta senha já foi redefinida. Comece de novo.");
+                return;
+            }
+
+            String erroSenha = SenhaUtil.validarForca(senha);
+            if (erroSenha != null) {
+                enviarErro(ex, 400, erroSenha);
+                return;
+            }
+            if (SenhaUtil.verificar(senha, p.getSenhaHash())) {
+                enviarErro(ex, 400, "A nova senha precisa ser diferente da anterior.");
+                return;
+            }
+
+            pacienteDAO.atualizarSenha(p.getIdPaciente(), SenhaUtil.hash(senha));
+            auditar(ex, p.getIdPaciente(), "redefiniu_senha", "conta", null);
+
+            Map<String, Object> resp = new LinkedHashMap<>();
+            resp.put("sucesso", Boolean.TRUE);
+            enviarJson(ex, 200, resp);
+
+        } catch (IllegalArgumentException e) {
+            enviarErro(ex, 400, "Corpo da requisição inválido (JSON).");
+        } catch (SQLException e) {
+            System.out.println("[ERRO redefinir] " + e.getMessage());
+            enviarErro(ex, 500, "Erro ao redefinir a senha.");
+        }
+    }
+
+    /**
+     * Pedaço curto do hash da senha, usado dentro do token de recuperação.
+     *
+     * Vai só o começo do hash porque o token trafega até o navegador: 8
+     * caracteres bastam para detectar que a senha mudou e não ajudam quem
+     * quisesse quebrar o hash inteiro.
+     */
+    private static String marcaDaSenha(String hash) {
+        if (hash == null || hash.length() < 8) return "";
+        return hash.substring(0, 8);
     }
 
     /** GET /api/auth/me — dados do paciente logado (rota protegida). */
@@ -331,6 +522,7 @@ public class ApiServer {
 
         Dependente d = new Dependente(userId, nome, cpf, genero, tipoSanguineo, dataNascimento);
         dependenteDAO.inserir(d);
+        auditar(ex, userId, "cadastrou_dependente", "dependentes", primeiroNome(nome));
 
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("dependente", dependenteJson(d));
@@ -346,13 +538,173 @@ public class ApiServer {
             enviarErro(ex, 400, "Id de dependente inválido.");
             return;
         }
+        // O nome é lido antes de excluir: depois não há de onde tirar, e a trilha
+        // ficaria com um "excluiu_dependente" que não diz quem foi excluído.
+        String nome = dependenteDAO.nomeDoPaciente(id, userId);
+
         boolean removido = dependenteDAO.excluirDoPaciente(id, userId);
         if (!removido) {
             enviarErro(ex, 404, "Dependente não encontrado.");
             return;
         }
+        auditar(ex, userId, "excluiu_dependente", "dependentes", primeiroNome(nome));
+
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("sucesso", Boolean.TRUE);
+        enviarJson(ex, 200, resp);
+    }
+
+    // ===================== CONTATOS DE EMERGÊNCIA =====================
+
+    /** /api/familiares — lista (GET), cadastra (POST) ou remove (DELETE /{id}). */
+    private static void familiares(HttpExchange ex) throws IOException {
+        Integer userId = autenticar(ex);
+        if (userId == null) return;
+
+        String metodo = ex.getRequestMethod();
+        String path = ex.getRequestURI().getPath();
+
+        try {
+            if ("GET".equals(metodo) && "/api/familiares".equals(path)) {
+                List<Object> arr = new ArrayList<>();
+                for (Familiar f : familiarDAO.listarPorPaciente(userId)) {
+                    arr.add(familiarJson(f));
+                }
+                Map<String, Object> resp = new LinkedHashMap<>();
+                resp.put("familiares", arr);
+                enviarJson(ex, 200, resp);
+
+            } else if ("POST".equals(metodo) && "/api/familiares".equals(path)) {
+                criarFamiliar(ex, userId);
+
+            } else if ("DELETE".equals(metodo) && path.startsWith("/api/familiares/")) {
+                removerFamiliar(ex, userId, path.substring("/api/familiares/".length()));
+
+            } else {
+                enviarErro(ex, 405, "Método não permitido.");
+            }
+        } catch (IllegalArgumentException e) {
+            enviarErro(ex, 400, "Corpo da requisição inválido (JSON).");
+        } catch (SQLException e) {
+            System.out.println("[ERRO familiares] " + e.getMessage());
+            enviarErro(ex, 500, "Erro ao processar os contatos de emergência.");
+        }
+    }
+
+    private static void criarFamiliar(HttpExchange ex, int userId) throws IOException, SQLException {
+        Map<String, Object> body = lerCorpo(ex);
+        String nome = campo(body, "nome");
+        String parentesco = campo(body, "parentesco");
+        String telefone = campo(body, "telefone");
+
+        if (nome == null || parentesco == null || telefone == null) {
+            enviarErro(ex, 400, "Informe o nome, o parentesco e o telefone do contato.");
+            return;
+        }
+        if (apenasDigitos(telefone).length() < 10) {
+            enviarErro(ex, 400, "Informe um telefone válido (com DDD).");
+            return;
+        }
+
+        Familiar f = new Familiar();
+        f.setNome(nome);
+        f.setParentesco(parentesco);
+        f.setTelefone(telefone);
+        familiarDAO.inserir(userId, f);
+
+        auditar(ex, userId, "cadastrou_contato", "contatos", primeiroNome(nome));
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("familiar", familiarJson(f));
+        enviarJson(ex, 201, resp);
+    }
+
+    private static void removerFamiliar(HttpExchange ex, int userId, String idTexto)
+            throws IOException, SQLException {
+        int id;
+        try {
+            id = Integer.parseInt(idTexto.trim());
+        } catch (NumberFormatException e) {
+            enviarErro(ex, 400, "Id de contato inválido.");
+            return;
+        }
+
+        String nome = familiarDAO.nomeDoPaciente(id, userId);
+        if (!familiarDAO.excluirDoPaciente(id, userId)) {
+            enviarErro(ex, 404, "Contato não encontrado.");
+            return;
+        }
+        auditar(ex, userId, "excluiu_contato", "contatos", primeiroNome(nome));
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("sucesso", Boolean.TRUE);
+        enviarJson(ex, 200, resp);
+    }
+
+    // ===================== NOTIFICAÇÕES =====================
+
+    /**
+     * /api/notificacoes — o que aconteceu na conta enquanto o paciente não
+     * estava olhando: GET lista, POST /{id}/lida e POST /lidas marcam a leitura.
+     *
+     * Não confundir com /api/avisos: aviso é calculado na hora a partir dos
+     * exames e consultas e não é gravado; notificação é um fato que aconteceu
+     * uma vez (um médico registrou algo no prontuário) e tem linha no banco.
+     */
+    private static void notificacoes(HttpExchange ex) throws IOException {
+        Integer userId = autenticar(ex);
+        if (userId == null) return;
+
+        String metodo = ex.getRequestMethod();
+        String path = ex.getRequestURI().getPath();
+
+        try {
+            if ("GET".equals(metodo) && "/api/notificacoes".equals(path)) {
+                List<Object> arr = new ArrayList<>();
+                for (Notificacao n : notificacaoDAO.listarPorPaciente(userId, false, LIMITE_NOTIFICACOES)) {
+                    arr.add(notificacaoJson(n));
+                }
+                Map<String, Object> resp = new LinkedHashMap<>();
+                resp.put("notificacoes", arr);
+                resp.put("nao_lidas", notificacaoDAO.contarNaoLidas(userId));
+                enviarJson(ex, 200, resp);
+
+            } else if ("POST".equals(metodo) && "/api/notificacoes/lidas".equals(path)) {
+                Map<String, Object> resp = new LinkedHashMap<>();
+                resp.put("marcadas", notificacaoDAO.marcarTodasLidas(userId));
+                enviarJson(ex, 200, resp);
+
+            } else if ("POST".equals(metodo) && path.startsWith("/api/notificacoes/")
+                    && path.endsWith("/lida")) {
+                marcarNotificacaoLida(ex, userId, path);
+
+            } else {
+                enviarErro(ex, 405, "Método não permitido.");
+            }
+        } catch (SQLException e) {
+            System.out.println("[ERRO notificacoes] " + e.getMessage());
+            enviarErro(ex, 500, "Erro ao processar as notificações.");
+        }
+    }
+
+    private static void marcarNotificacaoLida(HttpExchange ex, int userId, String path)
+            throws IOException, SQLException {
+        String meio = path.substring("/api/notificacoes/".length(), path.length() - "/lida".length());
+        int id;
+        try {
+            id = Integer.parseInt(meio.trim());
+        } catch (NumberFormatException e) {
+            enviarErro(ex, 400, "Id de notificação inválido.");
+            return;
+        }
+
+        // Marcar de novo o que já estava lido não é erro — o DAO devolve false
+        // e a tela não tem por que mostrar falha nisso.
+        notificacaoDAO.marcarLida(id, userId);
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("sucesso", Boolean.TRUE);
+        resp.put("nao_lidas", notificacaoDAO.contarNaoLidas(userId));
         enviarJson(ex, 200, resp);
     }
 
@@ -372,6 +724,12 @@ public class ApiServer {
                 }
                 Map<String, Object> resp = new LinkedHashMap<>();
                 resp.put("consultas", arr);
+
+                // A consulta traz motivo, resumo e conduta do atendimento: é
+                // leitura de dado sensível como o prontuário e os exames, e
+                // por isso entra na trilha do paciente.
+                auditarLeitura(ex, userId, "consultou_consultas", "consultas",
+                        alvoDaLeitura(userId, dependenteId));
                 enviarJson(ex, 200, resp);
                 return;
             }
@@ -391,6 +749,12 @@ public class ApiServer {
                 }
                 Map<String, Object> resp = new LinkedHashMap<>();
                 resp.put("consulta", consultaJson(c));
+
+                // A mesma ação da lista, de propósito: quem lê a trilha quer
+                // saber que as consultas foram abertas, não quantas vezes o
+                // React montou a tela de detalhe.
+                auditarLeitura(ex, userId, "consultou_consultas", "consultas",
+                        alvoDaLeitura(userId, c.getIdDependente() > 0 ? c.getIdDependente() : null));
                 enviarJson(ex, 200, resp);
                 return;
             }
@@ -403,9 +767,22 @@ public class ApiServer {
         }
     }
 
-    /** GET /api/exames — coletas de sangue e exames de imagem do paciente logado. */
+    /**
+     * /api/exames — lista os exames do paciente logado (GET) ou registra na
+     * trilha de auditoria o download do PDF (POST /api/exames/exportacao).
+     */
     private static void exames(HttpExchange ex) throws IOException {
-        if (!"GET".equals(ex.getRequestMethod())) { enviarErro(ex, 405, "Método não permitido."); return; }
+        String metodo = ex.getRequestMethod();
+        String path = ex.getRequestURI().getPath();
+
+        if ("/api/exames/exportacao".equals(path)) {
+            if (!"POST".equals(metodo)) { enviarErro(ex, 405, "Método não permitido."); return; }
+            registrarExportacao(ex);
+            return;
+        }
+        if (!"/api/exames".equals(path)) { enviarErro(ex, 404, "Rota não encontrada."); return; }
+        if (!"GET".equals(metodo)) { enviarErro(ex, 405, "Método não permitido."); return; }
+
         Integer userId = autenticar(ex);
         if (userId == null) return;
 
@@ -425,6 +802,11 @@ public class ApiServer {
             Map<String, Object> resp = new LinkedHashMap<>();
             resp.put("coletas", sangue);
             resp.put("imagem", imagem);
+
+            // Abrir resultado de exame é consulta a dado sensível: vai para a
+            // trilha depois de dar certo, nunca antes.
+            auditarLeitura(ex, userId, "consultou_exames", "exames",
+                    alvoDaLeitura(userId, dependenteId));
             enviarJson(ex, 200, resp);
 
         } catch (SQLException e) {
@@ -532,13 +914,15 @@ public class ApiServer {
     /**
      * GET /api/rede-saude — UBS, UPAs e prontos-socorros perto do paciente.
      *
-     * O município sai sempre do CEP cadastrado (é ele que diz qual rede
-     * municipal atende o paciente). Já o ponto usado para medir a distância
-     * aceita ?lat= e ?lon=, que o navegador manda quando o paciente autoriza a
-     * localização — sem isso, o cálculo usa as coordenadas do próprio CEP.
+     * O município sai do CEP cadastrado (é ele que diz qual rede municipal
+     * atende o paciente), ou de ?cep= quando o paciente pesquisa outra cidade
+     * na tela — na divisa, em viagem ou perto do trabalho. O ponto usado para
+     * medir a distância aceita ?lat= e ?lon=, que o navegador manda quando o
+     * paciente autoriza a localização; sem isso, o cálculo usa as coordenadas
+     * do próprio CEP.
      *
      * A resposta também devolve "origem", para a tela poder dizer de onde as
-     * distâncias foram medidas.
+     * distâncias foram medidas e qual cidade está sendo mostrada.
      */
     private static void redeSaude(HttpExchange ex) throws IOException {
         if (!"GET".equals(ex.getRequestMethod())) { enviarErro(ex, 405, "Método não permitido."); return; }
@@ -552,18 +936,30 @@ public class ApiServer {
                 return;
             }
 
-            Localizacao.Lugar lugar = Localizacao.buscarPorCep(p.getCep());
+            // A cidade sai do CEP do cadastro, a não ser que o paciente peça
+            // outra na tela (?cep=). Sem isso, quem mora na divisa não enxerga
+            // a UBS do outro lado: a busca do CNES é por município, e uma
+            // unidade de Guarulhos nunca aparece para um cadastro de São Paulo.
+            String cepEscolhido = textoDaQuery(ex, "cep");
+            boolean cidadeEscolhida = cepEscolhido != null;
+
+            Localizacao.Lugar lugar =
+                    Localizacao.buscarPorCep(cidadeEscolhida ? cepEscolhido : p.getCep());
             if (lugar == null) {
-                enviarErro(ex, 422,
-                        "Não foi possível localizar sua cidade pelo CEP. "
-                      + "Confira o endereço no seu perfil.");
+                enviarErro(ex, 422, cidadeEscolhida
+                        ? "Não encontramos esse CEP. Confira os 8 dígitos e tente de novo."
+                        : "Não foi possível localizar sua cidade pelo CEP. "
+                        + "Confira o endereço no seu perfil.");
                 return;
             }
 
-            // GPS do navegador tem prioridade; o CEP é o plano B.
+            // GPS do navegador tem prioridade; o CEP é o plano B. Com a cidade
+            // escolhida à mão o GPS é ignorado de propósito: medir a partir de
+            // onde o paciente está agora, em outra cidade, daria uma lista
+            // ordenada por uma distância que não é a que ele quer ver.
             Double lat = numeroDaQuery(ex, "lat");
             Double lon = numeroDaQuery(ex, "lon");
-            boolean porGps = Localizacao.coordenadaValida(lat, lon);
+            boolean porGps = !cidadeEscolhida && Localizacao.coordenadaValida(lat, lon);
             if (!porGps) {
                 lat = lugar.getLatitude();
                 lon = lugar.getLongitude();
@@ -579,6 +975,9 @@ public class ApiServer {
             origem.put("tipo", porGps ? "gps" : (lat != null ? "cep" : "nenhuma"));
             origem.put("cidade", lugar.getCidade());
             origem.put("estado", lugar.getEstado());
+            // A tela precisa saber se está mostrando a cidade do cadastro ou
+            // uma pesquisada, para dizer isso ao paciente e oferecer a volta.
+            origem.put("escolhida", cidadeEscolhida);
 
             Map<String, Object> resp = new LinkedHashMap<>();
             resp.put("origem", origem);
@@ -632,6 +1031,9 @@ public class ApiServer {
             resp.put("alergias", alergias);
             resp.put("condicoes", condicoes);
             resp.put("medicacoes", medicacoes);
+
+            auditarLeitura(ex, userId, "consultou_prontuario", "prontuario",
+                    alvoDaLeitura(userId, dependenteId));
             enviarJson(ex, 200, resp);
 
         } catch (SQLException e) {
@@ -694,6 +1096,12 @@ public class ApiServer {
         resp.put("codigo", codigo);
         resp.put("escopo", escopo);
         resp.put("validade_minutos", minutos);
+
+        // Conceder acesso aos próprios dados é ação de governança: fica registrado
+        // quem abriu a porta, com qual permissão e por quanto tempo.
+        auditar(ex, userId, "gerou_codigo", "acessos",
+                (AcessoTemporario.ESCOPO_ESCRITA.equals(escopo) ? "Leitura e registro" : "Somente leitura")
+                        + " · válido por " + minutos + " min.");
         enviarJson(ex, 201, resp);
     }
 
@@ -745,6 +1153,210 @@ public class ApiServer {
         enviarJson(ex, 200, resp);
     }
 
+    // ===================== TRILHA DE AUDITORIA =====================
+
+    /**
+     * GET /api/auditoria — a trilha completa do paciente do JWT.
+     *
+     * Junta os dois lados: o que os médicos fizeram com os códigos dele
+     * (acessos_log) e o que ele mesmo fez na conta (auditoria). O paciente do
+     * JWT é a única chave dos dois SELECTs — não existe parâmetro de id aqui.
+     */
+    private static void auditoria(HttpExchange ex) throws IOException {
+        if (!"GET".equals(ex.getRequestMethod())) { enviarErro(ex, 405, "Método não permitido."); return; }
+        Integer userId = autenticar(ex);
+        if (userId == null) return;
+
+        try {
+            listarAuditoria(ex, userId);
+        } catch (SQLException e) {
+            System.out.println("[ERRO auditoria] " + e.getMessage());
+            enviarErro(ex, 500, "Erro ao buscar a trilha de auditoria.");
+        }
+    }
+
+    /**
+     * Intercala as duas trilhas numa linha do tempo só.
+     *
+     * Cada lado já chega ordenado do banco, do mais novo para o mais antigo.
+     * Em vez de concatenar tudo e reordenar, as duas listas viram FILAS e a
+     * cada rodada sai a frente da mais recente: é a intercalação clássica de
+     * duas sequências ordenadas, que passa uma única vez por cada uma e nunca
+     * devolve mais registros do que o limite da tela.
+     */
+    private static void listarAuditoria(HttpExchange ex, int userId) throws IOException, SQLException {
+        Deque<AcessoLog> doMedico =
+                new ArrayDeque<>(acessoDAO.listarLogPorPaciente(userId, LIMITE_HISTORICO_ACESSOS));
+        Deque<RegistroAuditoria> doPaciente =
+                new ArrayDeque<>(auditoriaDAO.listarPorPaciente(userId, LIMITE_HISTORICO_ACESSOS));
+
+        List<Object> arr = new ArrayList<>();
+        while (arr.size() < LIMITE_HISTORICO_ACESSOS && !(doMedico.isEmpty() && doPaciente.isEmpty())) {
+            boolean medicoPrimeiro;
+            if (doPaciente.isEmpty()) {
+                medicoPrimeiro = true;
+            } else if (doMedico.isEmpty()) {
+                medicoPrimeiro = false;
+            } else {
+                medicoPrimeiro = maisRecente(doMedico.peekFirst().getCriadoEm(),
+                                             doPaciente.peekFirst().getCriadoEm());
+            }
+            arr.add(medicoPrimeiro
+                    ? trilhaMedicoJson(doMedico.pollFirst())
+                    : trilhaPacienteJson(doPaciente.pollFirst()));
+        }
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("registros", arr);
+        enviarJson(ex, 200, resp);
+    }
+
+    /**
+     * true quando `a` é igual ou mais recente que `b`.
+     *
+     * As duas datas são ISO (2026-08-20T14:30:05), e nesse formato a ordem
+     * alfabética é a mesma ordem cronológica — por isso dá para comparar como
+     * texto, sem converter as duas a cada rodada da intercalação.
+     */
+    private static boolean maisRecente(String a, String b) {
+        if (a == null) return false;
+        if (b == null) return true;
+        return a.compareTo(b) >= 0;
+    }
+
+    /**
+     * POST /api/exames/exportacao — o front avisa que o PDF de exames foi baixado.
+     *
+     * Exportar dado de saúde é exatamente o tipo de operação que precisa de
+     * trilha, mas o arquivo é montado no navegador (jsPDF): sem esta rota o
+     * servidor nunca ficaria sabendo que ele existiu. O nome da ação é fixado
+     * aqui, no servidor — do cliente vem só a contagem do que entrou no
+     * arquivo, então ninguém consegue escrever uma ação inventada na trilha.
+     */
+    private static void registrarExportacao(HttpExchange ex) throws IOException {
+        Integer userId = autenticar(ex);
+        if (userId == null) return;
+
+        try {
+            Map<String, Object> body = lerCorpo(ex);
+            int coletas = inteiro(body.get("coletas"));
+            int imagens = inteiro(body.get("imagens"));
+            boolean protegido = Boolean.TRUE.equals(body.get("protegido"));
+
+            // De quem era o relatório. O id vem do cliente, mas o NOME é
+            // resolvido aqui, contra o banco e preso ao paciente do JWT — o
+            // que o cliente escreveria nunca chega à trilha.
+            Integer dependenteId = body.get("dependenteId") instanceof Number
+                    ? ((Number) body.get("dependenteId")).intValue()
+                    : null;
+            String alvo = alvoDaLeitura(userId, dependenteId);
+
+            String detalhe = "PDF de exames · " + (alvo == null ? "titular" : alvo) + " · "
+                    + coletas + " coleta(s) e " + imagens + " exame(s) de imagem · "
+                    + (protegido ? "protegido por senha" : "sem senha");
+
+            auditar(ex, userId, "exportou_exames", "exames", detalhe);
+
+            Map<String, Object> resp = new LinkedHashMap<>();
+            resp.put("sucesso", Boolean.TRUE);
+            enviarJson(ex, 201, resp);
+
+        } catch (IllegalArgumentException e) {
+            enviarErro(ex, 400, "Corpo da requisição inválido (JSON).");
+        }
+    }
+
+    /**
+     * Enfileira uma ação do paciente na trilha. Não lança nem espera o banco:
+     * quem grava é a thread da fila do AuditoriaDAO.
+     */
+    private static void auditar(HttpExchange ex, int userId, String acao, String recurso, String detalhe) {
+        auditoriaDAO.registrar(userId, acao, recurso, detalhe, ipDe(ex), false);
+    }
+
+    /**
+     * Como o auditar, mas para leitura de dado sensível: o DAO agrupa as
+     * repetidas, senão cada montagem de tela do React viraria uma linha.
+     *
+     * O agrupamento leva o detalhe em conta, então abrir os exames do titular
+     * e em seguida os de um dependente continuam sendo duas linhas.
+     */
+    private static void auditarLeitura(HttpExchange ex, int userId, String acao,
+                                       String recurso, String detalhe) {
+        auditoriaDAO.registrar(userId, acao, recurso, detalhe, ipDe(ex), true);
+    }
+
+    /**
+     * De quem é o dado que está sendo aberto, do jeito que vai para a trilha.
+     *
+     * Devolve null para o titular — a trilha dele não precisa dizer "seu" em
+     * toda linha — e o primeiro nome quando é de um dependente, que é o que
+     * responde "abri os exames de quem?". O nome só sai do banco se o
+     * dependente for mesmo daquele paciente, então um id de outra conta na
+     * query string não vira nome nenhum.
+     *
+     * Falha de leitura vira null em vez de exceção: a trilha pode perder o
+     * nome, mas não pode derrubar a resposta que o paciente pediu.
+     */
+    private static String alvoDaLeitura(int userId, Integer dependenteId) {
+        if (dependenteId == null) return null;
+        try {
+            return primeiroNome(dependenteDAO.nomeDoPaciente(dependenteId, userId));
+        } catch (SQLException e) {
+            return null;
+        }
+    }
+
+    private static String ipDe(HttpExchange ex) {
+        try {
+            return ex.getRemoteAddress().getAddress().getHostAddress();
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Só o primeiro nome vai para a trilha. O paciente reconhece o dependente
+     * por ele, e minimizar dado (LGPD) vale também para o que nós mesmos
+     * gravamos — a trilha não precisa do nome completo nem do CPF.
+     */
+    private static String primeiroNome(String nome) {
+        if (nome == null) return null;
+        String limpo = nome.trim();
+        if (limpo.isEmpty()) return null;
+        int espaco = limpo.indexOf(' ');
+        return espaco > 0 ? limpo.substring(0, espaco) : limpo;
+    }
+
+    /** Número vindo do corpo da requisição, preso a uma faixa sã (0 a 9999). */
+    private static int inteiro(Object v) {
+        if (!(v instanceof Number)) return 0;
+        int n = ((Number) v).intValue();
+        if (n < 0) return 0;
+        return Math.min(n, 9999);
+    }
+
+    private static Map<String, Object> trilhaMedicoJson(AcessoLog log) {
+        Map<String, Object> m = acessoLogJson(log);
+        // Id com prefixo: as duas trilhas têm numeração própria e as chaves se
+        // repetiriam na lista única que a tela recebe.
+        m.put("id", "med-" + log.getIdLog());
+        m.put("origem", "medico");
+        return m;
+    }
+
+    private static Map<String, Object> trilhaPacienteJson(RegistroAuditoria r) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", "pac-" + r.getIdRegistro());
+        m.put("origem", "paciente");
+        m.put("acao", r.getAcao());
+        m.put("recurso", r.getRecurso());
+        m.put("detalhe", r.getDetalhe());
+        m.put("criado_em", r.getCriadoEm());
+        m.put("origem_ip", r.getOrigemIp());
+        return m;
+    }
+
     // ===================== PORTAL DO MÉDICO =====================
 
     /** /api/medico/* — entrada com o código e registro de dados no prontuário. */
@@ -761,6 +1373,10 @@ public class ApiServer {
                 registrarConsulta(ex);
             } else if ("POST".equals(metodo) && "/api/medico/exames".equals(path)) {
                 registrarExame(ex);
+            } else if ("POST".equals(metodo) && "/api/medico/prontuario".equals(path)) {
+                registrarItemProntuario(ex);
+            } else if ("DELETE".equals(metodo) && path.startsWith("/api/medico/prontuario/")) {
+                removerItemProntuario(ex, path.substring("/api/medico/prontuario/".length()));
             } else {
                 enviarErro(ex, 404, "Rota não encontrada.");
             }
@@ -842,17 +1458,21 @@ public class ApiServer {
             return;
         }
 
+        // Cada item vai com o seu id porque o médico com escopo de escrita pode
+        // remover um registro errado, e para isso a tela dele precisa saber
+        // qual linha remover.
         List<Object> alergias = new ArrayList<>();
         for (Alergia a : prontuarioDAO.listarAlergias(acesso.getIdPaciente(), null)) {
-            alergias.add(a.getDescricao());
+            alergias.add(itemProntuarioJson(a.getIdAlergia(), a.getDescricao()));
         }
         List<Object> condicoes = new ArrayList<>();
         for (HistoricoMedico h : prontuarioDAO.listarCondicoes(acesso.getIdPaciente(), null)) {
-            condicoes.add(h.getDescricao());
+            condicoes.add(itemProntuarioJson(h.getIdHistorico(), h.getDescricao()));
         }
         List<Object> medicacoes = new ArrayList<>();
         for (Medicacao m : prontuarioDAO.listarMedicacoes(acesso.getIdPaciente(), null)) {
-            medicacoes.add(m.getNome() + " " + m.getDosagem() + " — " + m.getFrequencia());
+            medicacoes.add(itemProntuarioJson(m.getIdMedicacao(),
+                    m.getNome() + " " + m.getDosagem() + " — " + m.getFrequencia()));
         }
 
         acessoDAO.registrarLog(acesso.getIdAcesso(), "leu_prontuario", null);
@@ -902,6 +1522,11 @@ public class ApiServer {
 
         int id = consultaDAO.inserir(c, acesso.getIdAcesso());
         acessoDAO.registrarLog(acesso.getIdAcesso(), "registrou_consulta", motivo);
+        // O paciente precisa ficar sabendo sem depender de abrir a tela certa
+        // por acaso. A mensagem diz o que aconteceu e quem fez — motivo,
+        // resumo e conduta ficam no prontuário, não na notificação.
+        notificacaoDAO.inserirSemFalhar(acesso.getIdPaciente(), NotificacaoDAO.TIPO_CONSULTA,
+                med.getNome() + " registrou uma consulta no seu prontuário.");
 
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("id", id);
@@ -974,11 +1599,149 @@ public class ApiServer {
         int id = exameDAO.inserir(e, acesso.getIdAcesso());
         acessoDAO.registrarLog(acesso.getIdAcesso(), "registrou_exame",
                 Exame.TIPO_IMAGEM.equals(tipo) ? e.getNome() : e.getItens().size() + " resultado(s)");
+        // Sem resultado nem laudo na mensagem: ela avisa que há novidade, e o
+        // paciente abre a tela de exames para ver o conteúdo.
+        notificacaoDAO.inserirSemFalhar(acesso.getIdPaciente(), NotificacaoDAO.TIPO_EXAME,
+                nomeDoMedico(acesso) + " registrou um novo exame no seu prontuário.");
 
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("id", id);
         resp.put("sucesso", Boolean.TRUE);
         enviarJson(ex, 201, resp);
+    }
+
+    /**
+     * POST /api/medico/prontuario — o médico lança uma alergia, uma condição
+     * acompanhada ou uma medicação em uso.
+     *
+     * Faltava exatamente isto para o portal cobrir o prontuário inteiro: até
+     * aqui o médico registrava consulta e exame, mas uma alergia descoberta no
+     * atendimento não tinha onde ser anotada.
+     */
+    private static void registrarItemProntuario(HttpExchange ex) throws IOException, SQLException {
+        AcessoTemporario acesso = autenticarMedico(ex);
+        if (acesso == null) return;
+        if (!exigirEscrita(ex, acesso)) return;
+
+        Map<String, Object> body = lerCorpo(ex);
+        String tipo = campo(body, "tipo");
+        int idPaciente = acesso.getIdPaciente();
+
+        int id;
+        String rotulo;
+        String descricao;
+
+        if ("alergia".equals(tipo)) {
+            descricao = campo(body, "descricao");
+            if (descricao == null) {
+                enviarErro(ex, 400, "Informe a descrição da alergia.");
+                return;
+            }
+            id = prontuarioDAO.inserirAlergia(idPaciente, descricao);
+            rotulo = "alergia";
+
+        } else if ("condicao".equals(tipo)) {
+            descricao = campo(body, "descricao");
+            if (descricao == null) {
+                enviarErro(ex, 400, "Informe a descrição da condição.");
+                return;
+            }
+            id = prontuarioDAO.inserirCondicao(idPaciente, descricao, campo(body, "desde"));
+            rotulo = "condição";
+
+        } else if ("medicacao".equals(tipo)) {
+            String nome = campo(body, "nome");
+            String dosagem = campo(body, "dosagem");
+            String frequencia = campo(body, "frequencia");
+            if (nome == null || dosagem == null || frequencia == null) {
+                enviarErro(ex, 400, "Informe o nome, a dosagem e a frequência da medicação.");
+                return;
+            }
+            id = prontuarioDAO.inserirMedicacao(idPaciente, nome, dosagem, frequencia, campo(body, "desde"));
+            rotulo = "medicação";
+            descricao = nome;
+
+        } else {
+            enviarErro(ex, 400, "Tipo inválido: use alergia, condicao ou medicacao.");
+            return;
+        }
+
+        acessoDAO.registrarLog(acesso.getIdAcesso(), "registrou_" + tipo, descricao);
+        notificacaoDAO.inserirSemFalhar(idPaciente, NotificacaoDAO.TIPO_PRONTUARIO,
+                nomeDoMedico(acesso) + " adicionou uma " + rotulo + " ao seu prontuário.");
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("id", id);
+        resp.put("sucesso", Boolean.TRUE);
+        enviarJson(ex, 201, resp);
+    }
+
+    /**
+     * DELETE /api/medico/prontuario/{tipo}/{id} — remove um item lançado errado.
+     *
+     * Corrigir prontuário é remover e lançar de novo: as duas operações ficam
+     * separadas na trilha do acesso, e o paciente vê as duas. Um UPDATE
+     * silencioso apagaria o que estava escrito antes sem deixar rastro.
+     */
+    private static void removerItemProntuario(HttpExchange ex, String resto)
+            throws IOException, SQLException {
+        AcessoTemporario acesso = autenticarMedico(ex);
+        if (acesso == null) return;
+        if (!exigirEscrita(ex, acesso)) return;
+
+        String[] partes = resto.split("/");
+        if (partes.length != 2) {
+            enviarErro(ex, 400, "Informe o tipo e o id do item.");
+            return;
+        }
+
+        String tipo = partes[0];
+        // A tabela e a coluna nunca vêm do cliente: o tipo recebido é traduzido
+        // aqui para as constantes do DAO, e o que não casar vira 400.
+        String tabela;
+        String coluna;
+        if ("alergia".equals(tipo)) {
+            tabela = ProntuarioDAO.TABELA_ALERGIA;
+            coluna = "descricao";
+        } else if ("condicao".equals(tipo)) {
+            tabela = ProntuarioDAO.TABELA_CONDICAO;
+            coluna = "descricao";
+        } else if ("medicacao".equals(tipo)) {
+            tabela = ProntuarioDAO.TABELA_MEDICACAO;
+            coluna = "nome";
+        } else {
+            enviarErro(ex, 400, "Tipo inválido: use alergia, condicao ou medicacao.");
+            return;
+        }
+
+        int id;
+        try {
+            id = Integer.parseInt(partes[1].trim());
+        } catch (NumberFormatException e) {
+            enviarErro(ex, 400, "Id inválido.");
+            return;
+        }
+
+        int idPaciente = acesso.getIdPaciente();
+        String descricao = prontuarioDAO.descricaoDe(tabela, coluna, id, idPaciente);
+        if (!prontuarioDAO.excluir(tabela, id, idPaciente)) {
+            enviarErro(ex, 404, "Item não encontrado no prontuário deste paciente.");
+            return;
+        }
+
+        acessoDAO.registrarLog(acesso.getIdAcesso(), "removeu_" + tipo, descricao);
+        notificacaoDAO.inserirSemFalhar(idPaciente, NotificacaoDAO.TIPO_PRONTUARIO,
+                nomeDoMedico(acesso) + " removeu um item do seu prontuário.");
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("sucesso", Boolean.TRUE);
+        enviarJson(ex, 200, resp);
+    }
+
+    /** Nome do médico do acesso, com um rótulo genérico se ele não veio. */
+    private static String nomeDoMedico(AcessoTemporario acesso) {
+        Medico med = acesso.getMedico();
+        return (med == null || med.getNome() == null) ? "Um profissional" : med.getNome();
     }
 
     /**
@@ -1216,6 +1979,36 @@ public class ApiServer {
         return m;
     }
 
+    private static Map<String, Object> familiarJson(Familiar f) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", f.getIdFamiliar());
+        m.put("nome", f.getNome());
+        m.put("parentesco", f.getParentesco());
+        m.put("telefone", f.getTelefone());
+        return m;
+    }
+
+    private static Map<String, Object> notificacaoJson(Notificacao n) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", n.getIdNotificacao());
+        m.put("tipo", n.getTipo());
+        m.put("mensagem", n.getMensagem());
+        m.put("criado_em", n.getDataEnvio());
+        m.put("lida_em", n.getLidaEm());
+        return m;
+    }
+
+    /**
+     * Item do prontuário no formato que o portal do médico usa: o texto para
+     * mostrar e o id para poder remover.
+     */
+    private static Map<String, Object> itemProntuarioJson(int id, String texto) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", id);
+        m.put("texto", texto);
+        return m;
+    }
+
     private static Map<String, Object> dependenteJson(Dependente d) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", d.getId());
@@ -1301,6 +2094,24 @@ public class ApiServer {
             } catch (NumberFormatException e) {
                 return null;
             }
+        }
+        return null;
+    }
+
+    /**
+     * Lê um parâmetro de texto da query string (usado por ?cep=).
+     * Devolve null quando o parâmetro não veio ou veio vazio.
+     */
+    private static String textoDaQuery(HttpExchange ex, String nome) {
+        String query = ex.getRequestURI().getQuery();
+        if (query == null || query.isEmpty()) return null;
+
+        for (String par : query.split("&")) {
+            int igual = par.indexOf('=');
+            if (igual <= 0) continue;
+            if (!nome.equals(par.substring(0, igual))) continue;
+            String valor = URLDecoder.decode(par.substring(igual + 1), StandardCharsets.UTF_8).trim();
+            return valor.isEmpty() ? null : valor;
         }
         return null;
     }

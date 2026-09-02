@@ -244,3 +244,79 @@ CREATE TABLE IF NOT EXISTS unidades_saude (
   atualizado_em    TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_unidade_municipio (codigo_municipio)
 );
+
+-- ============================================================
+--  Trilha de auditoria do paciente
+--  Complementa acessos_log: lá fica o que o MÉDICO fez com um código
+--  temporário; aqui fica o que o PRÓPRIO paciente fez na conta dele —
+--  entrou, abriu dado sensível, exportou o PDF, cadastrou ou excluiu um
+--  dependente, gerou um código de acesso.
+--
+--  É trilha de auditoria, não log técnico: só entra ação de negócio, o
+--  registro é imutável (não existe UPDATE nem DELETE nesta tabela em
+--  nenhum DAO) e ele é mostrado ao titular na tela "Histórico de acessos".
+--
+--  origem_ip existe para o paciente reconhecer um acesso que não foi ele.
+--  É dado pessoal, então fica restrito ao próprio titular, como o resto.
+--
+--  detalhe NUNCA recebe diagnóstico, resultado de exame, CPF ou cartão do
+--  SUS: guarda contagem e primeiro nome, o suficiente para o paciente
+--  entender o que aconteceu (ver AuditoriaDAO).
+-- ============================================================
+CREATE TABLE IF NOT EXISTS auditoria (
+  id               INT AUTO_INCREMENT PRIMARY KEY,
+  paciente_id      INT           NOT NULL,
+  acao             VARCHAR(40)   NOT NULL,  -- 'login', 'consultou_prontuario', ...
+  recurso          VARCHAR(40)   NULL,      -- 'conta' | 'prontuario' | 'exames' | ...
+  detalhe          VARCHAR(255)  NULL,
+  origem_ip        VARCHAR(45)   NULL,      -- 45 = cabe um IPv6
+  criado_em        TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_auditoria_paciente
+    FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE,
+  INDEX idx_auditoria_paciente (paciente_id, criado_em)
+);
+
+-- ============================================================
+--  Contatos de emergência (familiares)
+--  Quem avisar se algo acontecer com o paciente. É dado de OUTRA
+--  pessoa (nome e telefone de um familiar), então de propósito não
+--  entra no resumo enviado ao médico pelo acesso temporário: quem
+--  cadastrou foi o paciente, e o consentimento é dele, não do familiar.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS familiares (
+  id               INT AUTO_INCREMENT PRIMARY KEY,
+  paciente_id      INT           NOT NULL,
+  nome             VARCHAR(120)  NOT NULL,
+  parentesco       VARCHAR(60)   NOT NULL,
+  telefone         VARCHAR(20)   NOT NULL,
+  criado_em        TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_familiar_paciente
+    FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE,
+  INDEX idx_familiar_paciente (paciente_id)
+);
+
+-- ============================================================
+--  Notificações
+--  Diferente dos "avisos" do Dashboard, que são DERIVADOS dos dados
+--  (o AvisoDAO recalcula a cada requisição e nada é gravado), a
+--  notificação é um FATO que aconteceu uma vez e precisa sobreviver:
+--  um médico registrou uma consulta no prontuário do paciente.
+--
+--  Por isso ela é gravada, tem "lida_em" e não é recalculável — se a
+--  linha sumir, ninguém consegue reconstruir o momento em que o
+--  registro foi feito.
+--
+--  A mensagem NUNCA carrega diagnóstico, resultado ou conduta: diz o
+--  que aconteceu e quem fez, e o paciente abre a tela para ver o resto.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS notificacoes (
+  id               INT AUTO_INCREMENT PRIMARY KEY,
+  paciente_id      INT           NOT NULL,
+  tipo             VARCHAR(30)   NOT NULL,  -- 'consulta' | 'exame' | 'prontuario' | 'acesso'
+  mensagem         VARCHAR(255)  NOT NULL,
+  criado_em        TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+  lida_em          DATETIME      NULL,
+  CONSTRAINT fk_notificacao_paciente
+    FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE,
+  INDEX idx_notificacao_paciente (paciente_id, lida_em)
+);

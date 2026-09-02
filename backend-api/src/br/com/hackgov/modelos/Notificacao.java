@@ -1,11 +1,24 @@
 package br.com.hackgov.modelos;
 
+/**
+ * Uma notificação gravada para o paciente.
+ *
+ * Não confundir com os "avisos" do Dashboard: aviso é DERIVADO (o AvisoDAO
+ * recalcula a partir dos exames e consultas a cada requisição, e nada fica
+ * gravado), enquanto a notificação é um FATO que aconteceu uma vez — um médico
+ * registrou uma consulta no prontuário — e por isso precisa de linha própria,
+ * com marca de leitura.
+ *
+ * A mensagem nunca carrega diagnóstico, resultado ou conduta: diz o que
+ * aconteceu e quem fez, e o paciente abre a tela para ver o resto.
+ */
 public class Notificacao {
     private int idNotificacao;
+    private int idPaciente;
     private String mensagem;
     private String tipo;
     private String dataEnvio;
-    private Paciente paciente;
+    private String lidaEm;
 
     public int getIdNotificacao() {
         return idNotificacao;
@@ -13,6 +26,14 @@ public class Notificacao {
 
     public void setIdNotificacao(int idNotificacao) {
         this.idNotificacao = idNotificacao;
+    }
+
+    public int getIdPaciente() {
+        return idPaciente;
+    }
+
+    public void setIdPaciente(int idPaciente) {
+        this.idPaciente = idPaciente;
     }
 
     public String getMensagem() {
@@ -39,17 +60,16 @@ public class Notificacao {
         this.dataEnvio = dataEnvio;
     }
 
-    public Paciente getPaciente() {
-        return paciente;
+    /** Quando o paciente marcou como lida; null enquanto não leu. */
+    public String getLidaEm() {
+        return lidaEm;
     }
 
-    public void setPaciente(Paciente paciente) {
-        this.paciente = paciente;
+    public void setLidaEm(String lidaEm) {
+        this.lidaEm = lidaEm;
     }
 
-    public void exibeNotificacao() {
-        System.out.println(mensagem);
+    public boolean isLida() {
+        return lidaEm != null;
     }
 }
-
-

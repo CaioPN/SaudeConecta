@@ -4,6 +4,10 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Trash2, Users } from 'lucide-react';
+import BotaoPrivacidade from '../components/BotaoPrivacidade';
+import { usePessoas } from '../context/PessoasContext';
+import { usePrivacidade } from '../context/PrivacidadeContext';
+import { mascarar } from '../utils/privacidade';
 import api from '../services/api';
 
 const TIPOS_SANGUINEOS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
@@ -32,6 +36,11 @@ function calcularIdade(dataIso) {
 
 export default function Dependentes() {
     const navigate = useNavigate();
+    // O seletor de pessoa das outras telas lê a mesma lista; sem avisar o
+    // contexto, um dependente recém-cadastrado só apareceria lá depois de
+    // recarregar a página.
+    const { recarregar } = usePessoas();
+    const { oculto } = usePrivacidade();
     const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm({
         resolver: yupResolver(schema)
     });
@@ -60,6 +69,7 @@ export default function Dependentes() {
         try {
             const { data } = await api.post('/dependentes', dados);
             setDependentes((atual) => [...atual, data.dependente]);
+            recarregar();
             reset();
         } catch (err) {
             setErro(err?.response?.data?.erro || 'Não foi possível cadastrar o dependente.');
@@ -70,6 +80,7 @@ export default function Dependentes() {
         try {
             await api.delete(`/dependentes/${id}`);
             setDependentes((atual) => atual.filter((d) => d.id !== id));
+            recarregar();
         } catch (err) {
             setErro(err?.response?.data?.erro || 'Não foi possível remover o dependente.');
         }
@@ -85,8 +96,11 @@ export default function Dependentes() {
                 <ChevronLeft size={20} /> Voltar
             </button>
 
-            <h2 className="header-title mb-6">Dependentes</h2>
-            <p className="text-sm text-muted" style={{ marginTop: '-16px', marginBottom: '24px' }}>
+            <div className="section-header">
+                <h2 className="header-title">Dependentes</h2>
+                <BotaoPrivacidade rotulo="dados dos dependentes" />
+            </div>
+            <p className="text-sm text-muted" style={{ marginTop: '-8px', marginBottom: '24px' }}>
                 Cadastre familiares vinculados à sua conta. Eles não possuem acesso próprio.
             </p>
 
@@ -153,12 +167,20 @@ export default function Dependentes() {
             ) : (
                 dependentes.map((dep) => (
                     <div className="card card-sm border-blue" key={dep.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        {/* O nome fica visível mesmo com o olhinho fechado: é
+                            por ele que o titular sabe qual cartão é de quem na
+                            hora de remover. O que some é o documento e os dados
+                            de saúde — CPF, idade, gênero e tipo sanguíneo. */}
                         <div>
                             <h4 className="font-bold">{dep.nome}</h4>
-                            <p className="text-sm text-muted">
-                                {calcularIdade(dep.data_nascimento)} anos • {dep.genero} • {dep.tipo_sanguineo}
+                            <p className={`text-sm text-muted ${oculto ? 'valor-oculto' : ''}`}>
+                                {oculto
+                                    ? mascarar(`00 anos • ${dep.genero} • ${dep.tipo_sanguineo}`)
+                                    : `${calcularIdade(dep.data_nascimento)} anos • ${dep.genero} • ${dep.tipo_sanguineo}`}
                             </p>
-                            <p className="text-xs text-muted">CPF: {dep.cpf}</p>
+                            <p className={`text-xs text-muted ${oculto ? 'valor-oculto' : ''}`}>
+                                CPF: {oculto ? mascarar(dep.cpf) : dep.cpf}
+                            </p>
                         </div>
                         <button
                             onClick={() => removerDependente(dep.id)}

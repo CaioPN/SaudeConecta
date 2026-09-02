@@ -38,12 +38,16 @@ export const FAQ = [
         r: 'Na tela de login, toque em "Cadastre-se" e preencha os seus dados. É preciso aceitar os Termos de Uso e a política de tratamento de dados para concluir o cadastro.',
       },
       {
+        p: 'Onde cadastro quem deve ser avisado numa emergência?',
+        r: 'Em "Mais" → "Meu perfil", no fim da tela, existe a seção "Contatos de emergência". Você informa nome, parentesco e telefone de quem deve ser procurado. Esses contatos são só seus: eles não entram no resumo que o médico recebe pelo código de acesso, porque o telefone é de outra pessoa e quem consentiu com o cadastro foi você, não ela.',
+      },
+      {
         p: 'Quais são as regras da senha?',
         r: 'A senha precisa ter no mínimo 8 caracteres, com pelo menos uma letra maiúscula, uma minúscula, um número e um caractere especial.',
       },
       {
         p: 'Esqueci a minha senha. E agora?',
-        r: 'A redefinição automática pelo aplicativo ainda está em desenvolvimento. Por enquanto, peça a troca de senha pelo e-mail suporte@saudeconecta.com.br.',
+        r: 'Toque em "Esqueceu a senha?" na tela de login. Para provar que a conta é sua, o aplicativo pede três dados do seu cadastro — e-mail, CPF e data de nascimento —; conferindo os três, você escolhe a nova senha na hora. O pedido vale por 15 minutos e a troca fica registrada no seu histórico de acessos, para você perceber se alguém tentar fazer isso no seu lugar.',
       },
       {
         p: 'Como saio da minha conta?',
@@ -62,6 +66,14 @@ export const FAQ = [
       {
         p: 'Como adiciono um dependente?',
         r: 'Vá em "Minha Saúde" → "Dependentes" e toque no botão de adicionar. Você informa nome, CPF, data de nascimento, gênero e tipo sanguíneo.',
+      },
+      {
+        p: 'Consigo ver os exames e as consultas de um dependente?',
+        r: 'Sim. Em Exames, Consultas, Prontuário e Carteira de Vacinação existe um seletor no topo da tela com você e cada dependente. A escolha vale para todas essas telas ao mesmo tempo: se você trocar para o seu filho nos exames e abrir o prontuário em seguida, ele continua sendo o do filho. Ao recarregar o aplicativo, tudo volta para você.',
+      },
+      {
+        p: 'O médico com um código meu enxerga os meus dependentes?',
+        r: 'Não. O acesso temporário mostra apenas os seus dados — nada dos dependentes. Para que um profissional veja os dados de um dependente, isso ainda precisa ser feito por você, mostrando a tela.',
       },
       {
         p: 'O dependente tem login próprio?',
@@ -112,6 +124,10 @@ export const FAQ = [
         r: 'Toque em "Rede", na barra inferior. O app lista as unidades públicas da sua cidade — UBS, UPAs e prontos-socorros —, da mais perto para a mais longe, com endereço, telefone e horário de atendimento. Os botões filtram por tipo de unidade.',
       },
       {
+        p: 'Uma UBS que eu conheço não aparece na lista. Por quê?',
+        r: 'A lista é da rede municipal da cidade do CEP do seu cadastro, porque é essa a rede que atende você. Então uma unidade da cidade vizinha não aparece, mesmo estando a poucos quarteirões — situação comum para quem mora na divisa. Use "Ver outra cidade", no topo da tela, e informe um CEP daquela cidade. A tela também mostra as 60 unidades mais próximas, e não todas: em capitais são centenas.',
+      },
+      {
         p: 'De onde vêm essas informações?',
         r: 'Do CNES (Cadastro Nacional de Estabelecimentos de Saúde), a base oficial do Ministério da Saúde. O app guarda uma cópia local e a renova periodicamente, por isso um telefone ou horário pode estar desatualizado se a unidade mudou há poucos dias.',
       },
@@ -121,7 +137,7 @@ export const FAQ = [
       },
       {
         p: 'A minha localização fica guardada?',
-        r: 'Não. Ela é usada apenas para ordenar a lista naquele momento e não é gravada no seu cadastro nem enviada para outro lugar. A cidade pesquisada vem sempre do CEP do seu perfil.',
+        r: 'Não. Ela é usada apenas para ordenar a lista naquele momento e não é gravada no seu cadastro nem enviada para outro lugar. A cidade vem do CEP do seu perfil, ou do CEP que você digitar em "Ver outra cidade".',
       },
       {
         p: 'Consigo marcar atendimento por aqui?',
@@ -165,7 +181,15 @@ export const FAQ = [
       },
       {
         p: 'Posso escolher o que o médico faz com os meus dados?',
-        r: 'Sim. Ao gerar o código você escolhe entre "Somente leitura", em que o médico apenas consulta, e "Leitura e registro", em que ele também pode lançar a consulta e os exames do dia.',
+        r: 'Sim. Ao gerar o código você escolhe entre "Somente leitura", em que o médico apenas consulta, e "Leitura e registro", em que ele também pode lançar a consulta e os exames do dia e atualizar o seu prontuário.',
+      },
+      {
+        p: 'O que exatamente o médico consegue escrever no meu prontuário?',
+        r: 'Com o acesso de "Leitura e registro", ele pode lançar a consulta do dia, um exame com os resultados e itens do prontuário: alergias, condições acompanhadas e medicações em uso. Não existe "editar": para corrigir algo lançado errado, o profissional remove o item e lança o certo — e as duas ações aparecem separadas no seu histórico de acessos.',
+      },
+      {
+        p: 'Fico sabendo quando um médico registra alguma coisa?',
+        r: 'Sim. Assim que ele registra uma consulta, um exame ou um item do prontuário, aparece um bloco "Novidades" na tela inicial dizendo o que foi feito e por quem. A mensagem não traz diagnóstico nem resultado — para isso você abre a tela correspondente.',
       },
       {
         p: 'Consigo cancelar um acesso já concedido?',
@@ -191,7 +215,7 @@ export const FAQ = [
       },
       {
         p: 'Como sei quem viu os meus dados?',
-        r: 'Em "Mais" → "Histórico de acessos". A tela lista, do mais recente para o mais antigo, cada vez que um profissional entrou com um código gerado por você: o nome dele, o CRM, o que fez (consultou o resumo, registrou uma consulta ou um exame) e a data e a hora. O registro é automático — nem o médico nem você conseguem apagá-lo.',
+        r: 'Em "Mais" → "Histórico de acessos". A tela lista, do mais recente para o mais antigo, cada vez que um profissional entrou com um código gerado por você: o nome dele, o CRM, o que fez (consultou o resumo, registrou uma consulta, um exame ou um item do prontuário) e a data e a hora. O filtro no topo troca entre "Profissionais" e "Você": neste último ficam os seus próprios registros — quando você entrou na conta, abriu o prontuário, os exames ou as consultas, baixou o PDF, cadastrou ou excluiu um dependente ou um contato de emergência, pediu a recuperação da senha e gerou um código de acesso, com o endereço de rede de onde a ação partiu. Quando a leitura foi de um dependente, a linha diz o primeiro nome dele. O registro é automático — nem o médico nem você conseguem apagá-lo.',
       },
       {
         p: 'Dá para esconder os meus dados na tela?',

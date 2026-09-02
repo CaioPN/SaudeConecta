@@ -3,12 +3,16 @@ import { Calendar, MapPin, Info, ChevronLeft, User, Clock, FileText, Droplet } f
 import { useNavigate, useParams } from 'react-router-dom';
 import InfoField from '../components/InfoField';
 import StatusBadge from '../components/StatusBadge';
+import BotaoPrivacidade from '../components/BotaoPrivacidade';
+import { usePrivacidade } from '../context/PrivacidadeContext';
+import { mascararTexto } from '../utils/privacidade';
 import { buscarConsulta } from '../services/consultas';
 import { formatarData } from '../utils/exames';
 
 export default function Appointment() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { oculto } = usePrivacidade();
   const [consulta, setConsulta] = useState(null);
   const [carregando, setCarregando] = useState(true);
 
@@ -50,16 +54,26 @@ export default function Appointment() {
         <ChevronLeft size={20} /> Voltar
       </button>
 
-      <h2 className="header-title mb-6">Detalhes da Consulta</h2>
+      <div className="section-header">
+        <h2 className="header-title">Detalhes da Consulta</h2>
+        <BotaoPrivacidade rotulo="consulta" />
+      </div>
 
+      {/* Motivo, resumo e conduta são o registro clínico do atendimento — é o
+          conteúdo mais sensível da tela e o primeiro a sumir com o olhinho.
+          Data e hora ficam: dizem quando, não o quê. */}
       <div className="card mb-6">
         <div className="detail-card-header">
           <div className="icon-box icon-box-lg" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
             <User size={28} />
           </div>
           <div style={{ flex: 1 }}>
-            <h3 className="font-bold text-lg">{consulta.medico}</h3>
-            <p className="text-sm font-bold text-primary">{consulta.especialidade}</p>
+            <h3 className={`font-bold text-lg ${oculto ? 'valor-oculto' : ''}`}>
+              {oculto ? mascararTexto(consulta.medico) : consulta.medico}
+            </h3>
+            <p className={`text-sm font-bold text-primary ${oculto ? 'valor-oculto' : ''}`}>
+              {oculto ? mascararTexto(consulta.especialidade) : consulta.especialidade}
+            </p>
           </div>
           <StatusBadge status={consulta.status} />
         </div>
@@ -68,10 +82,10 @@ export default function Appointment() {
           {formatarData(consulta.data)} • {consulta.hora}
         </InfoField>
         <InfoField icon={MapPin} label="Local">
-          {consulta.local}
+          {oculto ? mascararTexto(consulta.local) : consulta.local}
         </InfoField>
         <InfoField icon={Info} label="Motivo">
-          {consulta.motivo}
+          {oculto ? mascararTexto(consulta.motivo) : consulta.motivo}
         </InfoField>
       </div>
 
@@ -81,12 +95,12 @@ export default function Appointment() {
           <div className="card mb-6">
             {consulta.resumo && (
               <InfoField icon={FileText} label="Resumo">
-                {consulta.resumo}
+                {oculto ? mascararTexto(consulta.resumo) : consulta.resumo}
               </InfoField>
             )}
             {consulta.conduta && (
               <InfoField icon={Clock} label="Conduta">
-                {consulta.conduta}
+                {oculto ? mascararTexto(consulta.conduta) : consulta.conduta}
               </InfoField>
             )}
           </div>

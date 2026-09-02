@@ -37,8 +37,16 @@ public class UnidadeSaudeDAO {
     /** Por quantos dias o espelho do CNES é considerado bom. */
     private static final int DIAS_VALIDADE_CACHE = 30;
 
-    /** Quantas unidades a tela recebe, das mais próximas para as mais distantes. */
-    private static final int LIMITE_PADRAO = 30;
+    /**
+     * Quantas unidades a tela recebe, das mais próximas para as mais distantes.
+     *
+     * Trinta cortava cedo demais numa cidade grande: São Paulo tem 547
+     * unidades, e quem mora longe do centro via a lista terminar ainda no
+     * bairro vizinho. Sessenta cabe na mesma consulta sem pesar (é uma linha
+     * curta por unidade) e cobre com folga o raio que interessa a pé ou de
+     * ônibus.
+     */
+    private static final int LIMITE_PADRAO = 60;
 
     /** Municípios com atualização em andamento, para não baixar duas vezes. */
     private static final Set<Integer> EM_ATUALIZACAO = new HashSet<>();

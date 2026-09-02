@@ -14,6 +14,7 @@ import AcessoMedico from './screens/AcessoMedico';
 import HistoricoAcessos from './screens/HistoricoAcessos';
 import PortalMedico from './screens/PortalMedico';
 import Cadastro from './screens/Cadastro';
+import RecuperarSenha from './screens/RecuperarSenha';
 import Dependentes from './screens/Dependentes';
 import Vacinas from './screens/Vacinas';
 import RedeSaude from './screens/RedeSaude';
@@ -32,6 +33,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Login />} />
             <Route path="/cadastro" element={<Cadastro />} />
+            <Route path="/recuperar-senha" element={<RecuperarSenha />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/patient" element={<PatientProfile />} />
             <Route path="/profile" element={<Profile />} />

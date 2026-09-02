@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, Syringe, FlaskConical, Activity } from 'lucide-react';
+import { Calendar, Syringe, FlaskConical, Activity, Bell, Stethoscope, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { usePrivacidade } from '../context/PrivacidadeContext';
@@ -8,6 +8,7 @@ import { mascararTexto } from '../utils/privacidade';
 import { ICONES } from '../utils/icones';
 import api from '../services/api';
 import { buscarAvisos } from '../services/avisos';
+import { listarNotificacoes, marcarTodasLidas } from '../services/notificacoes';
 
 // Cada tipo de aviso tem seu ícone; "exame" é o padrão para o que não casar.
 const ICONES_AVISO = {
@@ -52,9 +53,95 @@ function AvisoItem({ aviso }) {
   );
 }
 
+// Ícone de cada tipo de notificação.
+const ICONES_NOTIFICACAO = {
+  consulta: Stethoscope,
+  exame: FlaskConical,
+  prontuario: FileText,
+  acesso: Bell,
+};
+
+/**
+ * Notificações: o que aconteceu na conta enquanto o paciente não estava olhando.
+ *
+ * Fica separado do card "Avisos" de propósito, porque as duas coisas respondem
+ * a perguntas diferentes. Aviso é DERIVADO ("faz um ano do seu último exame") e
+ * some sozinho quando deixa de ser verdade; notificação é um FATO que aconteceu
+ * uma vez ("Dr. Fulano registrou uma consulta") e continua valendo mesmo depois
+ * de lida. Misturar os dois num card só faria o paciente não saber o que some e
+ * o que fica.
+ *
+ * O bloco não aparece quando não há nada não lido — quem abre o app todo dia
+ * não precisa ver um card vazio.
+ */
+function Notificacoes({ oculto }) {
+  const [lista, setLista] = useState([]);
+  const [naoLidas, setNaoLidas] = useState(0);
+
+  useEffect(() => {
+    let ativo = true;
+    listarNotificacoes()
+      .then(({ notificacoes, naoLidas: total }) => {
+        if (!ativo) return;
+        setLista(notificacoes.filter((n) => !n.lida));
+        setNaoLidas(total);
+      })
+      .catch(() => {
+        // Notificação é conveniência: se a busca falhar, o bloco não aparece e
+        // o resto do Dashboard segue normal.
+        if (ativo) setLista([]);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, []);
+
+  const limpar = async () => {
+    setLista([]);
+    setNaoLidas(0);
+    try {
+      await marcarTodasLidas();
+    } catch {
+      // Silêncio proposital: a tela já foi limpa, e insistir num erro de rede
+      // aqui atrapalharia mais do que ajudaria.
+    }
+  };
+
+  if (naoLidas === 0 || lista.length === 0) return null;
+
+  return (
+    <>
+      <div className="section-header">
+        <h3 className="section-title">
+          Novidades <span className="notificacao-contador">{naoLidas}</span>
+        </h3>
+        <button type="button" className="notificacao-limpar" onClick={limpar}>
+          Marcar como lidas
+        </button>
+      </div>
+      <div className="card">
+        {lista.map((n) => {
+          const Icone = ICONES_NOTIFICACAO[n.tipo] || Bell;
+          return (
+            <div key={n.id} className="notificacao-item">
+              <div className="icon-box icon-box-gray"><Icone size={18} /></div>
+              {/* A mensagem traz o nome do profissional e o que ele fez — sem
+                  diagnóstico nem resultado —, mas ainda assim segue o olhinho. */}
+              <p className={`text-sm ${oculto ? 'valor-oculto' : ''}`}>
+                {oculto ? mascararTexto(n.mensagem) : n.mensagem}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const { paciente } = useAuth();
+  const { oculto } = usePrivacidade();
   const [totalDependentes, setTotalDependentes] = useState(null);
   const [avisos, setAvisos] = useState(null);
 
@@ -116,6 +203,8 @@ export default function Dashboard() {
           <ICONES.dependentes size={24} />
         </div>
       </div>
+
+      <Notificacoes oculto={oculto} />
 
       <div className="section-header">
         <h3 className="section-title text-red">Avisos</h3>

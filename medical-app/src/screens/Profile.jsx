@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   User, ChevronLeft, Mail, Phone, IdCard, Calendar, Droplet, Venus, MapPin,
+  HeartHandshake, Trash2, Plus,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { usePrivacidade } from '../context/PrivacidadeContext';
 import BotaoPrivacidade from '../components/BotaoPrivacidade';
 import { mascarar } from '../utils/privacidade';
+import { listarFamiliares, cadastrarFamiliar, removerFamiliar } from '../services/familiares';
 
 // Calcula a idade a partir da data de nascimento (formato ISO).
 function calcularIdade(dataNascimento) {
@@ -80,6 +82,155 @@ function InfoRow({ icon: Icon, label, value, sensivel = false }) {
   );
 }
 
+const CONTATO_VAZIO = { nome: '', parentesco: '', telefone: '' };
+
+/**
+ * Contatos de emergência: quem avisar se algo acontecer com o paciente.
+ *
+ * Ficam no perfil, e não numa tela própria, porque são poucos e raramente
+ * mudam — abrir uma rota só para duas ou três linhas seria mais navegação do
+ * que informação.
+ *
+ * De propósito eles NÃO entram no resumo que o médico recebe pelo acesso
+ * temporário: o telefone é de outra pessoa, e quem consentiu com o cadastro
+ * foi o paciente, não o familiar.
+ */
+function ContatosEmergencia() {
+  const { oculto } = usePrivacidade();
+  const [contatos, setContatos] = useState([]);
+  const [form, setForm] = useState(CONTATO_VAZIO);
+  const [abrindo, setAbrindo] = useState(false);
+  const [erro, setErro] = useState('');
+  const [carregando, setCarregando] = useState(true);
+
+  useEffect(() => {
+    let ativo = true;
+    listarFamiliares()
+      .then((lista) => {
+        if (ativo) setContatos(lista);
+      })
+      .catch(() => {
+        if (ativo) setErro('Não foi possível carregar os contatos.');
+      })
+      .finally(() => {
+        if (ativo) setCarregando(false);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, []);
+
+  const alterar = (campo) => (e) => {
+    setForm({ ...form, [campo]: e.target.value });
+    if (erro) setErro('');
+  };
+
+  const adicionar = async (e) => {
+    e.preventDefault();
+    try {
+      const novo = await cadastrarFamiliar(form);
+      setContatos((atual) => [...atual, novo]);
+      setForm(CONTATO_VAZIO);
+      setAbrindo(false);
+    } catch (err) {
+      setErro(err?.response?.data?.erro || 'Não foi possível cadastrar o contato.');
+    }
+  };
+
+  const remover = async (id) => {
+    try {
+      await removerFamiliar(id);
+      setContatos((atual) => atual.filter((c) => c.id !== id));
+    } catch (err) {
+      setErro(err?.response?.data?.erro || 'Não foi possível remover o contato.');
+    }
+  };
+
+  return (
+    <>
+      <h3 className="section-title">Contatos de emergência</h3>
+
+      <div className="card">
+        {carregando && <p className="text-sm text-muted">Carregando…</p>}
+
+        {!carregando && contatos.length === 0 && !abrindo && (
+          <p className="text-sm text-muted">
+            Nenhum contato cadastrado. Cadastre quem deve ser avisado em uma
+            emergência.
+          </p>
+        )}
+
+        {contatos.map((c) => (
+          <div key={c.id} className="contato-item">
+            <div className="icon-box icon-box-gray"><HeartHandshake size={18} /></div>
+            <div style={{ flex: 1 }}>
+              <p className="font-bold">{c.nome}</p>
+              <p className="text-xs text-muted">{c.parentesco}</p>
+              {/* O telefone segue o olhinho; o nome e o parentesco ficam, para
+                  o paciente saber qual contato está removendo. */}
+              <p className={`text-sm ${oculto ? 'valor-oculto' : ''}`}>
+                {oculto ? mascarar(c.telefone) : formatarTelefone(c.telefone)}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => remover(c.id)}
+              className="icon-box icon-box-gray"
+              style={{ cursor: 'pointer', border: 'none' }}
+              title={`Remover ${c.nome}`}
+            >
+              <Trash2 size={18} />
+            </button>
+          </div>
+        ))}
+
+        {erro && <p className="form-erro">{erro}</p>}
+
+        {abrindo ? (
+          <form onSubmit={adicionar} style={{ marginTop: '16px' }}>
+            <div className="input-group">
+              <label className="input-label">Nome</label>
+              <input className="input-field" value={form.nome} onChange={alterar('nome')} required />
+            </div>
+            <div className="input-group">
+              <label className="input-label">Parentesco</label>
+              <input
+                className="input-field"
+                placeholder="Mãe, irmão, vizinha…"
+                value={form.parentesco}
+                onChange={alterar('parentesco')}
+                required
+              />
+            </div>
+            <div className="input-group">
+              <label className="input-label">Telefone</label>
+              <input
+                className="input-field"
+                placeholder="(11) 90000-0000"
+                value={form.telefone}
+                onChange={alterar('telefone')}
+                required
+              />
+            </div>
+            <button className="btn-primary" type="submit">Salvar contato</button>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => { setAbrindo(false); setForm(CONTATO_VAZIO); setErro(''); }}
+            >
+              Cancelar
+            </button>
+          </form>
+        ) : (
+          <button type="button" className="btn-secondary" onClick={() => setAbrindo(true)}>
+            <Plus size={16} /> Adicionar contato
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
 export default function Profile() {
   const navigate = useNavigate();
   const { paciente } = useAuth();
@@ -123,6 +274,8 @@ export default function Profile() {
         <InfoRow icon={MapPin} label="Endereço" value={endereco} sensivel />
         <InfoRow icon={MapPin} label="CEP" value={formatarCEP(paciente?.cep)} sensivel />
       </div>
+
+      <ContatosEmergencia />
     </div>
   );
 }

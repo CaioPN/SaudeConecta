@@ -72,7 +72,13 @@ export default function Login() {
         <div className="input-group">
           <div className="label-row">
             <label className="input-label">Senha</label>
-            <button type="button" className="forgot-password-link">Esqueceu a senha?</button>
+            <button
+              type="button"
+              className="forgot-password-link"
+              onClick={() => navigate('/recuperar-senha')}
+            >
+              Esqueceu a senha?
+            </button>
           </div>
           <div className="password-input-wrapper">
             <input 

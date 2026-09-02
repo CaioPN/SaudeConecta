@@ -32,12 +32,13 @@ backend-api/          API Java (pacote br.com.hackgov)
   src/br/com/hackgov/
     api/ApiServer       servidor HTTP + rotas
     dao/                acesso ao banco — Paciente, Dependente, Consulta,
-                        Exame, Prontuario, Acesso, Medico, Aviso
+                        Exame, Prontuario, Acesso, Medico, Aviso, Auditoria,
+                        UnidadeSaude, Notificacao, Familiar
     db/Conexao          conexão JDBC com o MySQL
     modelos/            POJOs — Paciente, Dependente, Familiar, Medico,
                         Consulta, Prontuario, HistoricoMedico, Medicacao,
                         Alergia, Notificacao, Exame, ItemExame,
-                        AcessoTemporario, AcessoLog, Aviso
+                        AcessoTemporario, AcessoLog, RegistroAuditoria, Aviso
     principal/Principal menu de console antigo (não serve o front)
     util/               Json (parser próprio), Jwt, SenhaUtil,
                         CodigoAcesso, ChatIA
@@ -53,22 +54,24 @@ medical-app/          front-end React + Vite
       Modal.jsx
       VLibras.jsx       acessibilidade em Libras
       BotaoPrivacidade.jsx  o "olhinho" que oculta dados sensíveis
+      SeletorPessoa.jsx  pílulas de titular/dependente nas telas clínicas
       InfoField.jsx, StatusBadge.jsx, ResultRow.jsx  (exibição compartilhada)
     content/          textos estáticos (LegalContent, FaqContent)
     context/
       AuthContext.jsx   estado de autenticação global
       PrivacidadeContext.jsx  estado do "olhinho" (global, não persistido)
+      PessoasContext.jsx  de quem são os dados na tela (idem, não persistido)
     data/             dados estáticos (calendário de vacinas do PNI)
     utils/            regras puras (faixa de referência, datas, linha do tempo)
                       icones.js — um ícone por assunto, usado por todas as telas
                       privacidade.js — máscaras do "olhinho"
     screens/          uma tela por rota
-      Login.jsx, Cadastro.jsx
+      Login.jsx, Cadastro.jsx, RecuperarSenha.jsx
       Dashboard.jsx, Profile.jsx, PatientProfile.jsx
       Dependentes.jsx, Vacinas.jsx
       Appointments.jsx, Appointment.jsx, Exams.jsx, MedicalRecord.jsx
       AcessoMedico.jsx  (paciente gera o código)
-      HistoricoAcessos.jsx  (trilha de auditoria do que o médico fez)
+      HistoricoAcessos.jsx  (trilha do médico + a do próprio paciente)
       PortalMedico.jsx  (médico usa o código — fora do app do paciente)
       Privacy.jsx, Terms.jsx, Faq.jsx
     services/         chamadas HTTP para a API (uma por assunto)
@@ -147,17 +150,19 @@ sem lógica de banco).
   - O `ChatIA` usa o `HttpClient` do próprio JDK (Java 11+) e o `Json` do
     projeto — nenhuma biblioteca nova, como manda a regra do backend.
 - **Dúvidas frequentes** (`Faq.jsx`, rota `/faq`, texto em
-  `content/FaqContent.js`): sanfona com 33 perguntas em oito categorias — o item
+  `content/FaqContent.js`): sanfona com 43 perguntas em oito categorias — o item
   "Dúvidas frequentes" do menu "Mais" apontava para uma rota que não existia.
   As respostas descrevem o que o app faz **hoje** (dizem, por exemplo, que a
-  redefinição de senha ainda não existe e que a tela de consultas só lista, não
-  agenda); ao mudar um fluxo, revise o texto correspondente. A base local do
+  tela de consultas só lista, não agenda, e explicam a conferência de três
+  dados da recuperação de senha); ao mudar um fluxo, revise o texto
+  correspondente. A base local do
   chatbot é a outra ponta da mesma informação — mantenha as duas de acordo.
 - **Rede de Saúde** (`RedeSaude.jsx`, rota `/rede-saude`, `services/redeSaude.js`,
   `UnidadeSaude`, `UnidadeSaudeDAO`, `util/CnesApi`, `util/Localizacao`, rota
   `GET /api/rede-saude`): lista as UBS, UPAs e prontos-socorros da cidade do
   paciente, da mais perto para a mais longe, com endereço, telefone, turno,
-  filtro por tipo, "Como chegar" (abre a rota no app de mapas) e "Ligar".
+  filtro por tipo, "Ver outra cidade", "Como chegar" (abre a rota no app de
+  mapas) e "Ligar".
   - Os dados vêm do **CNES** pelos dados abertos do Ministério da Saúde
     (`apidadosabertos.saude.gov.br`, pública e sem chave). Como ela devolve 20
     itens por requisição — São Paulo são 547 unidades, ~7 s de download —, o
@@ -188,11 +193,21 @@ sem lógica de banco).
     rajadas — medindo na mão, 1 consulta/s já é bloqueada por minutos, uma a
     cada 5 s passa. Como as não suspeitas são marcadas sem consultar, sobram
     ~17 consultas por cidade, uns 2 minutos.
-  - A cidade sai **sempre do CEP do cadastro** (`Localizacao`). Já o ponto de
-    partida da distância aceita `?lat=&lon=` do GPS do navegador; sem permissão,
-    usa a coordenada do CEP. O cabeçalho da tela diz qual dos dois foi usado. A
-    distância é Haversine — no SQL para ordenar, e em `Localizacao.distanciaKm`
-    para o resto.
+  - A cidade sai do **CEP do cadastro** (`Localizacao`) ou do **CEP pesquisado**
+    em "Ver outra cidade" (`?cep=` na rota). Já o ponto de partida da distância
+    aceita `?lat=&lon=` do GPS do navegador; sem permissão, usa a coordenada do
+    CEP. O cabeçalho da tela diz qual dos dois foi usado. A distância é
+    Haversine — no SQL para ordenar, e em `Localizacao.distanciaKm` para o resto.
+  - **"Ver outra cidade"** existe porque a lista é da rede **municipal**: a
+    busca do CNES é por município, então uma UBS de Guarulhos nunca apareceria
+    para um cadastro de São Paulo, mesmo a poucos quarteirões — foi assim que a
+    falta da UBS Jardim Vila Galvão apareceu. Com o CEP pesquisado o GPS é
+    ignorado de propósito: medir a partir de onde o paciente está agora, em
+    outra cidade, ordenaria a lista por uma distância que não é a que ele quer
+    ver. A resposta traz `origem.escolhida` para a tela saber se está mostrando
+    a cidade do cadastro ou uma pesquisada, e oferecer a volta.
+  - A tela recebe as **60** unidades mais próximas (`LIMITE_PADRAO`). Eram 30, o
+    que numa capital terminava a lista ainda no bairro vizinho.
   - O `Localizacao` tenta três APIs de CEP, todas públicas e sem chave:
     **AwesomeAPI** (`cep.awesomeapi.com.br`), depois BrasilAPI, depois ViaCEP.
     Só a AwesomeAPI informa coordenada, e isso é proposital: a BrasilAPI
@@ -223,6 +238,10 @@ sem lógica de banco).
   propósito não é gravado em lugar nenhum, então recarregar a página volta ao
   normal. É proteção de tela (ombro alheio), não de dados: o valor continua
   vindo da API e mora no estado do React.
+  - Alcança hoje Perfil, Dashboard, Exames, Prontuário, Consultas (lista e
+    detalhe), Dependentes, Vacinas e Histórico de acessos. Fora dele fica só o
+    Portal do Médico, que mostra os dados de outra pessoa e é usado no
+    consultório, não pelo titular.
   - Nos exames, com o olho fechado somem também o marcador da régua e o selo de
     situação — a posição na barra e a cor do selo entregam o resultado mesmo com
     o número mascarado. Ficam visíveis o nome do exame, a faixa de referência,
@@ -253,15 +272,48 @@ sem lógica de banco).
   para `/`, e `sair()` do `AuthContext` não era chamado em lugar nenhum — o
   `sc_token` e o `sc_paciente` continuavam no `localStorage`, e o próximo a
   abrir o app num aparelho compartilhado entrava na conta.
-- **Histórico de acessos** (`HistoricoAcessos.jsx`, rota `/acessos-log`,
-  `modelos/AcessoLog`, `AcessoDAO.listarLogPorPaciente`, rota
-  `GET /api/acessos/log`, `services/acessos.js`): a trilha de `acessos_log`
-  finalmente aparece para o paciente — quem entrou com um código dele, o que
-  fez (entrou, consultou o resumo, registrou consulta ou exame, ou a revogação
-  feita por ele mesmo) e quando. O filtro é pelo dono do acesso no SQL
-  (`a.paciente_id`), nunca por id vindo da URL, e a resposta traz no máximo
-  `LIMITE_HISTORICO_ACESSOS` (100) linhas. A tela reaproveita a linha do tempo
-  do prontuário e obedece ao olhinho no campo `detalhe`.
+- **Histórico de acessos e trilha de auditoria** (`HistoricoAcessos.jsx`, rota
+  `/acessos-log`, `GET /api/auditoria`, `services/auditoria.js`): a tela mostra
+  as **duas** trilhas do paciente numa linha do tempo só, com filtro
+  "Tudo / Profissionais / Você".
+  - O lado do **médico** é o de sempre (`acessos_log`, `modelos/AcessoLog`,
+    `AcessoDAO.listarLogPorPaciente`): quem entrou com um código dele, o que
+    fez e quando. A rota antiga `GET /api/acessos/log` continua existindo.
+  - O lado do **paciente** é novo (tabela `auditoria`, `RegistroAuditoria`,
+    `AuditoriaDAO`): `login`, `login_falhou`, `solicitou_senha`,
+    `redefiniu_senha`, `consultou_prontuario`, `consultou_exames`,
+    `consultou_consultas`, `exportou_exames`, `cadastrou_dependente`,
+    `excluiu_dependente`, `cadastrou_contato`, `excluiu_contato` e
+    `gerou_codigo` — ou seja, as quatro operações que a governança pede
+    (consulta sensível, exportação, exclusão de registro e concessão de
+    permissão) mais os eventos de autenticação e de troca de senha.
+    Quando a leitura é de um dependente, o `detalhe` diz o primeiro nome dele.
+  - **A gravação passa por uma fila.** `AuditoriaDAO.registrar` não escreve no
+    banco: enfileira (`ArrayDeque`, FIFO) e volta na hora; uma thread daemon
+    consome. Auditar não pode atrasar o atendimento nem derrubar a resposta se
+    o banco engasgar. Ter um só consumidor também dá de graça o agrupamento das
+    leituras — `consultou_exames` repetido dentro de `MINUTOS_AGRUPAMENTO`
+    (10) não vira linha nova, senão cada montagem de tela do React geraria uma.
+    O preço: a fila é memória, então um `kill` com registros pendentes os
+    perde. Vale para a trilha do paciente, não para a do médico, que continua
+    sendo gravada na hora pelo `AcessoDAO`.
+  - **A intercalação usa duas filas.** Como cada lado já chega ordenado do
+    banco, `ApiServer.listarAuditoria` transforma as duas listas em `Deque` e a
+    cada rodada tira a frente da mais recente — passa uma vez por cada lista,
+    em vez de concatenar e reordenar. As datas são ISO, então a comparação é
+    de texto (`maisRecente`).
+  - **Exportar PDF é auditado por uma rota própria**
+    (`POST /api/exames/exportacao`): o arquivo nasce no navegador (jsPDF), o
+    servidor não saberia que existiu. Do cliente vem só a contagem; o nome da
+    ação é fixado no backend, então ninguém escreve ação inventada na própria
+    trilha.
+  - LGPD: o `detalhe` nunca recebe diagnóstico, resultado, CPF ou cartão do
+    SUS — guarda contagem e **primeiro nome** (`ApiServer.primeiroNome`).
+    Grava-se o IP de origem (`origem_ip`) para o paciente reconhecer um acesso
+    que não foi ele; ele só é visível para o próprio titular e obedece ao
+    olhinho. Login com e-mail inexistente não gera registro: não há dono a quem
+    mostrar. Os dois SELECTs filtram pelo paciente do JWT, nunca por id de URL,
+    e devolvem no máximo `LIMITE_HISTORICO_ACESSOS` (100) linhas.
 - **PDF de exames com senha** (`Exams.jsx`): o relatório baixado sai
   criptografado, e a senha são os **4 primeiros dígitos do CPF** do paciente.
   Usa a criptografia que o próprio jsPDF já traz (`encryption` no construtor),
@@ -270,6 +322,51 @@ sem lógica de banco).
   arquivo sozinha, anulando a proteção. Sem CPF no cadastro o PDF é gerado sem
   senha, e a tela avisa em vez de trancar o arquivo com uma senha que o
   paciente não conhece.
+- **Seletor de pessoa nas telas clínicas** (`context/PessoasContext.jsx`,
+  `components/SeletorPessoa.jsx`): Exames, Consultas, Prontuário e Vacinas
+  passaram a mostrar os dados do titular **ou de um dependente**. O banco e as
+  rotas já aceitavam `?dependenteId=`; o que faltava era a tela.
+  - A escolha é **global**: quem abriu o app para cuidar do filho não reescolhe
+    a pessoa em cada tela. Como a do olhinho, ela não é gravada — recarregar a
+    página volta para o titular, que é o dono da conta.
+  - A lista de dependentes é buscada uma vez pelo contexto, e não uma vez por
+    tela. O `Vacinas.jsx`, que tinha o seletor próprio, passou a usar o
+    compartilhado; `Dependentes.jsx` avisa o contexto (`recarregar`) quando
+    cadastra ou exclui alguém.
+  - O seletor some sozinho quando não há dependente: uma pílula só, escrita
+    "você", não é escolha nenhuma.
+- **Esqueci minha senha** (`RecuperarSenha.jsx`, rota `/recuperar-senha`,
+  `services/senha.js`, `POST /api/auth/recuperar` e `/api/auth/redefinir`): o
+  botão do login era decorativo. Não há serviço de e-mail no projeto, então
+  quem prova a identidade é a **conferência de três dados do cadastro**
+  (e-mail, CPF e data de nascimento).
+  - Conferindo os três, volta um token de 15 minutos que só serve para trocar a
+    senha; ele fica no estado da tela e **nunca** no `localStorage`.
+  - O hash da senha vigente entra no token (`marcaDaSenha`), então um token que
+    sobrou de uma recuperação anterior morre assim que a senha muda.
+  - A resposta de erro não diz qual campo errou nem se o e-mail existe — seria
+    um jeito de descobrir quem usa o app. As tentativas por IP são limitadas.
+  - As duas pontas são auditadas (`solicitou_senha` e `redefiniu_senha`), para
+    o paciente ver no histórico se alguém tentou trocar a senha no lugar dele.
+- **Notificações** (`Notificacao`, `NotificacaoDAO`, `GET /api/notificacoes`,
+  `POST /api/notificacoes/{id}/lida` e `/lidas`, `services/notificacoes.js`):
+  card **"Novidades"** no Dashboard com o que aconteceu na conta enquanto o
+  paciente não estava olhando — um médico registrou consulta, exame ou item de
+  prontuário pelo acesso temporário.
+  - Não confundir com os **avisos**: aviso é calculado na hora a partir dos
+    exames e das consultas e não tem linha no banco; notificação é um fato que
+    aconteceu uma vez e fica gravado, com `lida_em`.
+- **Contatos de emergência** (`Familiar`, `FamiliarDAO`, `GET/POST /api/familiares`,
+  `DELETE /api/familiares/{id}`, `services/familiares.js`): quem avisar se algo
+  acontecer com o paciente, cadastrado no Perfil. São dados de **outra pessoa**,
+  então de propósito não entram no resumo enviado ao médico pelo acesso
+  temporário — quem consentiu com o cadastro foi o paciente, não o familiar.
+- **O médico edita o prontuário** (`POST /api/medico/prontuario`,
+  `DELETE /api/medico/prontuario/{tipo}/{id}`, `PortalMedico.jsx`): antes ele
+  registrava consulta e exame, mas uma alergia descoberta na consulta não tinha
+  onde ser anotada. Agora registra e remove **alergia, condição acompanhada e
+  medicação em uso**, sempre exigindo o escopo de escrita do código e caindo na
+  trilha de auditoria do paciente como as outras ações.
 - **Versão HTML de demonstração** (`demo/`, gerada por `node demo/gerar.mjs`):
   o app inteiro — as telas do paciente e o portal do médico — num **arquivo
   só**, sem Node, sem Java e sem MySQL, para mostrar o projeto a quem não vai
@@ -281,6 +378,10 @@ sem lógica de banco).
     embute o logotipo e os ícones do lucide em base64/SVG. Só a marcação das
     telas é escrita à mão, em JavaScript puro, no `app.template.html`.
     **Depois de mexer em algum desses arquivos, rode o `gerar.mjs` de novo.**
+  - Acompanha as telas do app: já traz a trilha do paciente com o filtro
+    "Tudo / Profissionais / Você", o seletor de pessoa em Exames, Consultas,
+    Prontuário e Vacinas, o card "Novidades" do Dashboard, os contatos de
+    emergência do Perfil e a recuperação de senha.
   - Tudo o que ela mostra é fictício e mora só na memória da página; o que
     depende do que não existe ali (PDF, mapa, ligação, IA do chatbot) avisa em
     vez de fingir que funcionou.
@@ -291,20 +392,16 @@ sem lógica de banco).
 
 ## O que falta
 
-- Exames e prontuário de **dependentes**: o banco e a API já aceitam
-  (`dependente_id` nas tabelas, `?dependenteId=` nas rotas), mas as telas ainda
-  mostram só o titular — falta o seletor de pessoa que a tela de Vacinas já tem.
-  O acesso do médico também é só do titular por enquanto.
-- O médico ainda não edita alergias, condições e medicações — só registra
-  consultas e exames.
-- DAOs que ainda não existem: Notificacao, Familiar (os modelos já existem,
-  falta a camada de acesso a dados)
+- O **acesso do médico** é só do titular: o código temporário não alcança os
+  dados de um dependente, mesmo com o seletor já pronto no app do paciente.
 - Os avisos do Dashboard são só do titular (não olham dependentes) e não
   cruzam com a carteira de vacinação: as doses pendentes são calculadas no
   front, a partir da data de nascimento, e o banco não guarda quais doses
   foram aplicadas.
-- Não existe fluxo de "esqueci minha senha" — o botão em `Login.jsx` é
-  decorativo. O hash de senha também é SHA-256 sem salt (`SenhaUtil`).
+- O hash de senha é SHA-256 sem salt (`SenhaUtil`). A recuperação de senha já
+  existe, mas prova a identidade conferindo três dados do cadastro — sem
+  serviço de e-mail, é o mais forte que dá para fazer aqui; quem souber
+  e-mail, CPF e data de nascimento da pessoa passa.
 - O chatbot **não conhece os dados do paciente** — ele explica o app e orienta,
   mas não responde "quando foi meu último exame?". Fazer isso exigiria mandar
   dado clínico para o modelo, o que o nível gratuito do Gemini não permite (usa
@@ -318,6 +415,14 @@ sem lógica de banco).
   unidade e as consultas, e o paciente não escolhe uma UBS de referência. A
   tabela `unidades_saude` também não guarda as especialidades da unidade — o
   CNES tem esse dado em outro endpoint (`/cnes/estabelecimentos/{cnes}`).
+- A Rede de Saúde mostra **uma cidade por vez**: quem mora na divisa precisa
+  pesquisar a cidade vizinha à mão em "Ver outra cidade". Listar as duas de uma
+  vez, por raio, exigiria saber quais municípios fazem divisa — o CNES só
+  consulta por município e não há API pública de vizinhança, então seria uma
+  tabela de municípios com coordenada mantida à mão.
+- Um CEP pesquisado de qualquer canto do país faz o município entrar no espelho
+  `unidades_saude` (é o comportamento normal do cache, mas a tabela cresce com
+  o que os pacientes pesquisarem).
 - A conferência de coordenadas só sabe consertar o que tem cara de defeito
   (unidade empilhada ou coordenada arredondada). Uma unidade isolada com
   coordenada errada e 7 casas decimais passa batido — não há como saber sem
@@ -329,8 +434,15 @@ sem lógica de banco).
   `/V 1 /R 2`) e a senha tem 4 dígitos — 10 mil combinações. Para valer como
   proteção de verdade seria preciso AES-256, que exigiria biblioteca nova ou
   gerar o PDF no backend.
-- O olhinho ainda não chega às telas de Consultas, Dependentes e Vacinas, nem
-  ao Portal do Médico (que é de outra pessoa, não do paciente).
+- A trilha de auditoria ainda não cobre a **edição de perfil**, e as ações
+  sobre um dependente continuam na conta do titular (a linha diz o nome dele,
+  mas não existe trilha separada por dependente). Nenhuma tela do paciente tem
+  UPDATE, então também não há ação de "alteração" para auditar.
+- As **notificações** só nascem do que o médico registra pelo acesso
+  temporário. Nada gera notificação sozinho (exame vencendo, consulta amanhã):
+  isso hoje é papel dos avisos, que são calculados na hora e não são gravados.
+- Os **contatos de emergência** são só cadastro: ninguém é avisado de nada, e
+  o médico com acesso temporário não os vê.
 
 ## Convenções
 

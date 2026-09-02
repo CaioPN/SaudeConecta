@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, MapPin, Phone, Navigation, Hospital, Ambulance, HeartPulse, Clock } from 'lucide-react';
+import {
+  ChevronLeft, MapPin, Phone, Navigation, Hospital, Ambulance, HeartPulse,
+  Clock, Search, X,
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { buscarRedeSaude, localizacaoDoNavegador } from '../services/redeSaude';
 
@@ -92,15 +95,30 @@ export default function RedeSaude() {
   const [filtro, setFiltro] = useState('todas');
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
+  // Cidade pesquisada na tela; vazio significa "a do meu cadastro".
+  const [cepBusca, setCepBusca] = useState('');
+  const [buscaAberta, setBuscaAberta] = useState(false);
+  const [cepDigitado, setCepDigitado] = useState('');
+  // Erro do próprio campo de CEP: fica dentro do formulário, senão apagaria
+  // a lista já carregada por causa de um dígito a menos.
+  const [erroBusca, setErroBusca] = useState(null);
 
   // Pede a localização ao navegador e só então chama a API: com o GPS a
   // distância sai do lugar onde a pessoa está agora; sem ele, do CEP do
   // cadastro. A permissão negada não é erro — é o caminho normal.
+  //
+  // Com uma cidade pesquisada o GPS é pulado: o paciente está perguntando por
+  // outro lugar, e medir a partir de onde ele está agora só embaralharia a
+  // ordem da lista.
   useEffect(() => {
     let ativo = true;
+    setCarregando(true);
+    setErro(null);
 
-    localizacaoDoNavegador()
-      .then((coordenadas) => buscarRedeSaude(coordenadas || {}))
+    const localizar = cepBusca ? Promise.resolve(null) : localizacaoDoNavegador();
+
+    localizar
+      .then((coordenadas) => buscarRedeSaude({ ...(coordenadas || {}), cep: cepBusca }))
       .then((dados) => {
         if (!ativo) return;
         setOrigem(dados.origem);
@@ -108,6 +126,7 @@ export default function RedeSaude() {
       })
       .catch((err) => {
         if (!ativo) return;
+        setUnidades([]);
         setErro(err?.response?.data?.erro || 'Não foi possível carregar a rede de saúde.');
       })
       .finally(() => {
@@ -117,7 +136,26 @@ export default function RedeSaude() {
     return () => {
       ativo = false;
     };
-  }, []);
+  }, [cepBusca]);
+
+  const pesquisarCidade = (evento) => {
+    evento.preventDefault();
+    const digitos = cepDigitado.replace(/\D/g, '');
+    if (digitos.length !== 8) {
+      setErroBusca('Digite os 8 dígitos do CEP.');
+      return;
+    }
+    setErroBusca(null);
+    setBuscaAberta(false);
+    setCepBusca(digitos);
+  };
+
+  const voltarParaMinhaCidade = () => {
+    setCepDigitado('');
+    setErroBusca(null);
+    setBuscaAberta(false);
+    setCepBusca('');
+  };
 
   const lista = useMemo(
     () => (filtro === 'todas' ? unidades : unidades.filter((u) => u.tipo === filtro)),
@@ -126,11 +164,15 @@ export default function RedeSaude() {
 
   // De onde as distâncias foram medidas — o paciente precisa saber, senão um
   // "1,2 km" medido a partir do CEP parece errado quando ele não está em casa.
-  const legendaOrigem = {
-    gps: 'distâncias a partir da sua localização',
-    cep: 'distâncias a partir do CEP do seu cadastro',
-    nenhuma: 'ordenadas por nome — não foi possível calcular a distância',
-  }[origem?.tipo];
+  const legendaOrigem = origem?.escolhida
+    ? (origem.tipo === 'nenhuma'
+        ? 'ordenadas por nome — não foi possível calcular a distância'
+        : 'distâncias a partir do CEP pesquisado')
+    : {
+        gps: 'distâncias a partir da sua localização',
+        cep: 'distâncias a partir do CEP do seu cadastro',
+        nenhuma: 'ordenadas por nome — não foi possível calcular a distância',
+      }[origem?.tipo];
 
   return (
     <div className="screen-container">
@@ -139,11 +181,56 @@ export default function RedeSaude() {
       </button>
 
       <h2 className="header-title mb-2">Rede de Saúde</h2>
-      <p className="text-sm text-muted mb-6">
+      <p className="text-sm text-muted mb-2">
         {origem?.cidade
           ? `${origem.cidade} - ${origem.estado} · ${legendaOrigem}`
           : 'Unidades públicas de saúde perto de você'}
       </p>
+
+      {/* Trocar de cidade: a lista é da rede municipal, e uma UBS da cidade
+          vizinha não aparece nem estando a poucos quarteirões — quem mora na
+          divisa, viaja ou trabalha em outra cidade precisa desta saída. */}
+      {buscaAberta ? (
+        <form className="rede-busca" onSubmit={pesquisarCidade}>
+          <div className="rede-busca-linha">
+            <input
+              className="input-field"
+              inputMode="numeric"
+              maxLength={9}
+              placeholder="CEP da cidade (só números)"
+              value={cepDigitado}
+              onChange={(e) => {
+                setCepDigitado(e.target.value);
+                if (erroBusca) setErroBusca(null);
+              }}
+              autoFocus
+            />
+            <button type="submit" className="rede-busca-acao" aria-label="Pesquisar cidade">
+              <Search size={18} />
+            </button>
+            <button
+              type="button"
+              className="rede-busca-acao"
+              onClick={() => { setErroBusca(null); setBuscaAberta(false); }}
+              aria-label="Cancelar"
+            >
+              <X size={18} />
+            </button>
+          </div>
+          {erroBusca && <p className="form-erro">{erroBusca}</p>}
+        </form>
+      ) : (
+        <div className="rede-cidade-acoes">
+          <button className="rede-filtro" onClick={() => setBuscaAberta(true)}>
+            <Search size={13} /> Ver outra cidade
+          </button>
+          {(cepBusca || origem?.escolhida) && (
+            <button className="rede-filtro" onClick={voltarParaMinhaCidade}>
+              <MapPin size={13} /> Minha cidade
+            </button>
+          )}
+        </div>
+      )}
 
       {!carregando && !erro && unidades.length > 0 && (
         <div className="rede-filtros">

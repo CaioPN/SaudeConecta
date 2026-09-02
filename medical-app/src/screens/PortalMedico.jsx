@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import {
   Stethoscope, ShieldCheck, Clock, LogOut, AlertCircle, Heart, Pill,
-  Droplet, Plus, Trash2, Check,
+  Droplet, Plus, Trash2, Check, FileText,
 } from 'lucide-react';
 import {
   entrarComCodigo, buscarPacienteDoAcesso, registrarConsulta, registrarExame,
+  registrarItemProntuario, removerItemProntuario,
 } from '../services/medico';
 
 const ITEM_VAZIO = { nome: '', valor: '', unidade: '', refMin: '', refMax: '' };
@@ -223,6 +224,151 @@ function FormularioExame({ token }) {
   );
 }
 
+/**
+ * Formulário do prontuário: alergia, condição acompanhada ou medicação em uso.
+ *
+ * É a parte que faltava para o portal cobrir o prontuário inteiro — até aqui o
+ * médico registrava consulta e exame, mas uma alergia descoberta no
+ * atendimento não tinha onde ser anotada.
+ *
+ * Não existe edição, só incluir e remover: corrigir é remover o registro
+ * errado e lançar o certo, e as duas ações ficam separadas no histórico que o
+ * paciente vê. Um "editar" apagaria o que estava escrito antes sem rastro.
+ */
+function FormularioProntuario({ token, dados, onMudou }) {
+  const [tipo, setTipo] = useState('alergia');
+  const [form, setForm] = useState({
+    descricao: '', nome: '', dosagem: '', frequencia: '', desde: '',
+  });
+  const [estado, setEstado] = useState(null); // 'enviando' | 'ok' | mensagem de erro
+
+  const alterar = (campo) => (e) => setForm({ ...form, [campo]: e.target.value });
+
+  const enviar = async (e) => {
+    e.preventDefault();
+    setEstado('enviando');
+    try {
+      const corpo = tipo === 'medicacao'
+        ? { tipo, nome: form.nome, dosagem: form.dosagem, frequencia: form.frequencia, desde: form.desde }
+        : { tipo, descricao: form.descricao, desde: form.desde };
+      await registrarItemProntuario(token, corpo);
+      setEstado('ok');
+      setForm({ descricao: '', nome: '', dosagem: '', frequencia: '', desde: '' });
+      onMudou?.();
+    } catch (err) {
+      setEstado(err.response?.data?.erro || 'Não foi possível registrar o item.');
+    }
+  };
+
+  const remover = async (qualTipo, id) => {
+    try {
+      await removerItemProntuario(token, qualTipo, id);
+      onMudou?.();
+    } catch (err) {
+      setEstado(err.response?.data?.erro || 'Não foi possível remover o item.');
+    }
+  };
+
+  // As três listas já vêm do backend com id, justamente para dar para remover.
+  const secoes = [
+    { chave: 'alergia', titulo: 'Alergias', itens: dados?.alergias || [] },
+    { chave: 'condicao', titulo: 'Condições', itens: dados?.condicoes || [] },
+    { chave: 'medicacao', titulo: 'Medicações', itens: dados?.medicacoes || [] },
+  ];
+
+  return (
+    <>
+      <form className="card" onSubmit={enviar}>
+        <div className="input-group">
+          <label className="input-label">O que registrar</label>
+          <select className="input-field" value={tipo} onChange={(e) => setTipo(e.target.value)}>
+            <option value="alergia">Alergia</option>
+            <option value="condicao">Condição acompanhada</option>
+            <option value="medicacao">Medicação em uso</option>
+          </select>
+        </div>
+
+        {tipo === 'medicacao' ? (
+          <>
+            <div className="input-group">
+              <label className="input-label">Medicamento</label>
+              <input className="input-field" value={form.nome} onChange={alterar('nome')} required />
+            </div>
+            <div className="input-group">
+              <label className="input-label">Dosagem</label>
+              <input
+                className="input-field"
+                placeholder="50mg"
+                value={form.dosagem}
+                onChange={alterar('dosagem')}
+                required
+              />
+            </div>
+            <div className="input-group">
+              <label className="input-label">Frequência</label>
+              <input
+                className="input-field"
+                placeholder="1 comprimido pela manhã"
+                value={form.frequencia}
+                onChange={alterar('frequencia')}
+                required
+              />
+            </div>
+          </>
+        ) : (
+          <div className="input-group">
+            <label className="input-label">
+              {tipo === 'alergia' ? 'Alergia' : 'Condição'}
+            </label>
+            <input
+              className="input-field"
+              placeholder={tipo === 'alergia' ? 'Dipirona' : 'Hipertensão'}
+              value={form.descricao}
+              onChange={alterar('descricao')}
+              required
+            />
+          </div>
+        )}
+
+        <div className="input-group">
+          <label className="input-label">Desde (opcional)</label>
+          <input type="date" className="input-field" value={form.desde} onChange={alterar('desde')} />
+        </div>
+
+        {estado === 'ok' && <p className="form-ok"><Check size={14} /> Registrado no prontuário.</p>}
+        {estado && estado !== 'ok' && estado !== 'enviando' && <p className="form-erro">{estado}</p>}
+
+        <button className="btn-primary" type="submit" disabled={estado === 'enviando'}>
+          {estado === 'enviando' ? 'Registrando…' : 'Adicionar ao prontuário'}
+        </button>
+      </form>
+
+      {secoes.map((secao) => (
+        <div className="card" key={secao.chave}>
+          <h3 className="section-title">{secao.titulo}</h3>
+          {secao.itens.length === 0 ? (
+            <p className="text-sm text-muted">Nada registrado.</p>
+          ) : (
+            secao.itens.map((item) => (
+              <div key={item.id} className="prontuario-item">
+                <p className="text-sm">{item.texto}</p>
+                <button
+                  type="button"
+                  className="item-remover"
+                  onClick={() => remover(secao.chave, item.id)}
+                  title="Remover do prontuário"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      ))}
+    </>
+  );
+}
+
 export default function PortalMedico() {
   // A sessão do médico vive só em memória: recarregar a página exige um novo
   // código, que é o comportamento esperado de um acesso temporário.
@@ -308,7 +454,7 @@ export default function PortalMedico() {
                   </div>
                   {dados.alergias.length === 0
                     ? <p className="text-sm text-muted">Nenhuma</p>
-                    : dados.alergias.map((a) => <p key={a} className="font-bold">{a}</p>)}
+                    : dados.alergias.map((a) => <p key={a.id} className="font-bold">{a.texto}</p>)}
                 </div>
                 <div className="card card-sm border-blue" style={{ marginBottom: 0 }}>
                   <div className="flex items-center gap-4 text-blue mb-2">
@@ -316,7 +462,7 @@ export default function PortalMedico() {
                   </div>
                   {dados.condicoes.length === 0
                     ? <p className="text-sm text-muted">Nenhuma</p>
-                    : dados.condicoes.map((c) => <p key={c} className="font-bold">{c}</p>)}
+                    : dados.condicoes.map((c) => <p key={c.id} className="font-bold">{c.texto}</p>)}
                 </div>
               </div>
 
@@ -324,9 +470,9 @@ export default function PortalMedico() {
                 <div className="card">
                   <h3 className="section-title">Medicações em uso</h3>
                   {dados.medicacoes.map((m) => (
-                    <div key={m} className="medicacao-item">
+                    <div key={m.id} className="medicacao-item">
                       <div className="icon-box icon-box-gray"><Pill size={18} /></div>
-                      <p className="text-sm font-bold">{m}</p>
+                      <p className="text-sm font-bold">{m.texto}</p>
                     </div>
                   ))}
                 </div>
@@ -343,10 +489,22 @@ export default function PortalMedico() {
                 <button className={`tab-btn ${aba === 'exame' ? 'active' : ''}`} onClick={() => setAba('exame')}>
                   <Droplet size={18} /><span>Exame</span>
                 </button>
+                <button className={`tab-btn ${aba === 'prontuario' ? 'active' : ''}`} onClick={() => setAba('prontuario')}>
+                  <FileText size={18} /><span>Prontuário</span>
+                </button>
               </div>
-              {aba === 'consulta'
-                ? <FormularioConsulta token={sessao.token} />
-                : <FormularioExame token={sessao.token} />}
+              {aba === 'consulta' && <FormularioConsulta token={sessao.token} />}
+              {aba === 'exame' && <FormularioExame token={sessao.token} />}
+              {aba === 'prontuario' && (
+                <FormularioProntuario
+                  token={sessao.token}
+                  dados={dados}
+                  // Recarrega o resumo depois de incluir ou remover: as listas
+                  // logo acima e as da aba são a mesma informação, e mostrar
+                  // versões diferentes das duas confundiria o médico.
+                  onMudou={() => carregarPaciente(sessao.token)}
+                />
+              )}
             </>
           ) : (
             <p className="acesso-nota">

@@ -293,6 +293,75 @@ const PRONTUARIO = {
   ],
 };
 
+// Histórico clínico dos dependentes. No app, o backend filtra por
+// `?dependenteId=`; aqui a chave do objeto faz o mesmo papel. Helena (id 1)
+// fica de fora de propósito: recém-nascida, ela mostra o estado vazio das
+// telas, que também precisa aparecer na demonstração.
+const CONSULTAS_DEPENDENTE = {
+  2: [
+    {
+      id: 51, data: '2026-06-11', hora: '15:20', medico: 'Dra. Carla Ribeiro', especialidade: 'Pediatra', crm: '667432-SP',
+      local: 'UBS Jardim América, Consultório 4', motivo: 'Consulta de rotina', status: 'realizada',
+      resumo: 'Crescimento e desenvolvimento dentro do esperado para a idade. Peso e altura no percentil 60.',
+      conduta: 'Manter acompanhamento anual. Reforçada a orientação sobre tempo de tela e atividade física.',
+    },
+  ],
+};
+
+const COLETAS_DEPENDENTE = {
+  2: [
+    {
+      id: 71, data: '2026-06-11', local: 'Laboratório Central — UBS Jardim América',
+      solicitante: 'Dra. Carla Ribeiro', crm: 'CRM 667432-SP',
+      itens: [
+        { id: 201, nome: 'Hemoglobina', valor: 12.9, unidade: 'g/dL', min: 11.5, max: 15.5 },
+        { id: 202, nome: 'Leucócitos', valor: 7200, unidade: '/mm³', min: 4500, max: 13500 },
+        { id: 203, nome: 'Glicose (jejum)', valor: 84, unidade: 'mg/dL', min: 70, max: 99 },
+      ],
+    },
+  ],
+};
+
+const PRONTUARIO_DEPENDENTE = {
+  2: {
+    alergias: [{ id: 51, descricao: 'Amoxicilina' }],
+    condicoes: [],
+    medicacoes: [],
+  },
+};
+
+const PRONTUARIO_VAZIO = { alergias: [], condicoes: [], medicacoes: [] };
+
+// As quatro telas clínicas leem daqui, e não das constantes direto — é o que
+// faz o seletor de pessoa valer para todas de uma vez, como no app.
+function consultasDaPessoa() {
+  return estado.pessoa === 'titular' ? CONSULTAS : (CONSULTAS_DEPENDENTE[estado.pessoa] || []);
+}
+function coletasDaPessoa() {
+  return estado.pessoa === 'titular' ? COLETAS : (COLETAS_DEPENDENTE[estado.pessoa] || []);
+}
+function imagemDaPessoa() {
+  // Só o titular tem exame de imagem na demonstração.
+  return estado.pessoa === 'titular' ? EXAMES_IMAGEM : [];
+}
+function prontuarioDaPessoa() {
+  return estado.pessoa === 'titular' ? PRONTUARIO : (PRONTUARIO_DEPENDENTE[estado.pessoa] || PRONTUARIO_VAZIO);
+}
+
+// Contatos de emergência (tabela `familiares` no app).
+const FAMILIARES_INICIAIS = [
+  { id: 1, nome: 'Marina Almeida Santos', parentesco: 'Mãe', telefone: '11991234567' },
+  { id: 2, nome: 'Carlos Eduardo Santos', parentesco: 'Irmão', telefone: '11987651234' },
+];
+
+// Notificações — no app elas nascem quando um médico registra alguma coisa
+// com um código do paciente. Não confundir com os AVISOS abaixo: aviso é
+// calculado a partir dos dados e some sozinho, notificação é um fato gravado.
+const NOTIFICACOES_INICIAIS = [
+  { id: 2, tipo: 'exame', mensagem: 'Dra. Ana Souza registrou um novo exame no seu prontuário.' },
+  { id: 1, tipo: 'consulta', mensagem: 'Dra. Ana Souza registrou uma consulta no seu prontuário.' },
+];
+
 // Avisos do Dashboard. No app eles saem do AvisoDAO; aqui já vêm prontos,
 // com a mesma redação e as mesmas severidades.
 const AVISOS = [
@@ -303,8 +372,23 @@ const AVISOS = [
 ];
 
 // Unidades da Rede de Saúde. No app elas vêm do CNES e são ordenadas por
-// distância; aqui são um recorte fixo da região da Avenida Paulista.
-const UNIDADES = [
+// distância; aqui são um recorte fixo, de duas cidades, para dar para mostrar
+// o "ver outra cidade" — que existe justamente porque a lista é da rede
+// municipal, e uma UBS da cidade vizinha não aparece nem estando perto.
+//
+// As unidades de Guarulhos são reais (CNES), medidas a partir do CEP
+// 07055-100, o da UBS Jardim Vila Galvão.
+const UNIDADES_GUARULHOS = [
+  { id: 21, tipo: 'ubs', nome: 'UBS Jardim Vila Galvão', endereco: 'Rua Martim Afonso, 130', bairro: 'Jd Vila Galvão', turno: 'Manhã e tarde', telefone: '1124971334', distancia: 0.01 },
+  { id: 22, tipo: 'ubs', nome: 'UBS São Rafael', endereco: 'Rua Domingos de Abreu, 216', bairro: 'Jd Vila Galvão', turno: 'Manhã e tarde', telefone: '1124220773', distancia: 0.68 },
+  { id: 23, tipo: 'ubs', nome: 'UBS Tranquilidade', endereco: 'Avenida Emílio Ribas, 1897', bairro: 'Jd Tranquilidade', turno: 'Manhã, tarde e noite', telefone: '1124225245', distancia: 0.97 },
+  { id: 24, tipo: 'ubs', nome: 'UBS Vila Galvão', endereco: 'Avenida Dona Eugênia Machado da Silva, 354', bairro: 'Vila Galvão', turno: 'Manhã e tarde', telefone: '1124040902', distancia: 1.33 },
+  { id: 25, tipo: 'ubs', nome: 'UBS São Ricardo', endereco: 'Rua Soldado Jair da Silva Tavares, 4', bairro: 'Vila São Ricardo', turno: 'Manhã e tarde', telefone: '1124973909', distancia: 1.85 },
+  { id: 26, tipo: 'ubs', nome: 'UBS Cavadas', endereco: 'Rua Cavadas, 412', bairro: 'Vila São João', turno: 'Manhã e tarde', telefone: '1124255405', distancia: 1.92 },
+  { id: 27, tipo: 'upa', nome: 'UPA 24h Paulista', endereco: 'Rua Bartolomeu Aires, 100', bairro: 'Jd Paulista', turno: '24 horas', telefone: '1124480000', distancia: 3.23 },
+];
+
+const UNIDADES_SAO_PAULO = [
   { id: 1, tipo: 'ubs', nome: 'UBS Bela Vista', endereco: 'Rua Santo Antônio, 1010', bairro: 'Bela Vista', turno: 'Manhã e tarde', telefone: '1132881234', distancia: 0.9 },
   { id: 2, tipo: 'upa', nome: 'UPA 24h Vergueiro', endereco: 'Rua Vergueiro, 2033', bairro: 'Vila Mariana', turno: '24 horas', telefone: '1155741234', distancia: 1.8 },
   { id: 3, tipo: 'ubs', nome: 'UBS Jardim América', endereco: 'Rua Groenlândia, 550', bairro: 'Jardim América', turno: 'Manhã e tarde', telefone: '1130625678', distancia: 2.1 },
@@ -315,12 +399,35 @@ const UNIDADES = [
   { id: 8, tipo: 'upa', nome: 'UPA 24h Cidade Ademar', endereco: 'Avenida Cupecê, 4020', bairro: 'Cidade Ademar', turno: '24 horas', telefone: '1155628900', distancia: 9.6 },
 ];
 
-// Trilha de auditoria: o que um médico já fez com um código do paciente.
+// A cidade do cadastro é a primeira; a outra só aparece se for pesquisada.
+const REDES = {
+  sp: { cidade: 'São Paulo', estado: 'SP', unidades: UNIDADES_SAO_PAULO },
+  guarulhos: { cidade: 'Guarulhos', estado: 'SP', unidades: UNIDADES_GUARULHOS },
+};
+
+// Trilha de auditoria — as DUAS pontas, como no app: o que um médico fez com
+// um código do paciente (origem 'medico') e o que o próprio paciente fez na
+// conta (origem 'paciente'). Já em ordem decrescente de data, que é como o
+// backend real devolve depois de intercalar as duas listas.
 const HISTORICO_ACESSOS = [
-  { id: 4, acao: 'registrou_exame', criadoEm: '2026-07-16T09:12:00', medico: 'Dra. Ana Souza', crm: '123456-SP', especialidade: 'Clínico Geral', escopo: 'escrita', detalhe: 'Coleta de sangue com 8 resultados' },
-  { id: 3, acao: 'registrou_consulta', criadoEm: '2026-07-14T11:41:00', medico: 'Dra. Ana Souza', crm: '123456-SP', especialidade: 'Clínico Geral', escopo: 'escrita', detalhe: 'Retorno com resultados' },
-  { id: 2, acao: 'leu_prontuario', criadoEm: '2026-07-14T11:05:00', medico: 'Dra. Ana Souza', crm: '123456-SP', especialidade: 'Clínico Geral', escopo: 'escrita' },
-  { id: 1, acao: 'entrou', criadoEm: '2026-07-14T11:04:00', medico: 'Dra. Ana Souza', crm: '123456-SP', especialidade: 'Clínico Geral', escopo: 'escrita' },
+  { id: 'pac-7', origem: 'paciente', acao: 'exportou_exames', criadoEm: '2026-07-18T20:03:00', ip: '187.45.9.120', detalhe: 'PDF de exames · titular · 3 coleta(s) e 2 exame(s) de imagem · protegido por senha' },
+  { id: 'pac-6', origem: 'paciente', acao: 'consultou_exames', criadoEm: '2026-07-18T20:01:00', ip: '187.45.9.120', detalhe: 'Lucas' },
+  { id: 'pac-5', origem: 'paciente', acao: 'consultou_prontuario', criadoEm: '2026-07-17T08:22:00', ip: '187.45.9.120' },
+  { id: 'med-4', origem: 'medico', acao: 'registrou_exame', criadoEm: '2026-07-16T09:12:00', medico: 'Dra. Ana Souza', crm: '123456-SP', especialidade: 'Clínico Geral', escopo: 'escrita', detalhe: 'Coleta de sangue com 8 resultados' },
+  { id: 'med-3', origem: 'medico', acao: 'registrou_consulta', criadoEm: '2026-07-14T11:41:00', medico: 'Dra. Ana Souza', crm: '123456-SP', especialidade: 'Clínico Geral', escopo: 'escrita', detalhe: 'Retorno com resultados' },
+  { id: 'med-2', origem: 'medico', acao: 'leu_prontuario', criadoEm: '2026-07-14T11:05:00', medico: 'Dra. Ana Souza', crm: '123456-SP', especialidade: 'Clínico Geral', escopo: 'escrita' },
+  { id: 'med-1', origem: 'medico', acao: 'entrou', criadoEm: '2026-07-14T11:04:00', medico: 'Dra. Ana Souza', crm: '123456-SP', especialidade: 'Clínico Geral', escopo: 'escrita' },
+  { id: 'pac-4', origem: 'paciente', acao: 'gerou_codigo', criadoEm: '2026-07-14T11:00:00', ip: '187.45.9.120', detalhe: 'Leitura e registro · 30 min' },
+  { id: 'pac-3', origem: 'paciente', acao: 'cadastrou_dependente', criadoEm: '2026-06-02T19:40:00', ip: '187.45.9.120', detalhe: 'Lucas' },
+  { id: 'pac-2', origem: 'paciente', acao: 'login', criadoEm: '2026-06-02T19:38:00', ip: '187.45.9.120' },
+  { id: 'pac-1', origem: 'paciente', acao: 'login_falhou', criadoEm: '2026-06-01T23:12:00', ip: '201.17.88.4', detalhe: 'Senha incorreta.' },
+];
+
+// Filtros da tela, iguais aos do app.
+const FILTROS_HISTORICO = [
+  { id: 'todos', rotulo: 'Tudo', icone: 'shieldCheck' },
+  { id: 'medico', rotulo: 'Profissionais', icone: 'stethoscope' },
+  { id: 'paciente', rotulo: 'Você', icone: 'user' },
 ];
 
 const ACESSOS_INICIAIS = [
@@ -456,10 +563,19 @@ const estado = {
   abaExames: 'sangue',
   faqAberta: null,
   filtroRede: 'todas',
-  pessoaVacina: 'titular',
+  filtroHistorico: 'todos',    // Tudo / Profissionais / Você, no histórico de acessos
+  redeCidade: 'sp',        // cidade mostrada na Rede de Saúde
+  redeEscolhida: false,    // true quando veio de uma pesquisa, não do cadastro
+  redeBuscaAberta: false,
+  redeErroBusca: null,
+  pessoa: 'titular',            // titular ou dependente: vale para Exames, Consultas, Prontuário e Vacinas
   escopoAcesso: 'escrita',
   dependentes: DEPENDENTES_INICIAIS.slice(),
   acessos: ACESSOS_INICIAIS.slice(),
+  familiares: FAMILIARES_INICIAIS.slice(),
+  notificacoes: NOTIFICACOES_INICIAIS.slice(),
+  contatoAberto: false,      // formulário de novo contato de emergência
+  passoSenha: 'identidade',  // recuperação de senha: identidade -> senha -> pronto
   codigoNovo: null,          // { codigo, escopo, expiraEm }
   erroTela: null,
   chatAberto: false,
@@ -490,7 +606,7 @@ function telaLogin() {
 
       '<div class="input-group">' +
         '<div class="label-row"><label class="input-label" for="login-senha">Senha</label>' +
-        '<button type="button" class="forgot-password-link" data-acao="sem-senha">Esqueceu a senha?</button></div>' +
+        '<button type="button" class="forgot-password-link" data-ir="/recuperar-senha">Esqueceu a senha?</button></div>' +
         '<div class="password-input-wrapper">' +
           '<input id="login-senha" type="password" class="input-field" value="demonstracao" style="padding-right:44px" />' +
           '<button type="button" class="password-toggle-btn" data-acao="ver-senha">' + ic('eye', 20) + '</button>' +
@@ -598,6 +714,91 @@ const ATALHOS = [
   { rota: '/acesso-medico', icone: ICONES.acessoMedico, label: 'Acesso do médico' },
 ];
 
+// --- Recuperar senha ---
+/**
+ * Dois passos: confirmar a identidade e escolher a senha nova.
+ *
+ * O app não manda e-mail (seria um servidor SMTP e uma biblioteca a mais no
+ * backend Java puro), então o que prova a identidade é a conferência de três
+ * dados do cadastro. Aqui, na demonstração, qualquer preenchimento avança —
+ * nada é conferido nem gravado.
+ */
+function telaRecuperarSenha() {
+  if (estado.passoSenha === 'pronto') {
+    return '<div class="screen-container">' +
+      botaoVoltar('/') +
+      '<h2 class="header-title mb-2">Recuperar senha</h2>' +
+      '<div class="card"><p class="form-ok">' + ic('check', 14) + ' Senha alterada.</p>' +
+      '<p class="text-sm text-muted mb-6">A troca ficou registrada no seu histórico de acessos. ' +
+      'Nesta demonstração nada foi gravado.</p>' +
+      '<button class="btn-primary" data-ir="/">Entrar com a nova senha</button></div></div>';
+  }
+
+  if (estado.passoSenha === 'senha') {
+    return '<div class="screen-container">' +
+      botaoVoltar('/') +
+      '<h2 class="header-title mb-2">Recuperar senha</h2>' +
+      '<p class="text-sm text-muted mb-6">Tudo certo, Gabriel. Escolha a nova senha — este pedido ' +
+      'vale por 15 minutos.</p>' +
+      '<form class="card" data-form="recuperar-senha">' +
+        '<div class="input-group"><label class="input-label">Nova senha</label>' +
+        '<input type="password" class="input-field" placeholder="••••••••" required></div>' +
+        '<div class="input-group"><label class="input-label">Repita a nova senha</label>' +
+        '<input type="password" class="input-field" placeholder="••••••••" required></div>' +
+        '<p class="text-xs text-muted mb-4">Ao menos 8 caracteres, com maiúscula, minúscula, ' +
+        'número e caractere especial.</p>' +
+        '<button class="btn-primary" type="submit">Salvar nova senha</button>' +
+      '</form></div>';
+  }
+
+  return '<div class="screen-container">' +
+    botaoVoltar('/') +
+    '<h2 class="header-title mb-2">Recuperar senha</h2>' +
+    '<p class="text-sm text-muted mb-6">Confirme três dados do seu cadastro para provar que a ' +
+    'conta é sua.</p>' +
+    '<form class="card" data-form="recuperar-identidade">' +
+      '<div class="input-group"><label class="input-label">E-mail do cadastro</label>' +
+      '<input type="email" class="input-field" placeholder="exemplo@email.com" required></div>' +
+      '<div class="input-group"><label class="input-label">CPF</label>' +
+      '<input class="input-field" placeholder="11 dígitos" maxlength="14" required></div>' +
+      '<div class="input-group"><label class="input-label">Data de nascimento</label>' +
+      '<input type="date" class="input-field" required></div>' +
+      '<button class="btn-primary" type="submit">Continuar</button>' +
+    '</form>' +
+    '<p class="acesso-nota">' + ic('shieldCheck', 14) +
+    ' A resposta não diz qual campo errou, e nem se o e-mail tem conta — seria um jeito de ' +
+    'descobrir quem usa o app.</p></div>';
+}
+
+const ICONES_NOTIFICACAO = {
+  consulta: 'stethoscope', exame: 'flask', prontuario: 'fileText', acesso: 'keyRound',
+};
+
+/**
+ * Bloco "Novidades" do Dashboard: o que aconteceu enquanto o paciente não
+ * estava olhando. Fica separado do card "Avisos" de propósito — aviso é
+ * calculado a partir dos dados e some sozinho quando deixa de ser verdade;
+ * notificação é um fato que aconteceu uma vez e continua valendo.
+ *
+ * Some por completo quando não há nada não lido.
+ */
+function blocoNotificacoes() {
+  if (estado.notificacoes.length === 0) return '';
+
+  const itens = estado.notificacoes.map(function (n) {
+    return '<div class="notificacao-item">' +
+      '<div class="icon-box icon-box-gray">' + ic(ICONES_NOTIFICACAO[n.tipo] || 'info', 18) + '</div>' +
+      '<p class="text-sm' + (estado.oculto ? ' valor-oculto' : '') + '">' +
+      esc(estado.oculto ? mascararTexto(n.mensagem) : n.mensagem) + '</p></div>';
+  }).join('');
+
+  return '<div class="section-header">' +
+    '<h3 class="section-title">Novidades <span class="notificacao-contador">' +
+    estado.notificacoes.length + '</span></h3>' +
+    '<button class="notificacao-limpar" data-acao="lerNotificacoes">Marcar como lidas</button></div>' +
+    '<div class="card">' + itens + '</div>';
+}
+
 function telaDashboard() {
   const primeiroNome = PACIENTE.nome.split(' ')[0];
   const total = estado.dependentes.length;
@@ -625,6 +826,8 @@ function telaDashboard() {
       ' <span class="text-sm font-bold text-muted">' + (total === 1 ? 'Ativo' : 'Ativos') + '</span></p></div>' +
       '<div class="icon-box">' + ic(ICONES.dependentes, 24) + '</div>' +
     '</div>' +
+
+    blocoNotificacoes() +
 
     '<div class="section-header"><h3 class="section-title text-red">Avisos</h3>' +
     botaoPrivacidade('avisos') + '</div>' +
@@ -703,14 +906,61 @@ function telaPerfil() {
     '<div class="card">' +
       linhaInfo('mapPin', 'Endereço', endereco, true) +
       linhaInfo('mapPin', 'CEP', formatarCEP(PACIENTE.cep), true) +
-    '</div></div>';
+    '</div>' +
+
+    blocoContatos() +
+  '</div>';
+}
+
+/**
+ * Contatos de emergência: quem avisar se algo acontecer com o paciente.
+ *
+ * Eles NÃO entram no resumo que o médico recebe pelo código de acesso — o
+ * telefone é de outra pessoa, e quem consentiu com o cadastro foi o paciente.
+ * O nome e o parentesco ficam visíveis mesmo com o olhinho fechado, para o
+ * paciente saber qual contato está removendo; o telefone é que some.
+ */
+function blocoContatos() {
+  const itens = estado.familiares.map(function (c) {
+    return '<div class="contato-item">' +
+      '<div class="icon-box icon-box-gray">' + ic('heart', 18) + '</div>' +
+      '<div style="flex:1"><p class="font-bold">' + esc(c.nome) + '</p>' +
+      '<p class="text-xs text-muted">' + esc(c.parentesco) + '</p>' +
+      '<p class="text-sm' + (estado.oculto ? ' valor-oculto' : '') + '">' +
+      esc(estado.oculto ? mascarar(c.telefone) : formatarTelefone(c.telefone)) + '</p></div>' +
+      '<button class="icon-box icon-box-gray" style="cursor:pointer;border:none" ' +
+      'data-remover-contato="' + c.id + '" title="Remover contato">' + ic('trash', 18) + '</button>' +
+    '</div>';
+  }).join('');
+
+  const formulario = estado.contatoAberto
+    ? '<form style="margin-top:16px" data-form="contato">' +
+        '<div class="input-group"><label class="input-label">Nome</label>' +
+        '<input class="input-field" name="nome" required></div>' +
+        '<div class="input-group"><label class="input-label">Parentesco</label>' +
+        '<input class="input-field" name="parentesco" placeholder="Mãe, irmão, vizinha…" required></div>' +
+        '<div class="input-group"><label class="input-label">Telefone</label>' +
+        '<input class="input-field" name="telefone" placeholder="(11) 90000-0000" required></div>' +
+        '<button class="btn-primary" type="submit">Salvar contato</button>' +
+        '<button class="btn-secondary" type="button" data-acao="cancelarContato">Cancelar</button>' +
+      '</form>'
+    : '<button class="btn-secondary" data-acao="novoContato">' + ic('plus', 16) + ' Adicionar contato</button>';
+
+  return '<h3 class="section-title">Contatos de emergência</h3>' +
+    '<div class="card">' +
+      (itens || '<p class="text-sm text-muted">Nenhum contato cadastrado. Cadastre quem deve ser ' +
+        'avisado em uma emergência.</p>') +
+      formulario +
+    '</div>';
 }
 
 // --- Prontuário ---
 const ICONES_LINHA = { consulta: 'stethoscope', exame: 'droplet' };
 
 function telaProntuario() {
-  const eventos = montarLinhaDoTempo(CONSULTAS, COLETAS, EXAMES_IMAGEM);
+  const pessoa = pessoaAtual();
+  const prontuario = prontuarioDaPessoa();
+  const eventos = montarLinhaDoTempo(consultasDaPessoa(), coletasDaPessoa(), imagemDaPessoa());
 
   const bloco = function (classe, cor, icone, titulo, itens) {
     const corpo = itens.length === 0
@@ -724,7 +974,7 @@ function telaProntuario() {
       '<span class="font-bold text-sm">' + titulo + '</span></div>' + corpo + '</div>';
   };
 
-  const medicacoes = PRONTUARIO.medicacoes.map(function (m) {
+  const medicacoes = prontuario.medicacoes.map(function (m) {
     return '<div class="medicacao-item">' +
       '<div class="icon-box icon-box-gray">' + ic('pill', 18) + '</div><div>' +
       '<p class="font-bold' + (estado.oculto ? ' valor-oculto' : '') + '">' +
@@ -756,20 +1006,25 @@ function telaProntuario() {
   return '<div class="screen-container">' +
     botaoVoltar() +
     '<div class="section-header"><div><h2 class="header-title">Prontuário</h2>' +
-    '<p class="header-subtitle">' + esc(PACIENTE.nome) + '</p></div>' +
+    '<p class="header-subtitle">' + esc(pessoa.nome) + '</p></div>' +
     botaoPrivacidade('prontuário') + '</div>' +
+
+    seletorPessoa() +
 
     '<h3 class="section-title">Visão Geral</h3>' +
     '<div class="quick-actions-grid mb-6">' +
-      bloco('border-red', 'text-red', 'alertCircle', 'Alergias', PRONTUARIO.alergias) +
-      bloco('border-blue', 'text-blue', 'heart', 'Condições', PRONTUARIO.condicoes) +
+      bloco('border-red', 'text-red', 'alertCircle', 'Alergias', prontuario.alergias) +
+      bloco('border-blue', 'text-blue', 'heart', 'Condições', prontuario.condicoes) +
     '</div>' +
 
-    '<h3 class="section-title">Medicações em uso</h3>' +
-    '<div class="card">' + medicacoes + '</div>' +
+    (medicacoes
+      ? '<h3 class="section-title">Medicações em uso</h3><div class="card">' + medicacoes + '</div>'
+      : '') +
 
     '<h3 class="section-title">Histórico</h3>' +
-    '<div class="timeline-container">' + linha + '</div>' +
+    (linha
+      ? '<div class="timeline-container">' + linha + '</div>'
+      : '<p class="empty-state">Nenhum registro no prontuário ainda.</p>') +
   '</div>';
 }
 
@@ -799,9 +1054,14 @@ function linhaResultado(item) {
 
 function telaExames() {
   const sangue = estado.abaExames === 'sangue';
+  const coletas = coletasDaPessoa();
+  const imagens = imagemDaPessoa();
+  const temExames = coletas.length > 0 || imagens.length > 0;
 
   const conteudo = sangue
-    ? COLETAS.map(function (coleta) {
+    ? (coletas.length === 0
+        ? '<p class="empty-state">Nenhum exame de sangue registrado até o momento.</p>'
+        : coletas.map(function (coleta) {
         const alterados = totalAlterados(coleta);
         const situacao = estado.oculto
           ? '<span class="status-badge oculto">•••</span>'
@@ -816,8 +1076,10 @@ function telaExames() {
           '</div>' + situacao + '</div>' +
           coleta.itens.map(linhaResultado).join('') +
         '</div>';
-      }).join('')
-    : EXAMES_IMAGEM.map(function (exame) {
+      }).join(''))
+    : (imagens.length === 0
+        ? '<p class="empty-state">Nenhum exame de imagem registrado até o momento.</p>'
+        : imagens.map(function (exame) {
         return '<div class="card exam-card">' +
           '<div class="exam-card-header"><h3 class="exam-card-title">' +
           ic('image', 16) + ' ' + esc(exame.nome) + '</h3></div>' +
@@ -830,18 +1092,25 @@ function telaExames() {
           '<p class="exam-aviso">' + ic('alertTriangle', 13) +
           ' Resumo informativo — não substitui o laudo oficial.</p>' +
         '</div>';
-      }).join('');
+      }).join(''));
 
   return '<div class="screen-container">' +
     botaoVoltar() +
     '<div class="section-header"><h2 class="header-title">Exames</h2>' +
       '<div class="flex items-center gap-4">' + botaoPrivacidade('resultados') +
-      '<button class="pdf-download-btn" data-acao="pdf">' + ic('download', 18) +
-      '<span>Baixar PDF</span></button></div>' +
+      (temExames
+        ? '<button class="pdf-download-btn" data-acao="pdf">' + ic('download', 18) +
+          '<span>Baixar PDF</span></button>'
+        : '') +
+      '</div>' +
     '</div>' +
 
-    '<p class="pdf-nota">' + ic('lock', 13) +
-    ' O PDF baixado abre com senha: os 4 primeiros dígitos do seu CPF.</p>' +
+    seletorPessoa() +
+
+    (temExames
+      ? '<p class="pdf-nota">' + ic('lock', 13) +
+        ' O PDF baixado abre com senha: os 4 primeiros dígitos do seu CPF.</p>'
+      : '') +
 
     '<div class="tabs-wrapper">' +
       '<button class="tab-btn' + (sangue ? ' active' : '') + '" data-aba-exames="sangue">' +
@@ -854,34 +1123,52 @@ function telaExames() {
 
 // --- Consultas ---
 function itemConsulta(c) {
+  // Com o olho fechado somem o profissional, a especialidade e o local — a
+  // especialidade é o campo que mais entrega. Data e situação ficam.
+  const o = estado.oculto;
+  const oc = o ? ' valor-oculto' : '';
   return '<button class="consulta-item" data-ir="/appointment/' + c.id + '">' +
     '<div class="consulta-item-data"><span class="consulta-item-dia">' + c.data.slice(8, 10) + '</span>' +
     '<span class="consulta-item-mes">' + mesAbreviado(c.data) + '</span></div>' +
     '<div class="consulta-item-body">' +
-      '<div class="consulta-item-top"><span class="font-bold">' + esc(c.medico) + '</span>' + selo(c.status) + '</div>' +
-      '<span class="consulta-item-espec">' + esc(c.especialidade) + '</span>' +
+      '<div class="consulta-item-top"><span class="font-bold' + oc + '">' +
+      esc(o ? mascararTexto(c.medico) : c.medico) + '</span>' + selo(c.status) + '</div>' +
+      '<span class="consulta-item-espec' + oc + '">' +
+      esc(o ? mascararTexto(c.especialidade) : c.especialidade) + '</span>' +
       '<span class="consulta-item-meta">' + ic('calendar', 12) + ' ' + esc(c.hora) + ' · ' +
-      ic('mapPin', 12) + ' ' + esc(c.local) + '</span>' +
+      ic('mapPin', 12) + ' <span class="' + (o ? 'valor-oculto' : '') + '">' +
+      esc(o ? mascararTexto(c.local) : c.local) + '</span></span>' +
     '</div>' + ic('chevronRight', 18, 'text-muted') + '</button>';
 }
 
 function telaConsultas() {
+  const consultas = consultasDaPessoa();
   // A lista vem da mais recente para a mais antiga; as próximas ficam em ordem
   // crescente para a consulta mais perto de acontecer vir primeiro.
-  const proximas = CONSULTAS.filter(function (c) { return c.status === 'agendada'; }).slice().reverse();
-  const anteriores = CONSULTAS.filter(function (c) { return c.status !== 'agendada'; });
+  const proximas = consultas.filter(function (c) { return c.status === 'agendada'; }).slice().reverse();
+  const anteriores = consultas.filter(function (c) { return c.status !== 'agendada'; });
 
   return '<div class="screen-container">' +
     botaoVoltar() +
-    '<h2 class="header-title mb-2">Consultas</h2>' +
-    '<p class="text-sm text-muted mb-6">Seus agendamentos e atendimentos anteriores</p>' +
-    '<h3 class="section-title">Próximas</h3>' + proximas.map(itemConsulta).join('') +
-    '<h3 class="section-title" style="margin-top:24px">Anteriores</h3>' + anteriores.map(itemConsulta).join('') +
+    '<div class="section-header"><div><h2 class="header-title mb-2">Consultas</h2>' +
+    '<p class="text-sm text-muted">Agendamentos e atendimentos anteriores</p></div>' +
+    botaoPrivacidade('consultas') + '</div>' +
+
+    seletorPessoa() +
+
+    '<h3 class="section-title">Próximas</h3>' +
+    (proximas.length
+      ? proximas.map(itemConsulta).join('')
+      : '<p class="empty-state">Nenhuma consulta agendada.</p>') +
+    '<h3 class="section-title" style="margin-top:24px">Anteriores</h3>' +
+    (anteriores.length
+      ? anteriores.map(itemConsulta).join('')
+      : '<p class="empty-state">Nenhum atendimento registrado.</p>') +
   '</div>';
 }
 
 function telaConsulta(id) {
-  const c = CONSULTAS.filter(function (x) { return String(x.id) === String(id); })[0];
+  const c = consultasDaPessoa().filter(function (x) { return String(x.id) === String(id); })[0];
   if (!c) {
     return '<div class="screen-container">' + botaoVoltar('/appointment') +
       '<p class="empty-state">Consulta não encontrada.</p></div>';
@@ -989,13 +1276,39 @@ function itemVacina(v) {
     '</div></div>';
 }
 
-function telaVacinas() {
-  const pessoas = [{ id: 'titular', nome: PACIENTE.nome, data_nascimento: PACIENTE.data_nascimento, titular: true }]
+// Titular + dependentes, na mesma ordem que o app monta no PessoasContext.
+function pessoasDaConta() {
+  return [{ id: 'titular', nome: PACIENTE.nome, data_nascimento: PACIENTE.data_nascimento, titular: true }]
     .concat(estado.dependentes.map(function (d) {
       return { id: d.id, nome: d.nome, data_nascimento: d.data_nascimento, genero: d.genero, titular: false };
     }));
+}
 
-  const pessoa = pessoas.filter(function (p) { return String(p.id) === String(estado.pessoaVacina); })[0] || pessoas[0];
+// A pessoa selecionada; volta ao titular quando o dependente escolhido foi
+// removido, exatamente como no app.
+function pessoaAtual() {
+  const pessoas = pessoasDaConta();
+  return pessoas.filter(function (p) { return String(p.id) === String(estado.pessoa); })[0] || pessoas[0];
+}
+
+// Pílulas de escolha da pessoa, compartilhadas por Exames, Consultas,
+// Prontuário e Vacinas. Somem quando não há dependente: uma pílula só escrita
+// "você" não é escolha nenhuma.
+function seletorPessoa() {
+  const pessoas = pessoasDaConta();
+  if (pessoas.length < 2) return '';
+  const atual = pessoaAtual();
+
+  return '<div class="vacina-pessoa-selector">' + pessoas.map(function (p) {
+    return '<button class="vacina-pessoa-pill' + (String(p.id) === String(atual.id) ? ' active' : '') + '" ' +
+      'data-pessoa="' + p.id + '">' +
+      '<span class="vacina-pessoa-icone ' + classePorGenero(p) + '">' + ic(p.titular ? 'user' : 'baby', 15) + '</span>' +
+      esc(p.titular ? p.nome.split(' ')[0] + ' (você)' : p.nome.split(' ')[0]) + '</button>';
+  }).join('') + '</div>';
+}
+
+function telaVacinas() {
+  const pessoa = pessoaAtual();
   const idade = calcularIdade(pessoa.data_nascimento);
   // O titular usa o calendário adulto; dependentes de até 12 anos, o infantil.
   const adulto = pessoa.titular || (idade != null && idade >= 13);
@@ -1005,19 +1318,12 @@ function telaVacinas() {
   const pendentes = carteira.filter(function (v) { return v.status === 'pendente'; });
   const percentual = carteira.length ? Math.round((tomadas.length / carteira.length) * 100) : 0;
 
-  const seletor = pessoas.map(function (p) {
-    return '<button class="vacina-pessoa-pill' + (String(p.id) === String(pessoa.id) ? ' active' : '') + '" ' +
-      'data-pessoa-vacina="' + p.id + '">' +
-      '<span class="vacina-pessoa-icone ' + classePorGenero(p) + '">' + ic(p.titular ? 'user' : 'baby', 15) + '</span>' +
-      esc(p.titular ? p.nome.split(' ')[0] + ' (você)' : p.nome.split(' ')[0]) + '</button>';
-  }).join('');
-
   return '<div class="screen-container vacinas-screen">' +
     '<div class="vacinas-topo">' +
       botaoVoltar() +
       '<h2 class="header-title mb-2">Carteira de Vacinação</h2>' +
       '<p class="text-sm text-muted mb-6">Calendário Nacional de Vacinação (SUS)</p>' +
-      '<div class="vacina-pessoa-selector">' + seletor + '</div>' +
+      seletorPessoa() +
       '<div class="card"><div class="vacina-resumo">' +
         '<div class="icon-box">' + ic('shieldCheck', 26) + '</div>' +
         '<div style="flex:1"><div class="flex justify-between items-center mb-2">' +
@@ -1075,23 +1381,50 @@ function itemUnidade(u) {
 }
 
 function telaRedeSaude() {
+  const rede = REDES[estado.redeCidade];
   const lista = estado.filtroRede === 'todas'
-    ? UNIDADES
-    : UNIDADES.filter(function (u) { return u.tipo === estado.filtroRede; });
+    ? rede.unidades
+    : rede.unidades.filter(function (u) { return u.tipo === estado.filtroRede; });
 
   const filtros = FILTROS_REDE.map(function (f) {
     return '<button class="rede-filtro' + (estado.filtroRede === f.id ? ' active' : '') +
       '" data-filtro-rede="' + f.id + '">' + f.rotulo + '</button>';
   }).join('');
 
+  // Trocar de cidade: a lista é da rede municipal, e uma UBS da cidade vizinha
+  // não aparece nem estando a poucos quarteirões.
+  const trocarCidade = estado.redeBuscaAberta
+    ? '<form class="rede-busca" data-form="rede-cidade">' +
+        '<div class="rede-busca-linha">' +
+          '<input name="cep" class="input-field" inputmode="numeric" maxlength="9" ' +
+          'placeholder="CEP da cidade (só números)" autofocus />' +
+          '<button type="submit" class="rede-busca-acao" aria-label="Pesquisar cidade">' + ic('search', 18) + '</button>' +
+          '<button type="button" class="rede-busca-acao" data-acao="rede-fechar-busca" aria-label="Cancelar">' + ic('x', 18) + '</button>' +
+        '</div>' +
+        (estado.redeErroBusca ? '<p class="form-erro">' + esc(estado.redeErroBusca) + '</p>' : '') +
+        '<p class="demo-nota">' + ic('info', 14) +
+        '<span>Na demonstração só São Paulo e Guarulhos estão carregadas — experimente ' +
+        '<strong>07055100</strong>, o CEP da UBS Jardim Vila Galvão. No app, o CEP vira ' +
+        'município pelos dados abertos e a cidade é baixada do CNES na hora.</span></p>' +
+      '</form>'
+    : '<div class="rede-cidade-acoes">' +
+        '<button class="rede-filtro" data-acao="rede-abrir-busca">' + ic('search', 13) + ' Ver outra cidade</button>' +
+        (estado.redeEscolhida
+          ? '<button class="rede-filtro" data-acao="rede-minha-cidade">' + ic('mapPin', 13) + ' Minha cidade</button>'
+          : '') +
+      '</div>';
+
   return '<div class="screen-container">' +
     botaoVoltar() +
     '<h2 class="header-title mb-2">Rede de Saúde</h2>' +
-    '<p class="text-sm text-muted mb-6">São Paulo - SP · distâncias a partir do CEP do seu cadastro</p>' +
+    '<p class="text-sm text-muted mb-2">' + esc(rede.cidade + ' - ' + rede.estado) + ' · distâncias a partir do ' +
+    (estado.redeEscolhida ? 'CEP pesquisado' : 'CEP do seu cadastro') + '</p>' +
+    trocarCidade +
     '<div class="rede-filtros">' + filtros + '</div>' +
     (lista.length ? lista.map(itemUnidade).join('') : '<p class="empty-state">Nenhuma unidade desse tipo por perto.</p>') +
     '<p class="rede-fonte">Fonte: CNES — Cadastro Nacional de Estabelecimentos de Saúde, ' +
-    'dados abertos do Ministério da Saúde. Nesta demonstração a lista é um recorte fixo de São Paulo.</p>' +
+    'dados abertos do Ministério da Saúde. Nesta demonstração a lista é um recorte fixo de ' +
+    'São Paulo e de Guarulhos; no app, a cidade inteira é baixada do CNES.</p>' +
   '</div>';
 }
 
@@ -1182,26 +1515,72 @@ function telaAcessoMedico() {
 }
 
 // --- Histórico de acessos ---
+// Mesmo mapa do app: a chave é o valor da coluna `acao`, venha ela de
+// acessos_log (lado do médico) ou de auditoria (lado do paciente).
 const ACOES_LOG = {
+  // Lado do médico
   entrou: { texto: 'Entrou com o seu código', icone: 'keyRound', cor: 'consulta' },
   leu_prontuario: { texto: 'Consultou o seu resumo clínico', icone: 'bookOpen', cor: 'consulta' },
   registrou_consulta: { texto: 'Registrou uma consulta', icone: 'calendar', cor: 'consulta' },
   registrou_exame: { texto: 'Registrou um exame', icone: 'activity', cor: 'exame' },
+  registrou_alergia: { texto: 'Registrou uma alergia', icone: 'alertTriangle', cor: 'consulta' },
+  removeu_alergia: { texto: 'Removeu uma alergia do prontuário', icone: 'alertTriangle', cor: 'revogado' },
+  registrou_condicao: { texto: 'Registrou uma condição', icone: 'bookOpen', cor: 'consulta' },
+  removeu_condicao: { texto: 'Removeu uma condição do prontuário', icone: 'bookOpen', cor: 'revogado' },
+  registrou_medicacao: { texto: 'Registrou uma medicação', icone: 'pill', cor: 'consulta' },
+  removeu_medicacao: { texto: 'Removeu uma medicação do prontuário', icone: 'pill', cor: 'revogado' },
   revogado: { texto: 'Você revogou o acesso', icone: 'ban', cor: 'revogado' },
+
+  // Lado do paciente
+  login: { texto: 'Você entrou na sua conta', icone: 'logIn', cor: 'consulta' },
+  login_falhou: { texto: 'Tentativa de entrada sem sucesso', icone: 'alertTriangle', cor: 'revogado' },
+  solicitou_senha: { texto: 'Pedido de recuperação de senha', icone: 'keyRound', cor: 'revogado' },
+  redefiniu_senha: { texto: 'A senha da conta foi trocada', icone: 'keyRound', cor: 'revogado' },
+  consultou_prontuario: { texto: 'Você abriu o prontuário', icone: 'bookOpen', cor: 'consulta' },
+  consultou_exames: { texto: 'Você abriu os exames', icone: 'activity', cor: 'exame' },
+  consultou_consultas: { texto: 'Você abriu as consultas', icone: 'calendar', cor: 'consulta' },
+  exportou_exames: { texto: 'Você baixou o PDF de exames', icone: 'download', cor: 'exame' },
+  cadastrou_dependente: { texto: 'Você cadastrou um dependente', icone: 'users', cor: 'consulta' },
+  excluiu_dependente: { texto: 'Você excluiu um dependente', icone: 'users', cor: 'revogado' },
+  cadastrou_contato: { texto: 'Você cadastrou um contato de emergência', icone: 'heart', cor: 'consulta' },
+  excluiu_contato: { texto: 'Você excluiu um contato de emergência', icone: 'heart', cor: 'revogado' },
+  gerou_codigo: { texto: 'Você gerou um código de acesso', icone: 'keyRound', cor: 'consulta' },
 };
 
 function telaHistoricoAcessos() {
-  const registros = HISTORICO_ACESSOS.map(function (r) {
+  const visiveis = estado.filtroHistorico === 'todos'
+    ? HISTORICO_ACESSOS
+    : HISTORICO_ACESSOS.filter(function (r) { return r.origem === estado.filtroHistorico; });
+
+  const abas = FILTROS_HISTORICO.map(function (f) {
+    return '<button class="tab-btn' + (estado.filtroHistorico === f.id ? ' active' : '') +
+      '" data-filtro-historico="' + f.id + '">' + ic(f.icone, 18) +
+      '<span>' + f.rotulo + '</span></button>';
+  }).join('');
+
+  const registros = visiveis.map(function (r) {
     const info = ACOES_LOG[r.acao] || { texto: 'Ação registrada', icone: 'shieldCheck', cor: 'consulta' };
+    const doMedico = r.origem === 'medico';
     const quem = [r.crm ? 'CRM ' + r.crm : '', r.especialidade].filter(Boolean).join(' · ');
+
+    // No lado do médico a segunda linha diz CRM e escopo; no lado do paciente,
+    // o endereço de rede de onde a ação partiu — que é o que deixa ele
+    // reconhecer um acesso que não foi dele. O IP obedece ao olhinho.
+    const subtitulo = doMedico
+      ? '<p class="text-xs text-muted">' + esc(quem) + (quem ? ' · ' : '') +
+        (r.escopo === 'escrita' ? 'Leitura e registro' : 'Somente leitura') + '</p>'
+      : (r.ip
+          ? '<p class="text-xs text-muted' + (estado.oculto ? ' valor-oculto' : '') + '">Aparelho em ' +
+            esc(estado.oculto ? mascararTexto(r.ip) : r.ip) + '</p>'
+          : '');
+
     return '<div class="timeline-item">' +
       '<div class="timeline-dot ' + info.cor + '">' + ic(info.icone, 10) + '</div>' +
       '<div class="timeline-head"><h4 class="font-bold">' + info.texto + '</h4></div>' +
       '<p class="text-xs text-muted">' + esc(dataHoraLonga(r.criadoEm)) + '</p>' +
       '<div class="acesso-log-quem">' +
         '<p class="font-bold text-sm">' + esc(r.medico || 'Você') + '</p>' +
-        '<p class="text-xs text-muted">' + esc(quem) + (quem ? ' · ' : '') +
-        (r.escopo === 'escrita' ? 'Leitura e registro' : 'Somente leitura') + '</p>' +
+        subtitulo +
         (r.detalhe
           ? '<p class="text-xs text-muted' + (estado.oculto ? ' valor-oculto' : '') + '">' +
             esc(estado.oculto ? mascararTexto(r.detalhe) : r.detalhe) + '</p>'
@@ -1216,10 +1595,15 @@ function telaHistoricoAcessos() {
     botaoPrivacidade('histórico') + '</div>' +
 
     '<p class="acesso-nota mb-6">' + ic('shieldCheck', 14) +
-    ' Cada vez que um profissional usa um código gerado por você, a ação fica registrada aqui. ' +
-    'O registro é automático e não pode ser apagado pelo médico nem por você.</p>' +
+    ' Toda vez que um profissional usa um código gerado por você — e toda vez que você entra, ' +
+    'abre um dado sensível ou exporta um arquivo — a ação fica registrada aqui. O registro é ' +
+    'automático e não pode ser apagado pelo médico nem por você.</p>' +
 
-    '<div class="timeline-container">' + registros + '</div>' +
+    '<div class="tabs-wrapper">' + abas + '</div>' +
+
+    (registros
+      ? '<div class="timeline-container">' + registros + '</div>'
+      : '<p class="empty-state">Nada registrado neste filtro por enquanto.</p>') +
   '</div>';
 }
 
@@ -1585,6 +1969,7 @@ function voltar(destino) {
 const ROTAS = {
   '/': telaLogin,
   '/cadastro': telaCadastro,
+  '/recuperar-senha': telaRecuperarSenha,
   '/dashboard': telaDashboard,
   '/patient': telaMinhaSaude,
   '/profile': telaPerfil,
@@ -1602,7 +1987,7 @@ const ROTAS = {
   '/faq': telaFaq,
 };
 
-const LIVRES = ['/', '/cadastro', '/medico'];
+const LIVRES = ['/', '/cadastro', '/recuperar-senha', '/medico'];
 
 // Desenha a tela da rota atual. `manterRolagem` é usado quando só o estado
 // mudou (olhinho, aba, filtro) e a página não deve pular para o topo.
@@ -1632,7 +2017,7 @@ function render(manterRolagem) {
 
 document.addEventListener('click', function (evento) {
   const alvo = evento.target.closest('[data-ir],[data-voltar],[data-acao],[data-aba-exames],' +
-    '[data-faq],[data-filtro-rede],[data-pessoa-vacina],[data-escopo],[data-revogar],' +
+    '[data-faq],[data-filtro-rede],[data-filtro-historico],[data-pessoa],[data-escopo],[data-revogar],' +
     '[data-remover-dependente],[data-sugestao],[data-aba-medico]');
 
   // Clicar fora fecha o menu "Mais".
@@ -1651,14 +2036,15 @@ document.addEventListener('click', function (evento) {
   if (d.abaExames) { estado.abaExames = d.abaExames; render(false); return; }
   if (d.abaMedico) { estado.abaMedico = d.abaMedico; render(true); return; }
   if (d.filtroRede) { estado.filtroRede = d.filtroRede; render(true); return; }
-  if (d.pessoaVacina) { estado.pessoaVacina = d.pessoaVacina; render(false); return; }
+  if (d.filtroHistorico) { estado.filtroHistorico = d.filtroHistorico; render(true); return; }
+  if (d.pessoa) { estado.pessoa = d.pessoa; render(false); return; }
   if (d.escopo) { estado.escopoAcesso = d.escopo; render(true); return; }
   if (d.faq) { estado.faqAberta = estado.faqAberta === d.faq ? null : d.faq; render(true); return; }
   if (d.sugestao) { enviarPergunta(d.sugestao); return; }
 
   if (d.removerDependente) {
     estado.dependentes = estado.dependentes.filter(function (x) { return String(x.id) !== d.removerDependente; });
-    if (String(estado.pessoaVacina) === d.removerDependente) estado.pessoaVacina = 'titular';
+    if (String(estado.pessoa) === d.removerDependente) estado.pessoa = 'titular';
     render(true);
     return;
   }
@@ -1674,7 +2060,28 @@ document.addEventListener('click', function (evento) {
     return;
   }
 
+  if (d.removerContato) {
+    estado.familiares = estado.familiares.filter(function (c) { return String(c.id) !== d.removerContato; });
+    render(true);
+    return;
+  }
+
   switch (d.acao) {
+    case 'lerNotificacoes':
+      estado.notificacoes = [];
+      render(true);
+      break;
+
+    case 'novoContato':
+      estado.contatoAberto = true;
+      render(true);
+      break;
+
+    case 'cancelarContato':
+      estado.contatoAberto = false;
+      render(true);
+      break;
+
     case 'menu':
       estado.menuAberto = !estado.menuAberto;
       renderBarra(rotaAtual());
@@ -1692,10 +2099,6 @@ document.addEventListener('click', function (evento) {
       alvo.innerHTML = ic(mostrar ? 'eyeOff' : 'eye', 20);
       break;
     }
-
-    case 'sem-senha':
-      avisar('A redefinição de senha ainda não existe no app — o botão é decorativo também no original.');
-      break;
 
     case 'biometria':
       avisar('A biometria depende do aparelho e não faz parte da demonstração.');
@@ -1758,6 +2161,25 @@ document.addEventListener('click', function (evento) {
       renderChatbot(rotaAtual());
       break;
 
+    case 'rede-abrir-busca':
+      estado.redeBuscaAberta = true;
+      estado.redeErroBusca = null;
+      render(true);
+      break;
+
+    case 'rede-fechar-busca':
+      estado.redeBuscaAberta = false;
+      estado.redeErroBusca = null;
+      render(true);
+      break;
+
+    case 'rede-minha-cidade':
+      estado.redeCidade = 'sp';
+      estado.redeEscolhida = false;
+      estado.filtroRede = 'todas';
+      render(false);
+      break;
+
     case 'medico-sair':
       estado.medico = null;
       estado.erroTela = null;
@@ -1790,6 +2212,31 @@ document.addEventListener('submit', function (evento) {
       ir('/dashboard');
       break;
 
+    case 'contato': {
+      const dados = new FormData(form);
+      estado.familiares = estado.familiares.concat([{
+        id: Date.now(),
+        nome: dados.get('nome'),
+        parentesco: dados.get('parentesco'),
+        telefone: String(dados.get('telefone') || '').replace(/\D/g, ''),
+      }]);
+      estado.contatoAberto = false;
+      render(true);
+      break;
+    }
+
+    // Recuperação de senha: o primeiro passo confere os dados do cadastro e o
+    // segundo grava a nova senha. Aqui nada é gravado — só o passo avança.
+    case 'recuperar-identidade':
+      estado.passoSenha = 'senha';
+      render(true);
+      break;
+
+    case 'recuperar-senha':
+      estado.passoSenha = 'pronto';
+      render(true);
+      break;
+
     case 'cadastro':
       estado.autenticado = true;
       avisar('Cadastro simulado: nada foi gravado. Você entrou na conta de exemplo.');
@@ -1814,6 +2261,32 @@ document.addEventListener('submit', function (evento) {
         tipo_sanguineo: dados.get('sangue'),
       }]);
       render(true);
+      break;
+    }
+
+    case 'rede-cidade': {
+      // No app quem descobre a cidade do CEP é a API de dados abertos; aqui,
+      // como só duas cidades estão carregadas, vale a faixa do CEP: os 070xx
+      // são de Guarulhos e os 01xxx a 05xxx, de São Paulo.
+      const digitos = String(new FormData(form).get('cep') || '').replace(/\D/g, '');
+      if (digitos.length !== 8) {
+        estado.redeErroBusca = 'Digite os 8 dígitos do CEP.';
+        render(true);
+        return;
+      }
+      const prefixo = Number(digitos.slice(0, 2));
+      const cidade = prefixo === 7 ? 'guarulhos' : (prefixo >= 1 && prefixo <= 5 ? 'sp' : null);
+      if (!cidade) {
+        estado.redeErroBusca = 'Nesta demonstração só São Paulo e Guarulhos estão carregadas.';
+        render(true);
+        return;
+      }
+      estado.redeCidade = cidade;
+      estado.redeEscolhida = true;
+      estado.redeBuscaAberta = false;
+      estado.redeErroBusca = null;
+      estado.filtroRede = 'todas';
+      render(false);
       break;
     }
 
