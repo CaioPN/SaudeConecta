@@ -70,6 +70,37 @@ public class DependenteDAO {
         return lista;
     }
 
+    /**
+     * SELECT — um dependente, desde que ele seja do paciente informado.
+     * Devolve null quando não existe ou é de outra conta.
+     *
+     * O par (id, paciente) é o que impede um código de acesso de abrir o
+     * prontuário de um dependente que não é da conta que gerou o código.
+     */
+    public Dependente buscarDoPaciente(int id, int idPaciente) throws SQLException {
+        String sql = "SELECT id, paciente_id, nome, cpf, genero, tipo_sanguineo, data_nascimento "
+                + "FROM dependentes WHERE id = ? AND paciente_id = ?";
+        try (Connection con = Conexao.abrir();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, id);
+            ps.setInt(2, idPaciente);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return null;
+                Dependente d = new Dependente();
+                d.setId(rs.getInt("id"));
+                d.setIdPaciente(rs.getInt("paciente_id"));
+                d.setNome(rs.getString("nome"));
+                d.setCpf(rs.getString("cpf"));
+                d.setGenero(rs.getString("genero"));
+                d.setTipoSanguineo(rs.getString("tipo_sanguineo"));
+                Date dn = rs.getDate("data_nascimento");
+                d.setDataNascimento(dn != null ? dn.toString() : null);
+                return d;
+            }
+        }
+    }
+
     /** DELETE — remove um dependente pelo id. Retorna true se removeu. */
     public boolean excluir(int id) throws SQLException {
         String sql = "DELETE FROM dependentes WHERE id = ?";

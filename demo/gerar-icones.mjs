@@ -21,6 +21,7 @@ const ICONES = {
   penLine: 'pen-line', ban: 'ban', copy: 'copy', messageCircle: 'message-circle', x: 'x',
   send: 'send', bot: 'bot', info: 'info', mail: 'mail', idCard: 'id-card', venus: 'venus',
   userCheck: 'user-check', plus: 'plus', logIn: 'log-in', search: 'search', arrowRight: 'arrow-right',
+  star: 'star', pencil: 'pencil', phoneCall: 'phone-call',
 };
 
 const saida = {};

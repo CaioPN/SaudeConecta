@@ -63,12 +63,13 @@ public class AuditoriaDAO {
      *
      * @param agrupavel true para leituras, que se repetem a cada abertura de tela
      */
-    public void registrar(int idPaciente, String acao, String recurso,
+    public void registrar(int idPaciente, Integer idDependente, String acao, String recurso,
                           String detalhe, String origemIp, boolean agrupavel) {
         if (idPaciente <= 0 || acao == null) return;
 
         RegistroAuditoria r = new RegistroAuditoria(
-                idPaciente, acao, recurso, limitar(detalhe, 255), limitar(origemIp, 45), agrupavel);
+                idPaciente, idDependente, acao, recurso,
+                limitar(detalhe, 255), limitar(origemIp, 45), agrupavel);
 
         garantirGravador();
         synchronized (FILA) {
@@ -86,9 +87,12 @@ public class AuditoriaDAO {
      * não relatório.
      */
     public List<RegistroAuditoria> listarPorPaciente(int idPaciente, int limite) throws SQLException {
-        String sql = "SELECT id, paciente_id, acao, recurso, detalhe, origem_ip, criado_em "
-                + "FROM auditoria WHERE paciente_id = ? "
-                + "ORDER BY criado_em DESC, id DESC LIMIT ?";
+        String sql = "SELECT a.id, a.paciente_id, a.dependente_id, a.acao, a.recurso, a.detalhe, "
+                + "       a.origem_ip, a.criado_em, d.nome AS dependente_nome "
+                + "FROM auditoria a "
+                + "LEFT JOIN dependentes d ON d.id = a.dependente_id "
+                + "WHERE a.paciente_id = ? "
+                + "ORDER BY a.criado_em DESC, a.id DESC LIMIT ?";
 
         List<RegistroAuditoria> lista = new ArrayList<>();
         try (Connection con = Conexao.abrir();
@@ -101,6 +105,11 @@ public class AuditoriaDAO {
                     RegistroAuditoria r = new RegistroAuditoria();
                     r.setIdRegistro(rs.getInt("id"));
                     r.setIdPaciente(rs.getInt("paciente_id"));
+                    int idDependente = rs.getInt("dependente_id");
+                    if (!rs.wasNull()) {
+                        r.setIdDependente(idDependente);
+                        r.setNomeDependente(rs.getString("dependente_nome"));
+                    }
                     r.setAcao(rs.getString("acao"));
                     r.setRecurso(rs.getString("recurso"));
                     r.setDetalhe(rs.getString("detalhe"));
@@ -148,17 +157,22 @@ public class AuditoriaDAO {
     }
 
     private static void gravar(RegistroAuditoria r) throws SQLException {
-        String sql = "INSERT INTO auditoria (paciente_id, acao, recurso, detalhe, origem_ip) "
-                + "VALUES (?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO auditoria (paciente_id, dependente_id, acao, recurso, detalhe, origem_ip) "
+                + "VALUES (?, ?, ?, ?, ?, ?)";
         try (Connection con = Conexao.abrir()) {
             if (r.isAgrupavel() && houveRecente(con, r)) return;
 
             try (PreparedStatement ps = con.prepareStatement(sql)) {
                 ps.setInt(1, r.getIdPaciente());
-                ps.setString(2, r.getAcao());
-                ps.setString(3, r.getRecurso());
-                ps.setString(4, r.getDetalhe());
-                ps.setString(5, r.getOrigemIp());
+                if (r.getIdDependente() == null) {
+                    ps.setNull(2, java.sql.Types.INTEGER);
+                } else {
+                    ps.setInt(2, r.getIdDependente());
+                }
+                ps.setString(3, r.getAcao());
+                ps.setString(4, r.getRecurso());
+                ps.setString(5, r.getDetalhe());
+                ps.setString(6, r.getOrigemIp());
                 ps.executeUpdate();
             }
         }
@@ -167,21 +181,27 @@ public class AuditoriaDAO {
     /**
      * true quando a MESMA ação, sobre o MESMO alvo, já foi gravada há pouco.
      *
-     * O detalhe entra na comparação porque é ele que diz de quem é o dado
-     * aberto: abrir os exames do titular e, em seguida, os de um dependente
-     * são duas leituras diferentes, e agrupar só por ação esconderia a
-     * segunda. O operador <=> do MySQL é a igualdade que trata NULL como
-     * valor — com "=" comum, o detalhe nulo do titular nunca casaria consigo
-     * mesmo e toda leitura dele viraria linha nova.
+     * O dependente e o detalhe entram na comparação porque são eles que dizem
+     * de quem é o dado aberto: abrir os exames do titular e, em seguida, os de
+     * um dependente são duas leituras diferentes, e agrupar só por ação
+     * esconderia a segunda. O operador <=> do MySQL é a igualdade que trata
+     * NULL como valor — com "=" comum, o dependente nulo do titular nunca
+     * casaria consigo mesmo e toda leitura dele viraria linha nova.
      */
     private static boolean houveRecente(Connection con, RegistroAuditoria r) throws SQLException {
         String sql = "SELECT 1 FROM auditoria WHERE paciente_id = ? AND acao = ? "
-                + "AND detalhe <=> ? AND criado_em > (NOW() - INTERVAL ? MINUTE) LIMIT 1";
+                + "AND dependente_id <=> ? AND detalhe <=> ? "
+                + "AND criado_em > (NOW() - INTERVAL ? MINUTE) LIMIT 1";
         try (PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, r.getIdPaciente());
             ps.setString(2, r.getAcao());
-            ps.setString(3, r.getDetalhe());
-            ps.setInt(4, MINUTOS_AGRUPAMENTO);
+            if (r.getIdDependente() == null) {
+                ps.setNull(3, java.sql.Types.INTEGER);
+            } else {
+                ps.setInt(3, r.getIdDependente());
+            }
+            ps.setString(4, r.getDetalhe());
+            ps.setInt(5, MINUTOS_AGRUPAMENTO);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next();
             }

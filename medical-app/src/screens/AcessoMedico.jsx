@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ChevronLeft, KeyRound, ShieldCheck, BookOpen, PenLine, Ban, Clock, Copy, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import StatusBadge from '../components/StatusBadge';
+import SeletorPessoa from '../components/SeletorPessoa';
+import { usePessoas } from '../context/PessoasContext';
 import { gerarAcesso, listarAcessos, revogarAcesso, situacaoAcesso } from '../services/acessos';
 
 const ROTULO_SITUACAO = {
@@ -38,6 +40,8 @@ export default function AcessoMedico() {
   const [acessos, setAcessos] = useState([]);
   const [novo, setNovo] = useState(null); // { codigo, expiraEm, escopo }
   const [escopo, setEscopo] = useState('escrita');
+  const [contatos, setContatos] = useState(false);
+  const { pessoa, dependenteId } = usePessoas();
   const [agora, setAgora] = useState(new Date());
   const [carregando, setCarregando] = useState(true);
   const [gerando, setGerando] = useState(false);
@@ -66,9 +70,14 @@ export default function AcessoMedico() {
     setErro(null);
     setCopiado(false);
     try {
-      const dados = await gerarAcesso(escopo);
+      const dados = await gerarAcesso(escopo, { dependenteId, compartilhaContatos: contatos });
       const expiraEm = new Date(Date.now() + dados.validade_minutos * 60000).toISOString();
-      setNovo({ codigo: dados.codigo, escopo: dados.escopo, expiraEm });
+      setNovo({
+        codigo: dados.codigo,
+        escopo: dados.escopo,
+        dependente: dados.dependente,
+        expiraEm,
+      });
       await recarregar();
     } catch {
       setErro('Não foi possível gerar o código. Tente de novo.');
@@ -129,7 +138,8 @@ export default function AcessoMedico() {
             </button>
           </div>
           <p className="codigo-aviso">
-            Anote agora: por segurança o código não fica guardado e não pode ser
+            Abre o prontuário de <strong>{novo.dependente || 'você'}</strong>. Anote
+            agora: por segurança o código não fica guardado e não pode ser
             consultado depois.
           </p>
         </div>
@@ -137,6 +147,14 @@ export default function AcessoMedico() {
 
       {/* Escolha do escopo + geração */}
       <h3 className="section-title">Novo acesso</h3>
+
+      {/* De quem é o prontuário que este código abre. O seletor é o mesmo das
+          telas clínicas, então quem já estava vendo o filho gera o código dele
+          sem trocar nada. */}
+      <SeletorPessoa />
+      <p className="text-sm text-muted mb-2">
+        O código vai abrir o prontuário de <strong>{pessoa.titular ? 'você' : pessoa.nome}</strong>.
+      </p>
       <div className="escopo-opcoes">
         <button
           className={`escopo-opcao ${escopo === 'leitura' ? 'active' : ''}`}
@@ -155,6 +173,20 @@ export default function AcessoMedico() {
           <span className="escopo-desc">O médico também registra a consulta e os exames.</span>
         </button>
       </div>
+
+      {/* Contato de emergência é dado de OUTRA pessoa, então nunca vai por
+          padrão: quem consentiu com o cadastro foi o paciente, não o familiar. */}
+      <label className="acesso-opcao-contatos">
+        <input
+          type="checkbox"
+          checked={contatos}
+          onChange={(e) => setContatos(e.target.checked)}
+        />
+        <span>
+          Enviar também meus contatos de emergência
+          <small className="text-xs text-muted"> — nome e telefone de quem avisar</small>
+        </span>
+      </label>
 
       <button className="btn-primary" onClick={gerar} disabled={gerando}>
         <KeyRound size={18} /> {gerando ? 'Gerando…' : 'Gerar código'}
@@ -183,6 +215,8 @@ export default function AcessoMedico() {
                   <p className="text-xs text-muted">
                     {a.crm ? `CRM ${a.crm} · ` : ''}
                     {a.escopo === 'escrita' ? 'Leitura e registro' : 'Somente leitura'}
+                    {` · ${a.dependente || 'você'}`}
+                    {a.compartilhaContatos ? ' · com contatos' : ''}
                   </p>
                 </div>
                 <StatusBadge status={STATUS_BADGE[situacao]} texto={ROTULO_SITUACAO[situacao]} />

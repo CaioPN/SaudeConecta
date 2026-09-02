@@ -25,23 +25,41 @@ import java.util.List;
 public class AcessoDAO {
 
     private static final String SELECT_BASE =
-            "SELECT a.id, a.paciente_id, a.escopo, a.criado_em, a.expira_em, a.usado_em, "
-            + "       a.revogado_em, m.id AS medico_id, m.nome AS medico_nome, "
+            "SELECT a.id, a.paciente_id, a.dependente_id, a.escopo, a.compartilha_contatos, "
+            + "       a.criado_em, a.expira_em, a.usado_em, "
+            + "       a.revogado_em, d.nome AS dependente_nome, "
+            + "       m.id AS medico_id, m.nome AS medico_nome, "
             + "       m.especialidade, m.crm "
             + "FROM acessos_temporarios a "
+            + "LEFT JOIN dependentes d ON d.id = a.dependente_id "
             + "LEFT JOIN medicos m ON m.id = a.medico_id ";
 
-    /** INSERT — cria um acesso válido por `minutos` a partir de agora. */
-    public int criar(int idPaciente, String codigoHash, String escopo, int minutos) throws SQLException {
-        String sql = "INSERT INTO acessos_temporarios (paciente_id, codigo_hash, escopo, expira_em) "
-                + "VALUES (?, ?, ?, ?)";
+    /**
+     * INSERT — cria um acesso válido por `minutos` a partir de agora.
+     *
+     * `idDependente` null gera o código do próprio titular; preenchido, gera um
+     * código que abre só o prontuário daquele dependente. Quem gera é sempre o
+     * titular, que é quem responde pela conta.
+     *
+     * `compartilhaContatos` é opt-in: contato de emergência é dado de outra
+     * pessoa (o familiar), e o consentimento dele nunca foi pedido — então só
+     * vai para o médico quando o paciente marca isso na hora de gerar.
+     */
+    public int criar(int idPaciente, Integer idDependente, String codigoHash, String escopo,
+                     boolean compartilhaContatos, int minutos) throws SQLException {
+        String sql = "INSERT INTO acessos_temporarios "
+                + "(paciente_id, dependente_id, codigo_hash, escopo, compartilha_contatos, expira_em) "
+                + "VALUES (?, ?, ?, ?, ?, ?)";
         try (Connection con = Conexao.abrir();
              PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             ps.setInt(1, idPaciente);
-            ps.setString(2, codigoHash);
-            ps.setString(3, escopo);
-            ps.setTimestamp(4, Timestamp.valueOf(LocalDateTime.now().plusMinutes(minutos)));
+            if (idDependente == null) ps.setNull(2, java.sql.Types.INTEGER);
+            else ps.setInt(2, idDependente);
+            ps.setString(3, codigoHash);
+            ps.setString(4, escopo);
+            ps.setBoolean(5, compartilhaContatos);
+            ps.setTimestamp(6, Timestamp.valueOf(LocalDateTime.now().plusMinutes(minutos)));
             ps.executeUpdate();
 
             try (ResultSet rs = ps.getGeneratedKeys()) {
@@ -220,7 +238,15 @@ public class AcessoDAO {
         AcessoTemporario a = new AcessoTemporario();
         a.setIdAcesso(rs.getInt("id"));
         a.setIdPaciente(rs.getInt("paciente_id"));
+
+        int idDependente = rs.getInt("dependente_id");
+        if (!rs.wasNull()) {
+            a.setIdDependente(idDependente);
+            a.setNomeDependente(rs.getString("dependente_nome"));
+        }
+
         a.setEscopo(rs.getString("escopo"));
+        a.setCompartilhaContatos(rs.getBoolean("compartilha_contatos"));
         a.setCriadoEm(texto(rs.getTimestamp("criado_em")));
         a.setExpiraEm(texto(rs.getTimestamp("expira_em")));
         a.setUsadoEm(texto(rs.getTimestamp("usado_em")));

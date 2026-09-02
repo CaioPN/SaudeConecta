@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, MapPin, Info, ChevronLeft, User, Clock, FileText, Droplet } from 'lucide-react';
+import {
+  Calendar, MapPin, Info, ChevronLeft, User, Clock, FileText, Droplet, Navigation,
+} from 'lucide-react';
+import { buscarDetalhesUnidade } from '../services/redeSaude';
 import { useNavigate, useParams } from 'react-router-dom';
 import InfoField from '../components/InfoField';
 import StatusBadge from '../components/StatusBadge';
@@ -15,6 +18,10 @@ export default function Appointment() {
   const { oculto } = usePrivacidade();
   const [consulta, setConsulta] = useState(null);
   const [carregando, setCarregando] = useState(true);
+  // Unidade da rede onde a consulta acontece, quando há vínculo. Vem de uma
+  // segunda chamada porque a consulta guarda só o código do CNES — o endereço
+  // e a coordenada moram no espelho da Rede de Saúde.
+  const [unidade, setUnidade] = useState(null);
 
   useEffect(() => {
     let ativo = true;
@@ -32,6 +39,20 @@ export default function Appointment() {
       ativo = false;
     };
   }, [id]);
+
+  useEffect(() => {
+    if (!consulta?.unidadeCnes) {
+      setUnidade(null);
+      return undefined;
+    }
+    let ativo = true;
+    buscarDetalhesUnidade(consulta.unidadeCnes)
+      .then((u) => { if (ativo) setUnidade(u); })
+      // Unidade fora do espelho (cidade que saiu da faxina, por exemplo): a
+      // tela segue mostrando o local em texto, sem o link.
+      .catch(() => { if (ativo) setUnidade(null); });
+    return () => { ativo = false; };
+  }, [consulta?.unidadeCnes]);
 
   if (carregando || !consulta) {
     return (
@@ -83,6 +104,20 @@ export default function Appointment() {
         </InfoField>
         <InfoField icon={MapPin} label="Local">
           {oculto ? mascararTexto(consulta.local) : consulta.local}
+          {/* Consulta marcada numa unidade da rede: a rota sai da coordenada
+              do CNES, que erra menos que o endereço em texto livre. Só aparece
+              quando existe o vínculo — consulta em consultório particular não
+              tem unidade espelhada aqui. */}
+          {unidade && !oculto && (
+            <a
+              className="consulta-como-chegar"
+              href={`https://www.google.com/maps/dir/?api=1&destination=${unidade.latitude},${unidade.longitude}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Navigation size={13} /> Como chegar — {unidade.nome}
+            </a>
+          )}
         </InfoField>
         <InfoField icon={Info} label="Motivo">
           {oculto ? mascararTexto(consulta.motivo) : consulta.motivo}

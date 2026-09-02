@@ -1,10 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ChevronLeft, MapPin, Phone, Navigation, Hospital, Ambulance, HeartPulse,
-  Clock, Search, X,
+  Clock, Search, X, Star, Info,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { buscarRedeSaude, localizacaoDoNavegador } from '../services/redeSaude';
+import {
+  buscarRedeSaude, localizacaoDoNavegador, buscarDetalhesUnidade,
+  definirUnidadeReferencia,
+} from '../services/redeSaude';
 
 // Cada tipo de unidade tem seu ícone e o nome que o paciente reconhece.
 // As chaves são as mesmas do backend (UnidadeSaude.UBS, UPA, PRONTO_SOCORRO).
@@ -36,13 +39,27 @@ function linkComoChegar(u) {
   return `https://www.google.com/maps/dir/?api=1&destination=${u.latitude},${u.longitude}`;
 }
 
-function UnidadeItem({ unidade }) {
+function UnidadeItem({ unidade, municipioAtual, ehReferencia, aoMarcarReferencia }) {
   const tipo = TIPOS[unidade.tipo] || TIPOS.ubs;
   const Icone = tipo.icone;
   const distancia = formatarDistancia(unidade.distancia_km);
 
+  // O que a unidade oferece vem de outra chamada ao CNES, uma por
+  // estabelecimento — por isso só é buscado quando o paciente abre esta.
+  const [servicos, setServicos] = useState(null);
+  const [buscandoServicos, setBuscandoServicos] = useState(false);
+
+  const verServicos = () => {
+    if (servicos || buscandoServicos) return;
+    setBuscandoServicos(true);
+    buscarDetalhesUnidade(unidade.codigo_cnes)
+      .then((u) => setServicos(u?.servicos?.length ? u.servicos : []))
+      .catch(() => setServicos([]))
+      .finally(() => setBuscandoServicos(false));
+  };
+
   return (
-    <div className="unidade-item">
+    <div className={`unidade-item ${ehReferencia ? 'referencia' : ''}`}>
       <div className={`unidade-icone ${unidade.tipo}`}>
         <Icone size={20} />
       </div>
@@ -53,7 +70,15 @@ function UnidadeItem({ unidade }) {
           {distancia && <span className="unidade-distancia">{distancia}</span>}
         </div>
 
-        <span className="unidade-tipo">{tipo.rotulo}</span>
+        <span className="unidade-tipo">
+          {tipo.rotulo}
+          {/* A lista traz unidades de municípios vizinhos que estejam dentro do
+              raio, para quem mora na divisa. Sem esta etiqueta o paciente iria
+              a um posto de outra cidade sem saber. */}
+          {municipioAtual && unidade.codigo_municipio !== municipioAtual
+            ? ' · cidade vizinha'
+            : ''}
+        </span>
 
         {unidade.endereco && (
           <span className="unidade-meta">
@@ -66,6 +91,16 @@ function UnidadeItem({ unidade }) {
           <span className="unidade-meta">
             <Clock size={12} /> {unidade.turno}
           </span>
+        )}
+
+        {/* Serviços da unidade, quando o paciente pede para ver */}
+        {servicos && servicos.length > 0 && (
+          <ul className="unidade-servicos">
+            {servicos.map((s) => <li key={s}>{s}</li>)}
+          </ul>
+        )}
+        {servicos && servicos.length === 0 && (
+          <span className="unidade-meta">O CNES não informa os serviços desta unidade.</span>
         )}
 
         <div className="unidade-acoes">
@@ -82,6 +117,18 @@ function UnidadeItem({ unidade }) {
               <Phone size={14} /> Ligar
             </a>
           )}
+          {!servicos && (
+            <button type="button" className="unidade-acao" onClick={verServicos}>
+              <Info size={14} /> {buscandoServicos ? 'Buscando…' : 'O que tem lá'}
+            </button>
+          )}
+          <button
+            type="button"
+            className={`unidade-acao ${ehReferencia ? 'ativa' : ''}`}
+            onClick={() => aoMarcarReferencia(ehReferencia ? null : unidade.codigo_cnes)}
+          >
+            <Star size={14} /> {ehReferencia ? 'Minha UBS' : 'Definir como minha'}
+          </button>
         </div>
       </div>
     </div>
@@ -92,6 +139,7 @@ export default function RedeSaude() {
   const navigate = useNavigate();
   const [origem, setOrigem] = useState(null);
   const [unidades, setUnidades] = useState([]);
+  const [referencia, setReferencia] = useState(null);
   const [filtro, setFiltro] = useState('todas');
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
@@ -123,6 +171,7 @@ export default function RedeSaude() {
         if (!ativo) return;
         setOrigem(dados.origem);
         setUnidades(dados.unidades);
+        setReferencia(dados.referencia);
       })
       .catch((err) => {
         if (!ativo) return;
@@ -161,6 +210,14 @@ export default function RedeSaude() {
     () => (filtro === 'todas' ? unidades : unidades.filter((u) => u.tipo === filtro)),
     [unidades, filtro],
   );
+
+  // A UBS de referência é a resposta para "qual é o meu posto": o Dashboard
+  // mostra o telefone e o endereço dela sem obrigar a procurar de novo.
+  const marcarReferencia = (codigoCnes) => {
+    definirUnidadeReferencia(codigoCnes)
+      .then(setReferencia)
+      .catch(() => setErro('Não foi possível salvar a sua unidade de referência.'));
+  };
 
   // De onde as distâncias foram medidas — o paciente precisa saber, senão um
   // "1,2 km" medido a partir do CEP parece errado quando ele não está em casa.
@@ -257,7 +314,15 @@ export default function RedeSaude() {
               : 'Nenhuma unidade desse tipo por perto.'}
           </p>
         ) : (
-          lista.map((u) => <UnidadeItem key={u.codigo_cnes} unidade={u} />)
+          lista.map((u) => (
+            <UnidadeItem
+              key={u.codigo_cnes}
+              unidade={u}
+              municipioAtual={origem?.codigo_municipio}
+              ehReferencia={referencia === u.codigo_cnes}
+              aoMarcarReferencia={marcarReferencia}
+            />
+          ))
         )
       )}
 

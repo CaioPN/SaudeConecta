@@ -25,6 +25,11 @@ CREATE TABLE IF NOT EXISTS pacientes (
   bairro           VARCHAR(120),
   cidade           VARCHAR(120),
   estado           VARCHAR(2),
+  -- UBS que o paciente escolheu como referência (unidades_saude.codigo_cnes).
+  -- Sem FK de propósito: unidades_saude é um espelho do CNES que pode ser
+  -- limpo e recarregado, e perder a escolha do paciente junto seria pior do
+  -- que guardar um código que talvez não esteja espelhado agora.
+  unidade_referencia INT         NULL,
   criado_em        TIMESTAMP     DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -69,6 +74,10 @@ CREATE TABLE IF NOT EXISTS consultas (
   local            VARCHAR(160)  NOT NULL,
   motivo           VARCHAR(160)  NOT NULL,
   status           VARCHAR(20)   NOT NULL DEFAULT 'agendada',
+  -- Unidade da Rede de Saúde onde a consulta acontece (codigo_cnes), quando
+  -- ela foi escolhida da lista. `local` continua sendo o texto livre, porque
+  -- consulta em consultório particular não tem CNES espelhado aqui.
+  unidade_cnes     INT           NULL,
   resumo           TEXT          NULL,
   conduta          TEXT          NULL,
   -- Autoria: acesso temporário que registrou o dado (NULL = veio do seed/paciente).
@@ -158,6 +167,13 @@ CREATE TABLE IF NOT EXISTS acessos_temporarios (
   paciente_id      INT           NOT NULL,
   codigo_hash      CHAR(64)      NOT NULL UNIQUE,
   escopo           VARCHAR(20)   NOT NULL DEFAULT 'leitura', -- 'leitura' | 'escrita'
+  -- De quem são os dados que este código abre: NULL = titular, preenchido =
+  -- aquele dependente. O código é sempre gerado pelo titular, que é quem
+  -- responde pelo dependente; o que muda é o prontuário que o médico vê.
+  dependente_id    INT           NULL,
+  -- Contato de emergência é dado de outra pessoa, então só vai para o médico
+  -- se o paciente marcar isso ao gerar o código (opt-in, nunca por padrão).
+  compartilha_contatos TINYINT(1) NOT NULL DEFAULT 0,
   criado_em        TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
   expira_em        DATETIME      NOT NULL,
   usado_em         DATETIME      NULL,   -- quando o médico trocou o código pelo token
@@ -165,6 +181,8 @@ CREATE TABLE IF NOT EXISTS acessos_temporarios (
   medico_id        INT           NULL,   -- preenchido no momento do uso
   CONSTRAINT fk_acesso_paciente
     FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_acesso_dependente
+    FOREIGN KEY (dependente_id) REFERENCES dependentes(id) ON DELETE CASCADE,
   CONSTRAINT fk_acesso_medico
     FOREIGN KEY (medico_id) REFERENCES medicos(id)
 );
@@ -241,6 +259,16 @@ CREATE TABLE IF NOT EXISTS unidades_saude (
   -- porque a API de CEP é gratuita e limita requisições, então esta coluna
   -- guarda o que já foi feito para nunca repetir o trabalho.
   cep_conferido    TINYINT(1)    NOT NULL DEFAULT 0,
+  -- O que a unidade oferece, em texto separado por ';' (24 h, centro cirúrgico,
+  -- atendimento ambulatorial pelo SUS...). Vem de OUTRO endpoint do CNES, um
+  -- por estabelecimento, então é buscado sob demanda, quando alguém abre a
+  -- unidade na tela — buscar as 547 de uma cidade seria 547 chamadas.
+  --
+  -- Não são "especialidades": o CNES não publica a lista de especialidades por
+  -- estabelecimento nesta API. O que ele publica são os serviços e a estrutura
+  -- da unidade, e é isso que está gravado aqui.
+  servicos         VARCHAR(500)  NULL,
+  servicos_em      DATETIME      NULL,
   atualizado_em    TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_unidade_municipio (codigo_municipio)
 );
@@ -266,6 +294,11 @@ CREATE TABLE IF NOT EXISTS unidades_saude (
 CREATE TABLE IF NOT EXISTS auditoria (
   id               INT AUTO_INCREMENT PRIMARY KEY,
   paciente_id      INT           NOT NULL,
+  -- Sobre quem foi a ação: NULL = o próprio titular, preenchido = o
+  -- dependente cujos dados foram abertos. A linha continua pertencendo ao
+  -- titular (é ele quem responde pela conta e quem vê a trilha), mas com
+  -- isto a tela consegue separar "o que fizeram com os dados do Miguel".
+  dependente_id    INT           NULL,
   acao             VARCHAR(40)   NOT NULL,  -- 'login', 'consultou_prontuario', ...
   recurso          VARCHAR(40)   NULL,      -- 'conta' | 'prontuario' | 'exames' | ...
   detalhe          VARCHAR(255)  NULL,
@@ -273,6 +306,8 @@ CREATE TABLE IF NOT EXISTS auditoria (
   criado_em        TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_auditoria_paciente
     FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_auditoria_dependente
+    FOREIGN KEY (dependente_id) REFERENCES dependentes(id) ON DELETE SET NULL,
   INDEX idx_auditoria_paciente (paciente_id, criado_em)
 );
 
@@ -312,11 +347,165 @@ CREATE TABLE IF NOT EXISTS familiares (
 CREATE TABLE IF NOT EXISTS notificacoes (
   id               INT AUTO_INCREMENT PRIMARY KEY,
   paciente_id      INT           NOT NULL,
-  tipo             VARCHAR(30)   NOT NULL,  -- 'consulta' | 'exame' | 'prontuario' | 'acesso'
+  tipo             VARCHAR(30)   NOT NULL,  -- 'consulta' | 'exame' | 'prontuario' | 'acesso' | 'lembrete'
+  -- Identidade do fato, para a notificação automática não repetir. Um lembrete
+  -- da consulta 42 tem chave 'consulta_proxima:42': o gerador roda a cada
+  -- Dashboard aberto, mas a linha nasce uma vez só. NULL = notificação de
+  -- evento único (o médico registrou algo), que nunca precisa ser deduplicada.
+  chave            VARCHAR(80)   NULL,
   mensagem         VARCHAR(255)  NOT NULL,
   criado_em        TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
   lida_em          DATETIME      NULL,
   CONSTRAINT fk_notificacao_paciente
     FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE,
+  UNIQUE KEY uk_notificacao_chave (paciente_id, chave),
   INDEX idx_notificacao_paciente (paciente_id, lida_em)
+);
+
+-- ============================================================
+--  Calendário Nacional de Vacinação (PNI — Ministério da Saúde)
+--  Não é por paciente: é a tabela de referência que diz quais doses
+--  existem e com que idade cada uma é recomendada.
+--
+--  Mora no banco, e não só no front, porque os dois lados precisam
+--  dela: a tela monta a carteira e o AvisoDAO conta as doses
+--  atrasadas. Duas cópias do calendário — uma em JS, outra em Java —
+--  sairiam do ar uma da outra no primeiro ajuste do PNI.
+--
+--  idade_meses NULL = dose sem idade fixa (calendário do adulto), que
+--  é exibida pelo período de referência e não entra no cálculo de
+--  atraso.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS calendario_vacinal (
+  id               INT AUTO_INCREMENT PRIMARY KEY,
+  publico          VARCHAR(10)   NOT NULL,      -- 'crianca' | 'adulto'
+  vacina           VARCHAR(80)   NOT NULL,
+  dose             VARCHAR(60)   NOT NULL,
+  idade_meses      INT           NULL,
+  periodo          VARCHAR(60)   NOT NULL,      -- texto exibido ('4 meses', '9 a 14 anos')
+  protege          VARCHAR(160)  NULL,
+  ordem            INT           NOT NULL DEFAULT 0,
+  UNIQUE KEY uk_calendario_dose (publico, vacina, dose)
+);
+
+-- ============================================================
+--  Doses aplicadas
+--  O que o app realmente sabe sobre a carteira de vacinação. Antes
+--  desta tabela a tela adivinhava: toda dose com data prevista no
+--  passado aparecia como tomada, o que é o oposto de um alerta útil —
+--  a criança que não foi ao posto aparecia em dia.
+--
+--  Uma linha = uma dose confirmada por alguém. `origem` diz quem
+--  confirmou (o paciente, pela tela, ou o médico com acesso de
+--  escrita), porque "eu marquei" e "o posto registrou" não valem a
+--  mesma coisa.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS vacinas_aplicadas (
+  id               INT AUTO_INCREMENT PRIMARY KEY,
+  paciente_id      INT           NOT NULL,
+  dependente_id    INT           NULL,
+  dose_id          INT           NOT NULL,      -- calendario_vacinal.id
+  data_aplicacao   DATE          NOT NULL,
+  origem           VARCHAR(20)   NOT NULL DEFAULT 'paciente',  -- 'paciente' | 'medico'
+  criado_em        TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_vacina_paciente
+    FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_vacina_dependente
+    FOREIGN KEY (dependente_id) REFERENCES dependentes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_vacina_dose
+    FOREIGN KEY (dose_id) REFERENCES calendario_vacinal(id) ON DELETE CASCADE,
+  -- Não há UNIQUE aqui, e isso é uma limitação do MySQL, não uma escolha.
+  -- No MySQL dois NULL contam como valores diferentes num índice único, e
+  -- dependente_id é NULL para o titular — um UNIQUE (paciente, dependente,
+  -- dose) deixaria o titular registrar a mesma dose várias vezes. A saída
+  -- natural seria uma coluna gerada (IFNULL(dependente_id, 0)), mas o MySQL
+  -- proíbe ON DELETE CASCADE numa coluna que serve de base para coluna
+  -- gerada — e a cascata é o que apaga as doses junto com o dependente.
+  --
+  -- Então quem garante uma linha por dose é o VacinaDAO, que apaga o registro
+  -- anterior antes de gravar o novo, dentro da mesma transação.
+  INDEX idx_vacina_pessoa (paciente_id, dependente_id, dose_id)
+);
+
+-- ============================================================
+--  Migração das colunas novas
+--  `CREATE TABLE IF NOT EXISTS` não altera tabela que já existe, então
+--  quem já tinha o banco criado não ganharia as colunas acrescentadas
+--  acima. O MySQL não tem `ADD COLUMN IF NOT EXISTS`, e rodar o ALTER
+--  direto quebraria o script para quem já está em dia — daí este
+--  procedimento, que confere o INFORMATION_SCHEMA antes de alterar.
+--
+--  É seguro rodar o schema.sql quantas vezes quiser.
+-- ============================================================
+DROP PROCEDURE IF EXISTS sc_adicionar_coluna;
+DELIMITER $$
+CREATE PROCEDURE sc_adicionar_coluna(
+  IN p_tabela VARCHAR(64), IN p_coluna VARCHAR(64), IN p_definicao TEXT)
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = p_tabela
+       AND COLUMN_NAME = p_coluna
+  ) THEN
+    SET @sql = CONCAT('ALTER TABLE `', p_tabela, '` ADD COLUMN `', p_coluna, '` ', p_definicao);
+    PREPARE stmt FROM @sql;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+  END IF;
+END$$
+DELIMITER ;
+
+CALL sc_adicionar_coluna('pacientes', 'unidade_referencia', 'INT NULL');
+CALL sc_adicionar_coluna('consultas', 'unidade_cnes', 'INT NULL');
+CALL sc_adicionar_coluna('acessos_temporarios', 'dependente_id', 'INT NULL');
+CALL sc_adicionar_coluna('acessos_temporarios', 'compartilha_contatos', 'TINYINT(1) NOT NULL DEFAULT 0');
+CALL sc_adicionar_coluna('auditoria', 'dependente_id', 'INT NULL');
+CALL sc_adicionar_coluna('notificacoes', 'chave', 'VARCHAR(80) NULL');
+CALL sc_adicionar_coluna('unidades_saude', 'servicos', 'VARCHAR(500) NULL');
+CALL sc_adicionar_coluna('unidades_saude', 'servicos_em', 'DATETIME NULL');
+
+DROP PROCEDURE IF EXISTS sc_adicionar_coluna;
+
+-- O mesmo para o índice que garante a deduplicação das notificações
+-- automáticas: sem ele, a coluna `chave` recém-criada não impediria a
+-- repetição do lembrete a cada Dashboard aberto.
+DROP PROCEDURE IF EXISTS sc_adicionar_indice_chave;
+DELIMITER $$
+CREATE PROCEDURE sc_adicionar_indice_chave()
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'notificacoes'
+       AND INDEX_NAME = 'uk_notificacao_chave'
+  ) THEN
+    ALTER TABLE notificacoes ADD UNIQUE KEY uk_notificacao_chave (paciente_id, chave);
+  END IF;
+END$$
+DELIMITER ;
+
+CALL sc_adicionar_indice_chave();
+DROP PROCEDURE IF EXISTS sc_adicionar_indice_chave;
+
+-- ============================================================
+--  Municípios espelhados
+--  Uma linha por município que já foi baixado do CNES, com a última
+--  vez que alguém pediu a lista dele.
+--
+--  Existe por causa do "Ver outra cidade": qualquer CEP pesquisado
+--  traz um município novo para a tabela unidades_saude, e uma cidade
+--  vista uma única vez ficaria lá para sempre. Com esta marca dá para
+--  apagar o que ninguém mais abre (UnidadeSaudeDAO.limparMunicipios-
+--  Abandonados) sem tocar nas cidades em uso.
+--
+--  A marca NÃO pode morar em unidades_saude: aquela tabela tem
+--  atualizado_em com ON UPDATE CURRENT_TIMESTAMP, e um UPDATE a cada
+--  visita faria o cache do CNES parecer sempre novo, quebrando a
+--  renovação de 30 dias.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS municipios_espelhados (
+  codigo_municipio INT           PRIMARY KEY,
+  acessado_em      DATETIME      NOT NULL,
+  criado_em        TIMESTAMP     DEFAULT CURRENT_TIMESTAMP
 );

@@ -105,6 +105,85 @@ public final class CnesApi {
         return unidades;
     }
 
+    /**
+     * Detalhes de UMA unidade: o que ela oferece, em texto pronto para a tela.
+     *
+     * O CNES não publica a lista de especialidades por estabelecimento nesta
+     * API — o que existe é o endpoint /cnes/estabelecimentos/{cnes}, que traz a
+     * estrutura da unidade (centro cirúrgico, obstétrico, neonatal,
+     * atendimento hospitalar e ambulatorial) e o turno por extenso. É isso que
+     * é montado aqui: "o que tem lá", que é a pergunta prática de quem vai
+     * decidir para onde ir.
+     *
+     * Uma chamada por unidade, por isso só é feita quando alguém abre a
+     * unidade na tela — as 547 de São Paulo de uma vez seriam 547 requisições.
+     *
+     * @return o texto com os serviços separados por ';', ou null se a API não
+     *         responder ou não houver nada que valha a pena mostrar.
+     */
+    public static String buscarServicos(int codigoCnes) {
+        Map<String, Object> dados = lerObjeto(URL_BASE + "/" + codigoCnes);
+        if (dados == null) return null;
+
+        List<String> servicos = new ArrayList<>();
+
+        String turno = texto(dados.get("descricao_turno_atendimento"));
+        if (turno != null && turno.contains("24 HORAS")) {
+            servicos.add("Aberto 24 horas");
+        }
+        if ("SIM".equalsIgnoreCase(texto(dados.get("estabelecimento_faz_atendimento_ambulatorial_sus")))) {
+            servicos.add("Atendimento ambulatorial pelo SUS");
+        }
+        if (verdadeiro(dados.get("estabelecimento_possui_atendimento_hospitalar"))) {
+            servicos.add("Internação hospitalar");
+        }
+        if (verdadeiro(dados.get("estabelecimento_possui_centro_cirurgico"))) {
+            servicos.add("Centro cirúrgico");
+        }
+        if (verdadeiro(dados.get("estabelecimento_possui_centro_obstetrico"))) {
+            servicos.add("Centro obstétrico");
+        }
+        if (verdadeiro(dados.get("estabelecimento_possui_centro_neonatal"))) {
+            servicos.add("Cuidado neonatal");
+        }
+        if (verdadeiro(dados.get("estabelecimento_possui_servico_apoio"))) {
+            servicos.add("Serviço de apoio (exames e diagnóstico)");
+        }
+
+        return servicos.isEmpty() ? null : String.join(";", servicos);
+    }
+
+    /** GET que devolve um objeto JSON (não uma lista), ou null se algo falhar. */
+    private static Map<String, Object> lerObjeto(String url) {
+        try {
+            HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(TEMPO_LIMITE)
+                    .header("Accept", "application/json")
+                    .GET()
+                    .build();
+
+            HttpResponse<String> resp = CLIENTE.send(
+                    req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+
+            if (resp.statusCode() != 200) return null;
+            return Json.parseObjeto(resp.body());
+
+        } catch (IOException | InterruptedException e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            System.out.println("[ERRO cnes detalhe] " + e.getClass().getSimpleName());
+            return null;
+        }
+    }
+
+    /** O CNES devolve esses campos como 1/0, às vezes como "1"/"0". */
+    private static boolean verdadeiro(Object v) {
+        if (v instanceof Number) return ((Number) v).intValue() == 1;
+        return "1".equals(texto(v));
+    }
+
     /** Faz o GET e devolve o array "estabelecimentos", ou null se algo falhar. */
     private static List<Object> lerPagina(String url) {
         try {

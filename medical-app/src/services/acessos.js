@@ -7,9 +7,20 @@ import api from './api';
  * pode ser recuperado depois. Se o paciente perder, gera outro.
  *
  * @param {'leitura'|'escrita'} escopo
+ * @param {object} [opcoes]
+ * @param {number} [opcoes.dependenteId]  Abre o prontuário de um dependente em
+ *   vez do seu. Quem gera continua sendo o titular — o que muda é de quem são
+ *   os dados que o médico vai ver.
+ * @param {boolean} [opcoes.compartilhaContatos]  Envia junto os contatos de
+ *   emergência. É opt-in porque o dado é de outra pessoa (o familiar), que
+ *   nunca consentiu com nada aqui.
  */
-export async function gerarAcesso(escopo = 'leitura') {
-  const { data } = await api.post('/acessos', { escopo });
+export async function gerarAcesso(escopo = 'leitura', { dependenteId, compartilhaContatos } = {}) {
+  const { data } = await api.post('/acessos', {
+    escopo,
+    dependenteId,
+    compartilhaContatos: Boolean(compartilhaContatos),
+  });
   return data;
 }
 
@@ -25,6 +36,8 @@ export async function listarAcessos() {
     revogadoEm: a.revogado_em,
     medico: a.medico?.nome || null,
     crm: a.medico?.crm || null,
+    dependente: a.dependente || null,
+    compartilhaContatos: Boolean(a.compartilha_contatos),
   }));
 }
 

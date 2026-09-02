@@ -1417,13 +1417,21 @@ button.record-card:hover { border-color: var(--primary-blue); }
   border: 1px solid #e5e7eb;
   background-color: var(--white);
 }
-.vacina-item.tomada {
+/* A carteira tem três estados desde que as doses passaram a ser registradas:
+   aplicada (verde), prevista (âmbar, ainda vai chegar) e atrasada (vermelho,
+   venceu sem registro). Antes eram dois, porque a tela deduzia da idade que a
+   dose tinha sido tomada e o atraso não existia. */
+.vacina-item.aplicada {
   background-color: #f0fdf4;
   border-color: #bbf7d0;
 }
-.vacina-item.pendente {
+.vacina-item.prevista {
   background-color: #fffbeb;
   border-color: #fde68a;
+}
+.vacina-item.atrasada {
+  background-color: #fef2f2;
+  border-color: #fecaca;
 }
 .vacina-status-icon {
   width: 30px;
@@ -1435,8 +1443,9 @@ button.record-card:hover { border-color: var(--primary-blue); }
   flex-shrink: 0;
   color: var(--white);
 }
-.vacina-status-icon.tomada { background-color: #22c55e; }
-.vacina-status-icon.pendente { background-color: #f59e0b; }
+.vacina-status-icon.aplicada { background-color: #22c55e; }
+.vacina-status-icon.prevista { background-color: #f59e0b; }
+.vacina-status-icon.atrasada { background-color: #ef4444; }
 .vacina-info {
   display: flex;
   flex-direction: column;
@@ -1464,8 +1473,29 @@ button.record-card:hover { border-color: var(--primary-blue); }
 .vacina-dose { font-size: 13px; color: var(--text-gray); }
 .vacina-protege { font-size: 12px; color: var(--text-gray); font-style: italic; }
 .vacina-data { font-size: 12px; font-weight: 600; margin-top: 2px; }
-.vacina-item.tomada .vacina-data { color: #16a34a; }
-.vacina-item.pendente .vacina-data { color: #d97706; }
+.vacina-item.aplicada .vacina-data { color: #16a34a; }
+.vacina-item.prevista .vacina-data { color: #d97706; }
+.vacina-item.atrasada .vacina-data { color: #dc2626; }
+
+/* Botão de confirmar/desfazer a dose. Discreto no repouso: a lista é para
+   ler, e o registro é a exceção, não o que se faz o tempo todo. */
+.vacina-acao {
+  align-self: flex-start;
+  margin-top: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background-color: var(--white);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.vacina-acao.destaque {
+  border-color: var(--primary-blue);
+  color: var(--primary-blue);
+}
+.vacina-acao:disabled { opacity: 0.5; cursor: default; }
 
 /* Dúvidas Frequentes — cada pergunta é um botão que abre a resposta abaixo. */
 .faq-categoria {
@@ -1725,6 +1755,87 @@ button.record-card:hover { border-color: var(--primary-blue); }
   margin: -12px 0 20px;
 }
 
+/* Opção de enviar os contatos de emergência junto com o acesso do médico.
+   Fica visualmente mais leve que os cartões de escopo de propósito: é uma
+   exceção que o paciente marca de vez em quando, não a escolha principal. */
+.acesso-opcao-contatos {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--borda-azul, #e5e7eb);
+  background-color: var(--white);
+  font-size: 13px;
+  cursor: pointer;
+}
+.acesso-opcao-contatos input { margin-top: 2px; }
+
+/* Unidade marcada como "a minha" e a lista de serviços que o CNES informa.
+   O destaque é a borda, e não o fundo: a lista já usa fundo para separar um
+   cartão do outro, e dois fundos brigando deixariam a tela suja. */
+.unidade-item.referencia {
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 1px var(--primary-blue) inset;
+}
+.unidade-acao.ativa {
+  color: var(--primary-blue);
+  font-weight: 700;
+}
+.unidade-servicos {
+  margin: 6px 0 2px;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--text-gray);
+  line-height: 1.6;
+}
+.unidade-servicos li { list-style: disc; }
+
+/* Nome do dependente de quem o aviso fala. Etiqueta pequena acima do título,
+   porque o Dashboard é do titular: o normal é o aviso ser dele, e o nome só
+   aparece quando é exceção. */
+.aviso-pessoa {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--primary-blue);
+  margin-bottom: 2px;
+}
+
+/* Filtro por pessoa e etiqueta de dependente na trilha de auditoria.
+   Reaproveita o visual das pílulas da Rede de Saúde (.rede-filtro) — é o mesmo
+   gesto, escolher um recorte da lista. */
+.trilha-pessoas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.trilha-pessoa {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--primary-blue);
+  background-color: var(--azul-suave, #eff6ff);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+/* Link para a rota da unidade, dentro do campo Local da consulta. */
+.consulta-como-chegar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary-blue);
+}
+
 /* ============================================================
    Detalhes em azul
    Camada que acrescenta as bordas, os filetes e os fundos azuis
@@ -1770,8 +1881,9 @@ button.record-card:hover { border-color: var(--primary-blue); }
 
 /* Exceções: cartões que já usam a cor para dizer alguma coisa (situação da
    vacina, alergia em vermelho) mantêm a borda semântica. */
-:root .vacina-item.tomada { border-color: #bbf7d0; }
-:root .vacina-item.pendente { border-color: #fde68a; }
+:root .vacina-item.aplicada { border-color: #bbf7d0; }
+:root .vacina-item.prevista { border-color: #fde68a; }
+:root .vacina-item.atrasada { border-color: #fecaca; }
 :root .card.border-red { border-color: #fecaca; }
 :root .codigo-card { border: 2px solid var(--primary-blue); }
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   User, ChevronLeft, Mail, Phone, IdCard, Calendar, Droplet, Venus, MapPin,
-  HeartHandshake, Trash2, Plus,
+  HeartHandshake, Trash2, Plus, Pencil,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -9,6 +9,7 @@ import { usePrivacidade } from '../context/PrivacidadeContext';
 import BotaoPrivacidade from '../components/BotaoPrivacidade';
 import { mascarar } from '../utils/privacidade';
 import { listarFamiliares, cadastrarFamiliar, removerFamiliar } from '../services/familiares';
+import { atualizarPerfil } from '../services/perfil';
 
 // Calcula a idade a partir da data de nascimento (formato ISO).
 function calcularIdade(dataNascimento) {
@@ -231,9 +232,86 @@ function ContatosEmergencia() {
   );
 }
 
+/**
+ * Formulário de contato e endereço.
+ *
+ * Só telefone e endereço são editáveis, e o backend recusa o resto de todo
+ * jeito: nome, CPF, nascimento, gênero e tipo sanguíneo identificam a pessoa
+ * no atendimento, e o e-mail é a chave do login. Corrigir um telefone digitado
+ * errado, por outro lado, é a coisa mais banal do mundo — e até agora exigia
+ * criar outra conta.
+ */
+function EditarContato({ paciente, aoSalvar, aoFechar }) {
+  const [form, setForm] = useState({
+    telefone: paciente?.telefone || '',
+    cep: paciente?.cep || '',
+    rua: paciente?.rua || '',
+    numero: paciente?.numero || '',
+    bairro: paciente?.bairro || '',
+    cidade: paciente?.cidade || '',
+    estado: paciente?.estado || '',
+  });
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState('');
+
+  const alterar = (campo) => (e) => setForm({ ...form, [campo]: e.target.value });
+
+  const enviar = (e) => {
+    e.preventDefault();
+    setSalvando(true);
+    setErro('');
+    atualizarPerfil(form)
+      .then((novo) => aoSalvar(novo))
+      .catch((err) => setErro(err?.response?.data?.erro || 'Não foi possível salvar.'))
+      .finally(() => setSalvando(false));
+  };
+
+  return (
+    <form className="card" onSubmit={enviar}>
+      <h3 className="section-title">Editar contato e endereço</h3>
+      {erro && <p className="text-sm text-red">{erro}</p>}
+
+      <div className="input-group">
+        <label className="input-label">Telefone</label>
+        <input className="input-field" value={form.telefone} onChange={alterar('telefone')} required />
+      </div>
+      <div className="input-group">
+        <label className="input-label">CEP</label>
+        <input className="input-field" value={form.cep} onChange={alterar('cep')} placeholder="00000-000" />
+      </div>
+      <div className="input-group">
+        <label className="input-label">Rua</label>
+        <input className="input-field" value={form.rua} onChange={alterar('rua')} />
+      </div>
+      <div className="input-group">
+        <label className="input-label">Número</label>
+        <input className="input-field" value={form.numero} onChange={alterar('numero')} />
+      </div>
+      <div className="input-group">
+        <label className="input-label">Bairro</label>
+        <input className="input-field" value={form.bairro} onChange={alterar('bairro')} />
+      </div>
+      <div className="input-group">
+        <label className="input-label">Cidade</label>
+        <input className="input-field" value={form.cidade} onChange={alterar('cidade')} />
+      </div>
+      <div className="input-group">
+        <label className="input-label">Estado (UF)</label>
+        <input className="input-field" value={form.estado} onChange={alterar('estado')} maxLength={2} />
+      </div>
+
+      <button className="btn-primary" type="submit" disabled={salvando}>
+        {salvando ? 'Salvando…' : 'Salvar alterações'}
+      </button>
+      <button type="button" className="btn-secondary" onClick={aoFechar}>Cancelar</button>
+    </form>
+  );
+}
+
 export default function Profile() {
   const navigate = useNavigate();
-  const { paciente } = useAuth();
+  const { paciente, atualizarPaciente } = useAuth();
+  const [editando, setEditando] = useState(false);
 
   const nome = paciente?.nome || 'Paciente';
   const idade = calcularIdade(paciente?.data_nascimento);
@@ -256,9 +334,24 @@ export default function Profile() {
         <p className="text-sm text-muted">{detalhes || 'Dados do paciente'}</p>
       </div>
 
+      {editando && (
+        <EditarContato
+          paciente={paciente}
+          aoSalvar={(novo) => { atualizarPaciente(novo); setEditando(false); }}
+          aoFechar={() => setEditando(false)}
+        />
+      )}
+
       <div className="section-header">
         <h3 className="section-title">Dados Cadastrais</h3>
-        <BotaoPrivacidade rotulo="meus dados" />
+        <div className="flex items-center" style={{ gap: '8px' }}>
+          {!editando && (
+            <button type="button" className="privacidade-btn" onClick={() => setEditando(true)}>
+              <Pencil size={14} /> Editar
+            </button>
+          )}
+          <BotaoPrivacidade rotulo="meus dados" />
+        </div>
       </div>
       <div className="card">
         <InfoRow icon={Mail} label="E-mail" value={paciente?.email} sensivel />

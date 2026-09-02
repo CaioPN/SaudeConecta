@@ -17,6 +17,9 @@ export async function listarAuditoria() {
     recurso: r.recurso || null,
     detalhe: r.detalhe || null,
     criadoEm: r.criado_em,
+    // Primeiro nome do dependente cujos dados foram abertos (null = titular).
+    dependente: r.dependente || null,
+    dependenteId: r.dependente_id ?? null,
     ip: r.origem_ip || null,
     escopo: r.escopo || null,
     medico: r.medico?.nome || null,

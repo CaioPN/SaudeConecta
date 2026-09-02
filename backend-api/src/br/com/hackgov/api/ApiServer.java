@@ -29,6 +29,7 @@ import br.com.hackgov.dao.ConsultaDAO;
 import br.com.hackgov.dao.DependenteDAO;
 import br.com.hackgov.dao.ExameDAO;
 import br.com.hackgov.dao.FamiliarDAO;
+import br.com.hackgov.dao.VacinaDAO;
 import br.com.hackgov.dao.MedicoDAO;
 import br.com.hackgov.dao.NotificacaoDAO;
 import br.com.hackgov.dao.PacienteDAO;
@@ -40,6 +41,7 @@ import br.com.hackgov.modelos.Alergia;
 import br.com.hackgov.modelos.Aviso;
 import br.com.hackgov.modelos.Consulta;
 import br.com.hackgov.modelos.Dependente;
+import br.com.hackgov.modelos.DoseVacina;
 import br.com.hackgov.modelos.Exame;
 import br.com.hackgov.modelos.Familiar;
 import br.com.hackgov.modelos.HistoricoMedico;
@@ -51,6 +53,7 @@ import br.com.hackgov.modelos.Paciente;
 import br.com.hackgov.modelos.RegistroAuditoria;
 import br.com.hackgov.modelos.UnidadeSaude;
 import br.com.hackgov.util.ChatIA;
+import br.com.hackgov.util.CarteiraVacinal;
 import br.com.hackgov.util.CodigoAcesso;
 import br.com.hackgov.util.Json;
 import br.com.hackgov.util.Localizacao;
@@ -69,6 +72,7 @@ import br.com.hackgov.util.SenhaUtil;
  *   POST   /api/auth/recuperar    confere a identidade de quem esqueceu a senha
  *   POST   /api/auth/redefinir    grava a senha nova com o token da recuperação
  *   GET    /api/auth/me           (protegido por JWT)
+ *   PUT    /api/auth/me           corrige telefone e endereço do cadastro
  *   GET    /api/dependentes       (protegido por JWT)
  *   POST   /api/dependentes       (protegido por JWT)
  *   DELETE /api/dependentes/{id}  (protegido por JWT)
@@ -81,6 +85,11 @@ import br.com.hackgov.util.SenhaUtil;
  *   GET    /api/prontuario        alergias, condições e medicações
  *   GET    /api/avisos            avisos do Dashboard (derivados dos dados)
  *   GET    /api/rede-saude        UBS, UPAs e prontos-socorros mais próximos
+ *   GET    /api/rede-saude/unidades/{cnes}  o que aquela unidade oferece
+ *   POST   /api/rede-saude/referencia       escolhe a UBS de referência
+ *   GET    /api/vacinas           carteira de vacinação; aceita ?dependenteId=
+ *   POST   /api/vacinas           marca uma dose como aplicada
+ *   DELETE /api/vacinas/{doseId}  desmarca uma dose
  *   POST   /api/exames/exportacao registra na auditoria o download do PDF
  *   GET    /api/auditoria         trilha de auditoria (médico + próprio paciente)
  *   GET    /api/familiares        contatos de emergência
@@ -94,7 +103,8 @@ import br.com.hackgov.util.SenhaUtil;
  * Em todas elas o paciente vem do JWT, nunca da requisição — assim um usuário
  * não consegue ler os dados de outro passando um id na URL.
  *
- * Senhas são tratadas com SHA-256 (ver SenhaUtil) e a sessão usa JWT (ver Jwt).
+ * Senhas são tratadas com PBKDF2 e salt (ver SenhaUtil) e a sessão usa JWT
+ * (ver Jwt).
  */
 public class ApiServer {
 
@@ -112,6 +122,7 @@ public class ApiServer {
     private static final AuditoriaDAO auditoriaDAO = new AuditoriaDAO();
     private static final FamiliarDAO familiarDAO = new FamiliarDAO();
     private static final NotificacaoDAO notificacaoDAO = new NotificacaoDAO();
+    private static final VacinaDAO vacinaDAO = new VacinaDAO();
 
     /** Validade padrão do código/token do médico, em minutos. */
     private static final int VALIDADE_ACESSO_MINUTOS = 30;
@@ -121,6 +132,13 @@ public class ApiServer {
 
     /** Quantas notificações a tela recebe de uma vez. */
     private static final int LIMITE_NOTIFICACOES = 30;
+
+    /**
+     * Com quantos dias de antecedência a consulta agendada vira lembrete.
+     * Dois dias: um dia é tarde para remarcar, uma semana é cedo demais e o
+     * lembrete some da lista antes de servir para alguma coisa.
+     */
+    private static final int DIAS_LEMBRETE_CONSULTA = 2;
 
     /**
      * Validade do token de redefinição de senha, em minutos. Curta de
@@ -150,6 +168,7 @@ public class ApiServer {
         server.createContext("/api/dependentes", comCors(ApiServer::dependentes));
         server.createContext("/api/familiares", comCors(ApiServer::familiares));
         server.createContext("/api/notificacoes", comCors(ApiServer::notificacoes));
+        server.createContext("/api/vacinas", comCors(ApiServer::vacinas));
         server.createContext("/api/consultas", comCors(ApiServer::consultas));
         server.createContext("/api/exames", comCors(ApiServer::exames));
         server.createContext("/api/prontuario", comCors(ApiServer::prontuario));
@@ -160,6 +179,19 @@ public class ApiServer {
         server.createContext("/api/auditoria", comCors(ApiServer::auditoria));
         server.createContext("/api/medico", comCors(ApiServer::medico));
         server.createContext("/", comCors(ApiServer::raiz));
+
+        // Espelho do CNES: tira as cidades que ninguém abre há meses. Uma vez
+        // por execução e em segundo plano — é faxina, não pode atrasar a subida
+        // da API nem competir com requisição de paciente.
+        Thread faxina = new Thread(() -> {
+            try {
+                unidadeSaudeDAO.limparMunicipiosAbandonados();
+            } catch (SQLException e) {
+                System.out.println("[ERRO faxina do espelho] " + e.getMessage());
+            }
+        }, "faxina-espelho");
+        faxina.setDaemon(true);
+        faxina.start();
 
         server.setExecutor(null); // executor padrão
         server.start();
@@ -286,6 +318,7 @@ public class ApiServer {
             }
 
             auditar(ex, p.getIdPaciente(), "login", "conta", null);
+            migrarHashSeNecessario(p, senha);
 
             Map<String, Object> resp = new LinkedHashMap<>();
             resp.put("paciente", pacienteJson(p));
@@ -297,6 +330,28 @@ public class ApiServer {
         } catch (SQLException e) {
             System.out.println("[ERRO login] " + e.getMessage());
             enviarErro(ex, 500, "Erro ao fazer login.");
+        }
+    }
+
+    /**
+     * Regrava a senha no formato novo quando a conta ainda guarda o hash
+     * antigo (SHA-256 sem salt).
+     *
+     * O login é o único ponto do sistema que conhece a senha em texto puro, e
+     * o hash novo não dá para derivar do velho — então a migração só pode
+     * acontecer aqui, na primeira entrada depois da mudança. Ninguém precisa
+     * trocar de senha nem é avisado de nada.
+     *
+     * Falhar aqui não pode derrubar o login: a pessoa acertou a senha, e
+     * continuar com o hash antigo é pior do que a alternativa, mas não é
+     * motivo para negar a entrada. Por isso o erro só é registrado.
+     */
+    private static void migrarHashSeNecessario(Paciente p, String senha) {
+        if (!SenhaUtil.precisaAtualizar(p.getSenhaHash())) return;
+        try {
+            pacienteDAO.atualizarSenha(p.getIdPaciente(), SenhaUtil.hash(senha));
+        } catch (SQLException e) {
+            System.out.println("[ERRO migrar hash] " + e.getMessage());
         }
     }
 
@@ -448,6 +503,10 @@ public class ApiServer {
 
     /** GET /api/auth/me — dados do paciente logado (rota protegida). */
     private static void me(HttpExchange ex) throws IOException {
+        if ("PUT".equals(ex.getRequestMethod())) {
+            atualizarPerfil(ex);
+            return;
+        }
         if (!"GET".equals(ex.getRequestMethod())) { enviarErro(ex, 405, "Método não permitido."); return; }
         Integer userId = autenticar(ex);
         if (userId == null) return;
@@ -467,6 +526,84 @@ public class ApiServer {
     }
 
     /** /api/dependentes — lista (GET), cadastra (POST) ou remove (DELETE /{id}). */
+    /**
+     * PUT /api/auth/me — o paciente corrige o próprio contato e endereço.
+     *
+     * Só telefone e endereço: nome, CPF, data de nascimento, gênero, tipo
+     * sanguíneo e e-mail continuam sendo dados que o app não deixa trocar pela
+     * tela (ver PacienteDAO.atualizarContato).
+     *
+     * Alterar cadastro é a quarta operação que a governança pede na trilha —
+     * as outras três (leitura sensível, exportação e exclusão) já estavam. O
+     * detalhe diz O QUE mudou, nunca o valor antigo nem o novo: telefone e
+     * endereço são dado pessoal, e a trilha é lida na tela do celular.
+     */
+    private static void atualizarPerfil(HttpExchange ex) throws IOException {
+        Integer userId = autenticar(ex);
+        if (userId == null) return;
+
+        try {
+            Paciente atual = pacienteDAO.buscarPorId(userId);
+            if (atual == null) {
+                enviarErro(ex, 404, "Paciente não encontrado.");
+                return;
+            }
+
+            Map<String, Object> body = lerCorpo(ex);
+            String telefone = campo(body, "telefone");
+            if (telefone == null) telefone = atual.getTelefone();
+            if (apenasDigitos(telefone).length() < 10) {
+                enviarErro(ex, 400, "Informe um telefone válido com DDD.");
+                return;
+            }
+
+            String cep = apenasDigitos(campo(body, "cep"));
+            if (!cep.isEmpty() && cep.length() != 8) {
+                enviarErro(ex, 400, "O CEP deve ter 8 dígitos.");
+                return;
+            }
+
+            String rua = campo(body, "rua");
+            String numero = campo(body, "numero");
+            String bairro = campo(body, "bairro");
+            String cidade = campo(body, "cidade");
+            String estado = campo(body, "estado");
+
+            pacienteDAO.atualizarContato(userId, telefone, cep.isEmpty() ? null : cep,
+                    rua, numero, bairro, cidade, estado);
+
+            List<String> mudou = new ArrayList<>();
+            if (!iguais(telefone, atual.getTelefone())) mudou.add("telefone");
+            if (!iguais(cep.isEmpty() ? null : cep, apenasDigitos(atual.getCep()).isEmpty()
+                    ? null : apenasDigitos(atual.getCep()))) mudou.add("CEP");
+            if (!iguais(rua, atual.getRua()) || !iguais(numero, atual.getNumero())
+                    || !iguais(bairro, atual.getBairro()) || !iguais(cidade, atual.getCidade())
+                    || !iguais(estado, atual.getEstado())) mudou.add("endereço");
+
+            if (!mudou.isEmpty()) {
+                auditar(ex, userId, "atualizou_perfil", "conta", String.join(", ", mudou));
+            }
+
+            Paciente novo = pacienteDAO.buscarPorId(userId);
+            Map<String, Object> resp = new LinkedHashMap<>();
+            resp.put("paciente", pacienteJson(novo));
+            enviarJson(ex, 200, resp);
+
+        } catch (IllegalArgumentException e) {
+            enviarErro(ex, 400, "Corpo da requisição inválido (JSON).");
+        } catch (SQLException e) {
+            System.out.println("[ERRO atualizar perfil] " + e.getMessage());
+            enviarErro(ex, 500, "Erro ao salvar os dados do perfil.");
+        }
+    }
+
+    /** Compara dois textos tratando null e vazio como a mesma coisa. */
+    private static boolean iguais(String a, String b) {
+        String x = a == null ? "" : a.trim();
+        String y = b == null ? "" : b.trim();
+        return x.equals(y);
+    }
+
     private static void dependentes(HttpExchange ex) throws IOException {
         Integer userId = autenticar(ex);
         if (userId == null) return;
@@ -522,7 +659,7 @@ public class ApiServer {
 
         Dependente d = new Dependente(userId, nome, cpf, genero, tipoSanguineo, dataNascimento);
         dependenteDAO.inserir(d);
-        auditar(ex, userId, "cadastrou_dependente", "dependentes", primeiroNome(nome));
+        auditar(ex, userId, "cadastrou_dependente", "dependentes", primeiroNome(nome), d.getId());
 
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("dependente", dependenteJson(d));
@@ -547,6 +684,9 @@ public class ApiServer {
             enviarErro(ex, 404, "Dependente não encontrado.");
             return;
         }
+        // Sem dependente_id aqui de propósito: a linha da tabela acabou de ser
+        // apagada, e a FK apontaria para um registro que não existe mais. O
+        // primeiro nome no detalhe é o que sobra para o paciente reconhecer.
         auditar(ex, userId, "excluiu_dependente", "dependentes", primeiroNome(nome));
 
         Map<String, Object> resp = new LinkedHashMap<>();
@@ -659,6 +799,16 @@ public class ApiServer {
         String path = ex.getRequestURI().getPath();
 
         try {
+            // Os lembretes nascem aqui, na leitura, e não numa thread de fundo:
+            // o app não tem push nem serviço rodando fora da requisição, e um
+            // agendador que varre todos os pacientes de tempo em tempo seria
+            // trabalho constante para avisar quem talvez nem abra o app. Como o
+            // Dashboard sempre passa por esta rota, gerar na hora dá o mesmo
+            // resultado com um SELECT a mais só para quem está usando.
+            if ("GET".equals(metodo)) {
+                gerarLembretes(userId);
+            }
+
             if ("GET".equals(metodo) && "/api/notificacoes".equals(path)) {
                 List<Object> arr = new ArrayList<>();
                 for (Notificacao n : notificacaoDAO.listarPorPaciente(userId, false, LIMITE_NOTIFICACOES)) {
@@ -687,6 +837,53 @@ public class ApiServer {
         }
     }
 
+    /**
+     * Cria os lembretes que ainda não existem para este paciente.
+     *
+     * Hoje há um só: consulta agendada chegando. Ele é o caso que a governança
+     * do app pede — fato com dia marcado, que precisa continuar visível depois
+     * que a data passa (o paciente que perdeu a consulta tem que ver que foi
+     * avisado). O resto ("faz um ano que você não faz exame") continua sendo
+     * aviso, recalculado a cada Dashboard e nunca gravado.
+     *
+     * A chave "consulta_proxima:{id}" garante uma linha por consulta, não uma
+     * por visita ao app.
+     */
+    private static void gerarLembretes(int userId) {
+        try {
+            for (String[] c : consultaDAO.listarParaLembrete(userId, DIAS_LEMBRETE_CONSULTA)) {
+                String quando = diaRelativo(c[1]);
+                String hora = c[2] == null ? null : c[2].substring(0, 5);
+                String dependente = c[4];
+
+                String mensagem = (dependente == null ? "Você tem" : primeiroNome(dependente) + " tem")
+                        + " consulta " + quando
+                        + (hora == null ? "" : " às " + hora)
+                        + " com " + c[3] + ".";
+
+                notificacaoDAO.criarSeNova(userId, NotificacaoDAO.TIPO_LEMBRETE,
+                        "consulta_proxima:" + c[0], mensagem);
+            }
+        } catch (SQLException e) {
+            // Lembrete é conveniência: se falhar, a lista de notificações
+            // continua sendo devolvida normalmente.
+            System.out.println("[ERRO lembretes] " + e.getMessage());
+        }
+    }
+
+    /** "hoje", "amanhã" ou "em 2 dias", a partir de uma data ISO. */
+    private static String diaRelativo(String dataIso) {
+        try {
+            long dias = java.time.temporal.ChronoUnit.DAYS.between(
+                    LocalDate.now(), LocalDate.parse(dataIso));
+            if (dias <= 0) return "hoje";
+            if (dias == 1) return "amanhã";
+            return "em " + dias + " dias";
+        } catch (java.time.format.DateTimeParseException e) {
+            return "em breve";
+        }
+    }
+
     private static void marcarNotificacaoLida(HttpExchange ex, int userId, String path)
             throws IOException, SQLException {
         String meio = path.substring("/api/notificacoes/".length(), path.length() - "/lida".length());
@@ -709,6 +906,168 @@ public class ApiServer {
     }
 
     /** /api/consultas — lista do paciente logado ou detalhe de /api/consultas/{id}. */
+    // ===================== CARTEIRA DE VACINAÇÃO =====================
+
+    /**
+     * /api/vacinas — carteira da pessoa selecionada (GET), marca uma dose como
+     * aplicada (POST) ou desmarca (DELETE /{doseId}).
+     *
+     * Aceita ?dependenteId= como as outras rotas clínicas. A data de
+     * nascimento sai do banco, nunca do cliente: é ela que define o calendário
+     * e as datas previstas, e aceitar isso de fora deixaria qualquer um mudar
+     * a própria carteira mandando outra data.
+     */
+    private static void vacinas(HttpExchange ex) throws IOException {
+        Integer userId = autenticar(ex);
+        if (userId == null) return;
+
+        String metodo = ex.getRequestMethod();
+        String path = ex.getRequestURI().getPath();
+
+        try {
+            if ("GET".equals(metodo) && "/api/vacinas".equals(path)) {
+                listarVacinas(ex, userId);
+            } else if ("POST".equals(metodo) && "/api/vacinas".equals(path)) {
+                registrarVacina(ex, userId);
+            } else if ("DELETE".equals(metodo) && path.startsWith("/api/vacinas/")) {
+                removerVacina(ex, userId, path.substring("/api/vacinas/".length()));
+            } else {
+                enviarErro(ex, 405, "Método não permitido.");
+            }
+        } catch (IllegalArgumentException e) {
+            enviarErro(ex, 400, "Corpo da requisição inválido (JSON).");
+        } catch (SQLException e) {
+            System.out.println("[ERRO vacinas] " + e.getMessage());
+            enviarErro(ex, 500, "Erro ao carregar a carteira de vacinação.");
+        }
+    }
+
+    private static void listarVacinas(HttpExchange ex, int userId) throws IOException, SQLException {
+        Integer dependenteId = idDependente(ex);
+        String nascimento = nascimentoDe(userId, dependenteId);
+        if (nascimento == null && dependenteId != null) {
+            enviarErro(ex, 404, "Dependente não encontrado.");
+            return;
+        }
+
+        String publico = CarteiraVacinal.publicoPara(nascimento);
+        List<DoseVacina> doses = vacinaDAO.listarCarteira(userId, dependenteId, publico);
+        CarteiraVacinal.calcular(doses, nascimento);
+
+        int aplicadas = 0;
+        int atrasadas = 0;
+        List<Object> arr = new ArrayList<>();
+        for (DoseVacina d : doses) {
+            if (DoseVacina.STATUS_APLICADA.equals(d.getStatus())) aplicadas++;
+            if (DoseVacina.STATUS_ATRASADA.equals(d.getStatus())) atrasadas++;
+            arr.add(doseJson(d));
+        }
+
+        Map<String, Object> resumo = new LinkedHashMap<>();
+        resumo.put("total", doses.size());
+        resumo.put("aplicadas", aplicadas);
+        resumo.put("atrasadas", atrasadas);
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("publico", publico);
+        resp.put("doses", arr);
+        resp.put("resumo", resumo);
+
+        // A carteira diz o que a pessoa tomou e o que deixou de tomar: é dado
+        // de saúde como os exames, e entra na trilha pelo mesmo motivo.
+        auditarLeitura(ex, userId, "consultou_vacinas", "vacinas",
+                alvoDaLeitura(userId, dependenteId), dependenteId);
+        enviarJson(ex, 200, resp);
+    }
+
+    private static void registrarVacina(HttpExchange ex, int userId) throws IOException, SQLException {
+        Map<String, Object> body = lerCorpo(ex);
+        int idDose = inteiro(body.get("doseId"));
+        if (idDose <= 0) {
+            enviarErro(ex, 400, "Informe a dose.");
+            return;
+        }
+
+        Integer dependenteId = body.get("dependenteId") instanceof Number
+                ? ((Number) body.get("dependenteId")).intValue()
+                : null;
+        if (dependenteId != null && dependenteDAO.nomeDoPaciente(dependenteId, userId) == null) {
+            enviarErro(ex, 404, "Dependente não encontrado.");
+            return;
+        }
+
+        // Sem data no corpo, vale hoje: o caso comum é marcar a dose ao voltar
+        // do posto. Data futura é recusada — carteira não registra intenção.
+        String data = campo(body, "data");
+        if (data == null) data = LocalDate.now().toString();
+        try {
+            if (LocalDate.parse(data).isAfter(LocalDate.now())) {
+                enviarErro(ex, 400, "A data de aplicação não pode estar no futuro.");
+                return;
+            }
+        } catch (java.time.format.DateTimeParseException e) {
+            enviarErro(ex, 400, "Data de aplicação inválida.");
+            return;
+        }
+
+        String descricao = vacinaDAO.descricaoDaDose(idDose);
+        if (descricao == null) {
+            enviarErro(ex, 404, "Dose não encontrada no calendário.");
+            return;
+        }
+
+        vacinaDAO.registrar(userId, dependenteId, idDose, data, VacinaDAO.ORIGEM_PACIENTE);
+        auditar(ex, userId, "registrou_vacina", "vacinas", descricao, dependenteId);
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("sucesso", Boolean.TRUE);
+        resp.put("data", data);
+        enviarJson(ex, 201, resp);
+    }
+
+    private static void removerVacina(HttpExchange ex, int userId, String idTexto)
+            throws IOException, SQLException {
+        int idDose;
+        try {
+            idDose = Integer.parseInt(idTexto.trim());
+        } catch (NumberFormatException e) {
+            enviarErro(ex, 400, "Dose inválida.");
+            return;
+        }
+
+        Integer dependenteId = idDependente(ex);
+        String descricao = vacinaDAO.descricaoDaDose(idDose);
+
+        if (!vacinaDAO.remover(userId, dependenteId, idDose)) {
+            enviarErro(ex, 404, "Esta dose não estava registrada.");
+            return;
+        }
+
+        // Desmarcar é apagar um registro de saúde: entra na trilha como as
+        // outras exclusões.
+        auditar(ex, userId, "removeu_vacina", "vacinas", descricao, dependenteId);
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("sucesso", Boolean.TRUE);
+        enviarJson(ex, 200, resp);
+    }
+
+    /**
+     * Data de nascimento do titular ou de um dependente dele.
+     *
+     * Devolve null quando o dependente não é da conta — o chamador transforma
+     * isso em 404, que é a mesma resposta de "não existe": quem tenta adivinhar
+     * id de dependente alheio não descobre se acertou.
+     */
+    private static String nascimentoDe(int userId, Integer dependenteId) throws SQLException {
+        if (dependenteId == null) {
+            Paciente p = pacienteDAO.buscarPorId(userId);
+            return p == null ? null : p.getDataNascimento();
+        }
+        Dependente d = dependenteDAO.buscarDoPaciente(dependenteId, userId);
+        return d == null ? null : d.getDataNascimento();
+    }
+
     private static void consultas(HttpExchange ex) throws IOException {
         if (!"GET".equals(ex.getRequestMethod())) { enviarErro(ex, 405, "Método não permitido."); return; }
         Integer userId = autenticar(ex);
@@ -729,7 +1088,7 @@ public class ApiServer {
                 // leitura de dado sensível como o prontuário e os exames, e
                 // por isso entra na trilha do paciente.
                 auditarLeitura(ex, userId, "consultou_consultas", "consultas",
-                        alvoDaLeitura(userId, dependenteId));
+                        alvoDaLeitura(userId, dependenteId), dependenteId);
                 enviarJson(ex, 200, resp);
                 return;
             }
@@ -753,8 +1112,9 @@ public class ApiServer {
                 // A mesma ação da lista, de propósito: quem lê a trilha quer
                 // saber que as consultas foram abertas, não quantas vezes o
                 // React montou a tela de detalhe.
+                Integer donoDaConsulta = c.getIdDependente() > 0 ? c.getIdDependente() : null;
                 auditarLeitura(ex, userId, "consultou_consultas", "consultas",
-                        alvoDaLeitura(userId, c.getIdDependente() > 0 ? c.getIdDependente() : null));
+                        alvoDaLeitura(userId, donoDaConsulta), donoDaConsulta);
                 enviarJson(ex, 200, resp);
                 return;
             }
@@ -806,7 +1166,7 @@ public class ApiServer {
             // Abrir resultado de exame é consulta a dado sensível: vai para a
             // trilha depois de dar certo, nunca antes.
             auditarLeitura(ex, userId, "consultou_exames", "exames",
-                    alvoDaLeitura(userId, dependenteId));
+                    alvoDaLeitura(userId, dependenteId), dependenteId);
             enviarJson(ex, 200, resp);
 
         } catch (SQLException e) {
@@ -898,6 +1258,8 @@ public class ApiServer {
                 m.put("titulo", a.getTitulo());
                 m.put("detalhe", a.getDetalhe());
                 m.put("severidade", a.getSeveridade());
+                // Primeiro nome de quem o aviso trata (null = titular).
+                m.put("pessoa", a.getPessoa());
                 lista.add(m);
             }
 
@@ -925,9 +1287,31 @@ public class ApiServer {
      * distâncias foram medidas e qual cidade está sendo mostrada.
      */
     private static void redeSaude(HttpExchange ex) throws IOException {
-        if (!"GET".equals(ex.getRequestMethod())) { enviarErro(ex, 405, "Método não permitido."); return; }
         Integer userId = autenticar(ex);
         if (userId == null) return;
+
+        String metodo = ex.getRequestMethod();
+        String path = ex.getRequestURI().getPath();
+
+        try {
+            if ("POST".equals(metodo) && "/api/rede-saude/referencia".equals(path)) {
+                definirUnidadeReferencia(ex, userId);
+                return;
+            }
+            if ("GET".equals(metodo) && path.startsWith("/api/rede-saude/unidades/")) {
+                detalharUnidade(ex, path.substring("/api/rede-saude/unidades/".length()));
+                return;
+            }
+        } catch (IllegalArgumentException e) {
+            enviarErro(ex, 400, "Corpo da requisição inválido (JSON).");
+            return;
+        } catch (SQLException e) {
+            System.out.println("[ERRO rede-saude] " + e.getMessage());
+            enviarErro(ex, 500, "Erro ao acessar a rede de saúde.");
+            return;
+        }
+
+        if (!"GET".equals(metodo)) { enviarErro(ex, 405, "Método não permitido."); return; }
 
         try {
             Paciente p = pacienteDAO.buscarPorId(userId);
@@ -975,6 +1359,7 @@ public class ApiServer {
             origem.put("tipo", porGps ? "gps" : (lat != null ? "cep" : "nenhuma"));
             origem.put("cidade", lugar.getCidade());
             origem.put("estado", lugar.getEstado());
+            origem.put("codigo_municipio", lugar.getCodigoMunicipio());
             // A tela precisa saber se está mostrando a cidade do cadastro ou
             // uma pesquisada, para dizer isso ao paciente e oferecer a volta.
             origem.put("escolhida", cidadeEscolhida);
@@ -982,12 +1367,78 @@ public class ApiServer {
             Map<String, Object> resp = new LinkedHashMap<>();
             resp.put("origem", origem);
             resp.put("unidades", lista);
+            // A UBS de referência vai junto para a tela poder marcá-la na lista
+            // sem uma segunda requisição.
+            resp.put("referencia", pacienteDAO.unidadeReferencia(userId));
             enviarJson(ex, 200, resp);
 
         } catch (SQLException e) {
             System.out.println("[ERRO rede-saude] " + e.getMessage());
             enviarErro(ex, 500, "Erro ao buscar a rede de saúde.");
         }
+    }
+
+    /**
+     * POST /api/rede-saude/referencia — o paciente escolhe (ou tira) a UBS que
+     * considera a dele.
+     *
+     * Serve para o Dashboard mostrar telefone e endereço do posto sem o
+     * paciente precisar procurar de novo na lista toda vez. Guardar só o
+     * código do CNES é de propósito: é dado público, e assim a escolha não
+     * envelhece junto com o espelho — se a unidade mudar de endereço, o
+     * endereço novo vem do CNES na próxima renovação.
+     */
+    private static void definirUnidadeReferencia(HttpExchange ex, int userId)
+            throws IOException, SQLException {
+        Map<String, Object> body = lerCorpo(ex);
+        Object codigo = body.get("codigoCnes");
+
+        Integer cnes = codigo instanceof Number ? ((Number) codigo).intValue() : null;
+        if (cnes != null && unidadeSaudeDAO.buscarPorCnes(cnes) == null) {
+            enviarErro(ex, 404, "Unidade não encontrada.");
+            return;
+        }
+
+        pacienteDAO.atualizarUnidadeReferencia(userId, cnes);
+        auditar(ex, userId, "definiu_referencia", "rede",
+                cnes == null ? "Removeu a unidade de referência." : "Unidade CNES " + cnes);
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("referencia", cnes);
+        enviarJson(ex, 200, resp);
+    }
+
+    /**
+     * GET /api/rede-saude/unidades/{cnes} — detalhes de uma unidade.
+     *
+     * A lista traz o essencial (nome, endereço, telefone, turno, distância);
+     * o que a unidade oferece é uma chamada extra ao CNES, uma por
+     * estabelecimento, então só acontece quando alguém abre aquela unidade.
+     *
+     * Exige login como o resto da rota, ainda que o dado seja público: sem
+     * isso a API viraria um proxy aberto para o CNES.
+     */
+    private static void detalharUnidade(HttpExchange ex, String codigoTexto)
+            throws IOException, SQLException {
+        int cnes;
+        try {
+            cnes = Integer.parseInt(codigoTexto.trim());
+        } catch (NumberFormatException e) {
+            enviarErro(ex, 400, "Código de unidade inválido.");
+            return;
+        }
+
+        UnidadeSaude u = unidadeSaudeDAO.buscarPorCnes(cnes);
+        if (u == null) {
+            enviarErro(ex, 404, "Unidade não encontrada.");
+            return;
+        }
+
+        u.setServicos(unidadeSaudeDAO.servicosDe(cnes));
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("unidade", unidadeJson(u));
+        enviarJson(ex, 200, resp);
     }
 
     /** GET /api/prontuario — alergias, condições e medicações do paciente logado. */
@@ -1033,7 +1484,7 @@ public class ApiServer {
             resp.put("medicacoes", medicacoes);
 
             auditarLeitura(ex, userId, "consultou_prontuario", "prontuario",
-                    alvoDaLeitura(userId, dependenteId));
+                    alvoDaLeitura(userId, dependenteId), dependenteId);
             enviarJson(ex, 200, resp);
 
         } catch (SQLException e) {
@@ -1087,8 +1538,28 @@ public class ApiServer {
             if (pedido >= 5 && pedido <= 60) minutos = pedido;
         }
 
+        // De quem é o prontuário que este código abre. O id vem do corpo, mas
+        // é conferido contra a conta do JWT: um código só pode ser gerado para
+        // um dependente do próprio titular.
+        Integer idDependente = null;
+        String nomeDependente = null;
+        Object dep = body.get("dependenteId");
+        if (dep instanceof Number) {
+            idDependente = ((Number) dep).intValue();
+            nomeDependente = dependenteDAO.nomeDoPaciente(idDependente, userId);
+            if (nomeDependente == null) {
+                enviarErro(ex, 404, "Dependente não encontrado.");
+                return;
+            }
+        }
+
+        // Contato de emergência é dado de outra pessoa: só vai junto se o
+        // paciente pedir, e a resposta devolve o que foi decidido para a tela
+        // poder mostrar sem adivinhar.
+        boolean contatos = Boolean.TRUE.equals(body.get("compartilhaContatos"));
+
         String codigo = CodigoAcesso.gerar();
-        int id = acessoDAO.criar(userId, CodigoAcesso.hash(codigo), escopo, minutos);
+        int id = acessoDAO.criar(userId, idDependente, CodigoAcesso.hash(codigo), escopo, contatos, minutos);
 
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("id", id);
@@ -1096,12 +1567,18 @@ public class ApiServer {
         resp.put("codigo", codigo);
         resp.put("escopo", escopo);
         resp.put("validade_minutos", minutos);
+        resp.put("dependente", nomeDependente == null ? null : primeiroNome(nomeDependente));
+        resp.put("compartilha_contatos", contatos);
 
         // Conceder acesso aos próprios dados é ação de governança: fica registrado
-        // quem abriu a porta, com qual permissão e por quanto tempo.
+        // quem abriu a porta, para os dados de quem, com qual permissão e por
+        // quanto tempo.
         auditar(ex, userId, "gerou_codigo", "acessos",
                 (AcessoTemporario.ESCOPO_ESCRITA.equals(escopo) ? "Leitura e registro" : "Somente leitura")
-                        + " · válido por " + minutos + " min.");
+                        + " · " + (nomeDependente == null ? "titular" : primeiroNome(nomeDependente))
+                        + (contatos ? " · com contatos de emergência" : "")
+                        + " · válido por " + minutos + " min.",
+                idDependente);
         enviarJson(ex, 201, resp);
     }
 
@@ -1255,7 +1732,7 @@ public class ApiServer {
                     + coletas + " coleta(s) e " + imagens + " exame(s) de imagem · "
                     + (protegido ? "protegido por senha" : "sem senha");
 
-            auditar(ex, userId, "exportou_exames", "exames", detalhe);
+            auditar(ex, userId, "exportou_exames", "exames", detalhe, dependenteId);
 
             Map<String, Object> resp = new LinkedHashMap<>();
             resp.put("sucesso", Boolean.TRUE);
@@ -1271,7 +1748,19 @@ public class ApiServer {
      * quem grava é a thread da fila do AuditoriaDAO.
      */
     private static void auditar(HttpExchange ex, int userId, String acao, String recurso, String detalhe) {
-        auditoriaDAO.registrar(userId, acao, recurso, detalhe, ipDe(ex), false);
+        auditar(ex, userId, acao, recurso, detalhe, null);
+    }
+
+    /**
+     * Mesma coisa, dizendo de quem era o dado.
+     *
+     * O dependente vai numa coluna própria, e não só no texto do detalhe,
+     * porque a tela filtra por pessoa: procurar pelo nome dentro de uma frase
+     * funcionaria hoje e quebraria no primeiro ajuste de redação.
+     */
+    private static void auditar(HttpExchange ex, int userId, String acao, String recurso,
+                                String detalhe, Integer idDependente) {
+        auditoriaDAO.registrar(userId, idDependente, acao, recurso, detalhe, ipDe(ex), false);
     }
 
     /**
@@ -1283,7 +1772,12 @@ public class ApiServer {
      */
     private static void auditarLeitura(HttpExchange ex, int userId, String acao,
                                        String recurso, String detalhe) {
-        auditoriaDAO.registrar(userId, acao, recurso, detalhe, ipDe(ex), true);
+        auditarLeitura(ex, userId, acao, recurso, detalhe, null);
+    }
+
+    private static void auditarLeitura(HttpExchange ex, int userId, String acao,
+                                       String recurso, String detalhe, Integer idDependente) {
+        auditoriaDAO.registrar(userId, idDependente, acao, recurso, detalhe, ipDe(ex), true);
     }
 
     /**
@@ -1349,6 +1843,10 @@ public class ApiServer {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", "pac-" + r.getIdRegistro());
         m.put("origem", "paciente");
+        // Só o primeiro nome, como no resto da trilha: a tela precisa saber de
+        // quem era o dado, não repetir o nome completo de um menor de idade.
+        m.put("dependente", r.getNomeDependente() == null ? null : primeiroNome(r.getNomeDependente()));
+        m.put("dependente_id", r.getIdDependente());
         m.put("acao", r.getAcao());
         m.put("recurso", r.getRecurso());
         m.put("detalhe", r.getDetalhe());
@@ -1439,11 +1937,18 @@ public class ApiServer {
         claims.put("medico", med.getNome());
         claims.put("crm", med.getCrm());
 
+        // Quando o código foi gerado para um dependente, quem o médico vai
+        // atender é ele — o titular aparece só como responsável.
+        Dependente dep = acesso.getIdDependente() == null
+                ? null
+                : dependenteDAO.buscarDoPaciente(acesso.getIdDependente(), acesso.getIdPaciente());
+
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("token", Jwt.gerar(claims, VALIDADE_ACESSO_MINUTOS * 60L));
         resp.put("escopo", acesso.getEscopo());
         resp.put("expira_em", acesso.getExpiraEm());
-        resp.put("paciente", resumoPacienteJson(p));
+        resp.put("paciente", dep == null ? resumoPacienteJson(p) : resumoDependenteJson(dep));
+        resp.put("titular", dep == null ? null : primeiroNome(p.getNome()));
         enviarJson(ex, 200, resp);
     }
 
@@ -1458,32 +1963,86 @@ public class ApiServer {
             return;
         }
 
+        // De quem é o prontuário: o titular ou o dependente que o código
+        // escolheu. Quem decide isso é a linha do acesso, gravada quando o
+        // paciente gerou o código — nada aqui vem da requisição do médico.
+        Integer idDependente = acesso.getIdDependente();
+        Dependente dep = null;
+        if (idDependente != null) {
+            dep = dependenteDAO.buscarDoPaciente(idDependente, acesso.getIdPaciente());
+            if (dep == null) {
+                // O dependente foi excluído depois que o código foi gerado.
+                enviarErro(ex, 404, "Dependente não encontrado.");
+                return;
+            }
+        }
+
         // Cada item vai com o seu id porque o médico com escopo de escrita pode
         // remover um registro errado, e para isso a tela dele precisa saber
         // qual linha remover.
         List<Object> alergias = new ArrayList<>();
-        for (Alergia a : prontuarioDAO.listarAlergias(acesso.getIdPaciente(), null)) {
+        for (Alergia a : prontuarioDAO.listarAlergias(acesso.getIdPaciente(), idDependente)) {
             alergias.add(itemProntuarioJson(a.getIdAlergia(), a.getDescricao()));
         }
         List<Object> condicoes = new ArrayList<>();
-        for (HistoricoMedico h : prontuarioDAO.listarCondicoes(acesso.getIdPaciente(), null)) {
+        for (HistoricoMedico h : prontuarioDAO.listarCondicoes(acesso.getIdPaciente(), idDependente)) {
             condicoes.add(itemProntuarioJson(h.getIdHistorico(), h.getDescricao()));
         }
         List<Object> medicacoes = new ArrayList<>();
-        for (Medicacao m : prontuarioDAO.listarMedicacoes(acesso.getIdPaciente(), null)) {
+        for (Medicacao m : prontuarioDAO.listarMedicacoes(acesso.getIdPaciente(), idDependente)) {
             medicacoes.add(itemProntuarioJson(m.getIdMedicacao(),
                     m.getNome() + " " + m.getDosagem() + " — " + m.getFrequencia()));
         }
 
-        acessoDAO.registrarLog(acesso.getIdAcesso(), "leu_prontuario", null);
+        // Contato de emergência é dado de um terceiro (o familiar), que nunca
+        // consentiu com nada aqui. Por isso só sai quando o paciente marcou a
+        // opção ao gerar o código — e a trilha registra que saiu.
+        List<Object> contatos = new ArrayList<>();
+        if (acesso.isCompartilhaContatos()) {
+            for (Familiar f : familiarDAO.listarPorPaciente(acesso.getIdPaciente())) {
+                Map<String, Object> c = new LinkedHashMap<>();
+                c.put("nome", f.getNome());
+                c.put("parentesco", f.getParentesco());
+                c.put("telefone", f.getTelefone());
+                contatos.add(c);
+            }
+        }
+
+        acessoDAO.registrarLog(acesso.getIdAcesso(), "leu_prontuario",
+                dep == null ? null : "Prontuário de " + primeiroNome(dep.getNome()));
+        if (!contatos.isEmpty()) {
+            acessoDAO.registrarLog(acesso.getIdAcesso(), "leu_contatos",
+                    contatos.size() + " contato(s) de emergência");
+        }
 
         Map<String, Object> resp = new LinkedHashMap<>();
-        resp.put("paciente", resumoPacienteJson(p));
+        resp.put("paciente", dep == null ? resumoPacienteJson(p) : resumoDependenteJson(dep));
+        // Quando o prontuário é de um dependente, o médico ainda precisa saber
+        // de quem é a conta — é o titular que responde por ele no atendimento.
+        resp.put("titular", dep == null ? null : primeiroNome(p.getNome()));
+        resp.put("dependente", dep == null ? null : dep.getNome());
         resp.put("alergias", alergias);
         resp.put("condicoes", condicoes);
         resp.put("medicacoes", medicacoes);
+        resp.put("contatos", contatos);
         resp.put("escopo", acesso.getEscopo());
         enviarJson(ex, 200, resp);
+    }
+
+    /**
+     * Resumo de um dependente para o médico.
+     *
+     * Mesmos campos do resumo do titular, e pelo mesmo motivo: o que o médico
+     * precisa para atender é nome, idade, gênero e tipo sanguíneo. CPF,
+     * telefone, e-mail e endereço nunca entram aqui.
+     */
+    private static Map<String, Object> resumoDependenteJson(Dependente d) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("nome", d.getNome());
+        m.put("data_nascimento", d.getDataNascimento());
+        m.put("genero", d.getGenero());
+        m.put("tipo_sanguineo", d.getTipoSanguineo());
+        return m;
     }
 
     /** POST /api/medico/consultas — registra o atendimento no prontuário. */
@@ -1511,6 +2070,9 @@ public class ApiServer {
 
         Consulta c = new Consulta();
         c.setIdPaciente(acesso.getIdPaciente());
+        if (acesso.getIdDependente() != null) {
+            c.setIdDependente(acesso.getIdDependente());
+        }
         c.setMedico(med);
         c.setData(data != null ? data : LocalDate.now().toString());
         c.setHora(hora != null ? hora : LocalTime.now().withSecond(0).withNano(0).toString());
@@ -1520,13 +2082,25 @@ public class ApiServer {
         c.setResumo(campo(body, "resumo"));
         c.setConduta(campo(body, "conduta"));
 
+        // Unidade da rede, quando o atendimento aconteceu em uma delas. O
+        // código é conferido contra o espelho do CNES: um número inventado no
+        // corpo da requisição não vira vínculo.
+        Object cnes = body.get("unidadeCnes");
+        if (cnes instanceof Number) {
+            int codigo = ((Number) cnes).intValue();
+            if (unidadeSaudeDAO.buscarPorCnes(codigo) != null) {
+                c.setUnidadeCnes(codigo);
+            }
+        }
+
         int id = consultaDAO.inserir(c, acesso.getIdAcesso());
         acessoDAO.registrarLog(acesso.getIdAcesso(), "registrou_consulta", motivo);
         // O paciente precisa ficar sabendo sem depender de abrir a tela certa
         // por acaso. A mensagem diz o que aconteceu e quem fez — motivo,
         // resumo e conduta ficam no prontuário, não na notificação.
         notificacaoDAO.inserirSemFalhar(acesso.getIdPaciente(), NotificacaoDAO.TIPO_CONSULTA,
-                med.getNome() + " registrou uma consulta no seu prontuário.");
+                med.getNome() + " registrou uma consulta no prontuário de "
+                        + deQuem(acesso) + ".");
 
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("id", id);
@@ -1556,6 +2130,9 @@ public class ApiServer {
 
         Exame e = new Exame();
         e.setIdPaciente(acesso.getIdPaciente());
+        if (acesso.getIdDependente() != null) {
+            e.setIdDependente(acesso.getIdDependente());
+        }
         e.setSolicitante(acesso.getMedico());
         e.setTipo(tipo);
         e.setData(data != null ? data : LocalDate.now().toString());
@@ -1602,7 +2179,8 @@ public class ApiServer {
         // Sem resultado nem laudo na mensagem: ela avisa que há novidade, e o
         // paciente abre a tela de exames para ver o conteúdo.
         notificacaoDAO.inserirSemFalhar(acesso.getIdPaciente(), NotificacaoDAO.TIPO_EXAME,
-                nomeDoMedico(acesso) + " registrou um novo exame no seu prontuário.");
+                nomeDoMedico(acesso) + " registrou um novo exame no prontuário de "
+                        + deQuem(acesso) + ".");
 
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("id", id);
@@ -1637,7 +2215,7 @@ public class ApiServer {
                 enviarErro(ex, 400, "Informe a descrição da alergia.");
                 return;
             }
-            id = prontuarioDAO.inserirAlergia(idPaciente, descricao);
+            id = prontuarioDAO.inserirAlergia(idPaciente, acesso.getIdDependente(), descricao);
             rotulo = "alergia";
 
         } else if ("condicao".equals(tipo)) {
@@ -1646,7 +2224,8 @@ public class ApiServer {
                 enviarErro(ex, 400, "Informe a descrição da condição.");
                 return;
             }
-            id = prontuarioDAO.inserirCondicao(idPaciente, descricao, campo(body, "desde"));
+            id = prontuarioDAO.inserirCondicao(idPaciente, acesso.getIdDependente(),
+                    descricao, campo(body, "desde"));
             rotulo = "condição";
 
         } else if ("medicacao".equals(tipo)) {
@@ -1657,7 +2236,8 @@ public class ApiServer {
                 enviarErro(ex, 400, "Informe o nome, a dosagem e a frequência da medicação.");
                 return;
             }
-            id = prontuarioDAO.inserirMedicacao(idPaciente, nome, dosagem, frequencia, campo(body, "desde"));
+            id = prontuarioDAO.inserirMedicacao(idPaciente, acesso.getIdDependente(),
+                    nome, dosagem, frequencia, campo(body, "desde"));
             rotulo = "medicação";
             descricao = nome;
 
@@ -1668,7 +2248,8 @@ public class ApiServer {
 
         acessoDAO.registrarLog(acesso.getIdAcesso(), "registrou_" + tipo, descricao);
         notificacaoDAO.inserirSemFalhar(idPaciente, NotificacaoDAO.TIPO_PRONTUARIO,
-                nomeDoMedico(acesso) + " adicionou uma " + rotulo + " ao seu prontuário.");
+                nomeDoMedico(acesso) + " adicionou uma " + rotulo + " ao prontuário de "
+                        + deQuem(acesso) + ".");
 
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("id", id);
@@ -1739,6 +2320,16 @@ public class ApiServer {
     }
 
     /** Nome do médico do acesso, com um rótulo genérico se ele não veio. */
+    /**
+     * De quem é o prontuário aberto por este acesso, do ponto de vista do
+     * paciente que vai ler a notificação: "você" ou o primeiro nome do
+     * dependente. Só o primeiro nome, como no resto do app.
+     */
+    private static String deQuem(AcessoTemporario acesso) {
+        String nome = acesso.getNomeDependente();
+        return nome == null ? "você" : primeiroNome(nome);
+    }
+
     private static String nomeDoMedico(AcessoTemporario acesso) {
         Medico med = acesso.getMedico();
         return (med == null || med.getNome() == null) ? "Um profissional" : med.getNome();
@@ -1867,6 +2458,9 @@ public class ApiServer {
     private static Map<String, Object> unidadeJson(UnidadeSaude u) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("codigo_cnes", u.getCodigoCnes());
+        // A lista pode misturar municípios quando o paciente mora perto da
+        // divisa; é com este código que a tela marca o que é de fora.
+        m.put("codigo_municipio", u.getCodigoMunicipio());
         m.put("nome", u.getNome());
         m.put("tipo", u.getTipo());
         m.put("endereco", enderecoEmLinha(u));
@@ -1878,6 +2472,10 @@ public class ApiServer {
         m.put("distancia_km", u.getDistanciaKm() < 0
                 ? null
                 : Math.round(u.getDistanciaKm() * 10) / 10.0);
+        // Lista, e não a string com ';', para a tela não ter que separar texto.
+        m.put("servicos", u.getServicos() == null
+                ? new ArrayList<>()
+                : new ArrayList<>(java.util.Arrays.asList(u.getServicos().split(";"))));
         return m;
     }
 
@@ -1900,6 +2498,10 @@ public class ApiServer {
         m.put("status", c.getStatus());
         m.put("resumo", c.getResumo());
         m.put("conduta", c.getConduta());
+        // Código da unidade da rede, quando a consulta foi marcada em uma. É
+        // com ele que a tela de detalhe oferece "Como chegar" apontando para o
+        // endereço oficial do CNES, em vez do texto livre do campo local.
+        m.put("unidade_cnes", c.getUnidadeCnes());
         m.put("medico", medicoJson(c.getMedico()));
         return m;
     }
@@ -1935,6 +2537,10 @@ public class ApiServer {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", a.getIdAcesso());
         m.put("escopo", a.getEscopo());
+        // Só o primeiro nome: a lista de acessos fica na tela do titular, que
+        // já sabe quem é, e nome completo de menor não precisa trafegar aqui.
+        m.put("dependente", a.getNomeDependente() == null ? null : primeiroNome(a.getNomeDependente()));
+        m.put("compartilha_contatos", a.isCompartilhaContatos());
         m.put("criado_em", a.getCriadoEm());
         m.put("expira_em", a.getExpiraEm());
         m.put("usado_em", a.getUsadoEm());
@@ -2006,6 +2612,20 @@ public class ApiServer {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", id);
         m.put("texto", texto);
+        return m;
+    }
+
+    private static Map<String, Object> doseJson(DoseVacina d) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", d.getIdDose());
+        m.put("vacina", d.getVacina());
+        m.put("dose", d.getDose());
+        m.put("periodo", d.getPeriodo());
+        m.put("protege", d.getProtege());
+        m.put("prevista", d.getPrevista());
+        m.put("aplicada_em", d.getAplicadaEm());
+        m.put("origem", d.getOrigem());
+        m.put("status", d.getStatus());
         return m;
     }
 

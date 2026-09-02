@@ -15,6 +15,12 @@ public class Consulta {
     private String status;
     private String resumo;
     private String conduta;
+    /**
+     * Unidade da Rede de Saúde onde a consulta acontece (codigo_cnes), quando
+     * ela foi escolhida da lista. Fica ao lado de {@code local}, que continua sendo
+     * o texto livre: consulta em consultório particular não tem CNES.
+     */
+    private Integer unidadeCnes;
     private Paciente paciente;
     private Medico medico;
     private Prontuario prontuario;
@@ -128,5 +134,12 @@ public class Consulta {
 
     public void cancelarConsulta() {
         status = "Cancelada";
+    }
+    public Integer getUnidadeCnes() {
+        return unidadeCnes;
+    }
+
+    public void setUnidadeCnes(Integer unidadeCnes) {
+        this.unidadeCnes = unidadeCnes;
     }
 }

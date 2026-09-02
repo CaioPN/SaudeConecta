@@ -12,8 +12,11 @@
 USE saudeconecta;
 
 -- Paciente de exemplo.
--- O hash é o SHA-256 de "Teste@123" gerado pelo SenhaUtil do backend Java
--- (o seed antigo trazia um hash bcrypt do backend Node, que o Java não valida).
+-- O hash é o SHA-256 de "Teste@123", o formato ANTIGO do SenhaUtil. Continua
+-- aqui de propósito: o seed é também o caso de teste da migração de hash — na
+-- primeira vez que este login entra, o backend regrava a senha em PBKDF2 com
+-- salt (ver SenhaUtil.precisaAtualizar). Um hash PBKDF2 fixo no seed não
+-- serviria, porque cada geração tem um salt diferente.
 INSERT INTO pacientes (nome, email, telefone, cpf, genero, tipo_sanguineo, senha_hash, data_nascimento,
                        cep, rua, numero, bairro, cidade, estado)
 SELECT 'Gabriel Ferreira', 'gabriel@gmail.com', '11999999999', '12345678900',
@@ -196,3 +199,97 @@ SELECT 'Campanha Nacional de Multivacinação', 'Multivacinação',
 WHERE NOT EXISTS (
   SELECT 1 FROM campanhas_vacinacao WHERE nome = 'Campanha Nacional de Multivacinação'
 );
+
+-- ============================================================
+--  Calendário Nacional de Vacinação (PNI — Ministério da Saúde)
+--  Fonte: https://www.gov.br/saude/pt-br/vacinacao/calendario
+--
+--  É tabela de referência, não dado de paciente. Está no seed, e não no
+--  schema, porque é conteúdo: se o PNI mudar uma idade recomendada, muda
+--  esta lista — a estrutura da tabela continua a mesma.
+--
+--  INSERT IGNORE + UNIQUE (publico, vacina, dose): rodar o seed de novo
+--  não duplica dose nenhuma.
+-- ============================================================
+INSERT IGNORE INTO calendario_vacinal (publico, vacina, dose, idade_meses, periodo, protege, ordem) VALUES
+  ('crianca', 'BCG', 'Dose única', 0, 'Ao nascer', 'Formas graves de tuberculose', 1),
+  ('crianca', 'Hepatite B', '1ª dose', 0, 'Ao nascer', 'Hepatite B', 2),
+  ('crianca', 'Pentavalente', '1ª dose', 2, '2 meses', 'Difteria, tétano, coqueluche, Hib e hepatite B', 3),
+  ('crianca', 'VIP (Poliomielite)', '1ª dose', 2, '2 meses', 'Poliomielite (paralisia infantil)', 4),
+  ('crianca', 'Pneumocócica 10', '1ª dose', 2, '2 meses', 'Pneumonia, meningite e otite', 5),
+  ('crianca', 'Rotavírus', '1ª dose', 2, '2 meses', 'Diarreia grave por rotavírus', 6),
+  ('crianca', 'Meningocócica C', '1ª dose', 3, '3 meses', 'Meningite meningocócica C', 7),
+  ('crianca', 'Pentavalente', '2ª dose', 4, '4 meses', NULL, 8),
+  ('crianca', 'VIP (Poliomielite)', '2ª dose', 4, '4 meses', NULL, 9),
+  ('crianca', 'Pneumocócica 10', '2ª dose', 4, '4 meses', NULL, 10),
+  ('crianca', 'Rotavírus', '2ª dose', 4, '4 meses', NULL, 11),
+  ('crianca', 'Meningocócica C', '2ª dose', 5, '5 meses', NULL, 12),
+  ('crianca', 'Pentavalente', '3ª dose', 6, '6 meses', NULL, 13),
+  ('crianca', 'VIP (Poliomielite)', '3ª dose', 6, '6 meses', NULL, 14),
+  ('crianca', 'Febre Amarela', '1ª dose', 9, '9 meses', 'Febre amarela', 15),
+  ('crianca', 'Tríplice Viral', '1ª dose', 12, '12 meses', 'Sarampo, caxumba e rubéola', 16),
+  ('crianca', 'Pneumocócica 10', 'Reforço', 12, '12 meses', NULL, 17),
+  ('crianca', 'Meningocócica C', 'Reforço', 12, '12 meses', NULL, 18),
+  ('crianca', 'DTP', '1º reforço', 15, '15 meses', 'Difteria, tétano e coqueluche', 19),
+  ('crianca', 'VOP (Poliomielite)', '1º reforço', 15, '15 meses', NULL, 20),
+  ('crianca', 'Hepatite A', 'Dose única', 15, '15 meses', 'Hepatite A', 21),
+  ('crianca', 'Tetra Viral', 'Dose única', 15, '15 meses', 'Sarampo, caxumba, rubéola e varicela', 22),
+  ('crianca', 'DTP', '2º reforço', 48, '4 anos', NULL, 23),
+  ('crianca', 'VOP (Poliomielite)', '2º reforço', 48, '4 anos', NULL, 24),
+  ('crianca', 'Varicela', '2ª dose', 48, '4 anos', 'Catapora (varicela)', 25),
+  ('crianca', 'Febre Amarela', 'Reforço', 48, '4 anos', NULL, 26),
+  ('adulto', 'Hepatite B', 'Esquema completo (3 doses)', NULL, 'Infância', 'Hepatite B', 1),
+  ('adulto', 'Tríplice Viral', '2 doses', NULL, 'Infância / Adolescência', 'Sarampo, caxumba e rubéola', 2),
+  ('adulto', 'Febre Amarela', 'Dose única', NULL, 'Infância', 'Febre amarela', 3),
+  ('adulto', 'HPV Quadrivalente', '2 doses', NULL, '9 a 14 anos', 'Cânceres associados ao HPV', 4),
+  ('adulto', 'Meningocócica ACWY', 'Dose de reforço', NULL, '11 a 14 anos', 'Meningite A, C, W e Y', 5),
+  ('adulto', 'dT (Dupla adulto)', 'Reforço', NULL, 'A cada 10 anos', 'Difteria e tétano', 6),
+  ('adulto', 'COVID-19', 'Esquema completo', NULL, 'Atualizado', NULL, 7),
+  ('adulto', 'Influenza', 'Dose anual', NULL, 'Campanha 2026', 'Gripe (influenza)', 8);
+
+-- ============================================================
+--  Calendário Nacional de Vacinação (PNI — Ministério da Saúde)
+--  Fonte: https://www.gov.br/saude/pt-br/vacinacao/calendario
+--
+--  É tabela de referência, não dado de paciente. Está no seed, e não no
+--  schema, porque é conteúdo: se o PNI mudar uma idade recomendada, muda
+--  esta lista — a estrutura da tabela continua a mesma.
+--
+--  INSERT IGNORE + UNIQUE (publico, vacina, dose): rodar o seed de novo
+--  não duplica dose nenhuma.
+-- ============================================================
+INSERT IGNORE INTO calendario_vacinal (publico, vacina, dose, idade_meses, periodo, protege, ordem) VALUES
+  ('crianca', 'BCG', 'Dose única', 0, 'Ao nascer', 'Formas graves de tuberculose', 1),
+  ('crianca', 'Hepatite B', '1ª dose', 0, 'Ao nascer', 'Hepatite B', 2),
+  ('crianca', 'Pentavalente', '1ª dose', 2, '2 meses', 'Difteria, tétano, coqueluche, Hib e hepatite B', 3),
+  ('crianca', 'VIP (Poliomielite)', '1ª dose', 2, '2 meses', 'Poliomielite (paralisia infantil)', 4),
+  ('crianca', 'Pneumocócica 10', '1ª dose', 2, '2 meses', 'Pneumonia, meningite e otite', 5),
+  ('crianca', 'Rotavírus', '1ª dose', 2, '2 meses', 'Diarreia grave por rotavírus', 6),
+  ('crianca', 'Meningocócica C', '1ª dose', 3, '3 meses', 'Meningite meningocócica C', 7),
+  ('crianca', 'Pentavalente', '2ª dose', 4, '4 meses', NULL, 8),
+  ('crianca', 'VIP (Poliomielite)', '2ª dose', 4, '4 meses', NULL, 9),
+  ('crianca', 'Pneumocócica 10', '2ª dose', 4, '4 meses', NULL, 10),
+  ('crianca', 'Rotavírus', '2ª dose', 4, '4 meses', NULL, 11),
+  ('crianca', 'Meningocócica C', '2ª dose', 5, '5 meses', NULL, 12),
+  ('crianca', 'Pentavalente', '3ª dose', 6, '6 meses', NULL, 13),
+  ('crianca', 'VIP (Poliomielite)', '3ª dose', 6, '6 meses', NULL, 14),
+  ('crianca', 'Febre Amarela', '1ª dose', 9, '9 meses', 'Febre amarela', 15),
+  ('crianca', 'Tríplice Viral', '1ª dose', 12, '12 meses', 'Sarampo, caxumba e rubéola', 16),
+  ('crianca', 'Pneumocócica 10', 'Reforço', 12, '12 meses', NULL, 17),
+  ('crianca', 'Meningocócica C', 'Reforço', 12, '12 meses', NULL, 18),
+  ('crianca', 'DTP', '1º reforço', 15, '15 meses', 'Difteria, tétano e coqueluche', 19),
+  ('crianca', 'VOP (Poliomielite)', '1º reforço', 15, '15 meses', NULL, 20),
+  ('crianca', 'Hepatite A', 'Dose única', 15, '15 meses', 'Hepatite A', 21),
+  ('crianca', 'Tetra Viral', 'Dose única', 15, '15 meses', 'Sarampo, caxumba, rubéola e varicela', 22),
+  ('crianca', 'DTP', '2º reforço', 48, '4 anos', NULL, 23),
+  ('crianca', 'VOP (Poliomielite)', '2º reforço', 48, '4 anos', NULL, 24),
+  ('crianca', 'Varicela', '2ª dose', 48, '4 anos', 'Catapora (varicela)', 25),
+  ('crianca', 'Febre Amarela', 'Reforço', 48, '4 anos', NULL, 26),
+  ('adulto', 'Hepatite B', 'Esquema completo (3 doses)', NULL, 'Infância', 'Hepatite B', 1),
+  ('adulto', 'Tríplice Viral', '2 doses', NULL, 'Infância / Adolescência', 'Sarampo, caxumba e rubéola', 2),
+  ('adulto', 'Febre Amarela', 'Dose única', NULL, 'Infância', 'Febre amarela', 3),
+  ('adulto', 'HPV Quadrivalente', '2 doses', NULL, '9 a 14 anos', 'Cânceres associados ao HPV', 4),
+  ('adulto', 'Meningocócica ACWY', 'Dose de reforço', NULL, '11 a 14 anos', 'Meningite A, C, W e Y', 5),
+  ('adulto', 'dT (Dupla adulto)', 'Reforço', NULL, 'A cada 10 anos', 'Difteria e tétano', 6),
+  ('adulto', 'COVID-19', 'Esquema completo', NULL, 'Atualizado', NULL, 7),
+  ('adulto', 'Influenza', 'Dose anual', NULL, 'Campanha 2026', 'Gripe (influenza)', 8);

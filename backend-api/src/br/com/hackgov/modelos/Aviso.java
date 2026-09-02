@@ -17,15 +17,35 @@ public class Aviso {
     private String titulo;
     private String detalhe;
     private String severidade;
+    /**
+     * Primeiro nome de quem o aviso trata, ou null quando é do próprio
+     * titular. Vai em campo separado, e não embutido no título, porque a tela
+     * o exibe como etiqueta — e porque um aviso sem dono ("campanha de
+     * vacinação") não deve ganhar nome nenhum.
+     */
+    private String pessoa;
 
     public Aviso() {
     }
 
     public Aviso(String tipo, String titulo, String detalhe, String severidade) {
+        this(tipo, titulo, detalhe, severidade, null);
+    }
+
+    public Aviso(String tipo, String titulo, String detalhe, String severidade, String pessoa) {
         this.tipo = tipo;
         this.titulo = titulo;
         this.detalhe = detalhe;
         this.severidade = severidade;
+        this.pessoa = pessoa;
+    }
+
+    public String getPessoa() {
+        return pessoa;
+    }
+
+    public void setPessoa(String pessoa) {
+        this.pessoa = pessoa;
     }
 
     /** Origem do aviso: "exame", "consulta", "resultado" ou "campanha". */

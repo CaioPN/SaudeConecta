@@ -45,6 +45,13 @@ const ACOES = {
   cadastrou_contato: { texto: 'Você cadastrou um contato de emergência', icone: HeartHandshake, cor: 'consulta' },
   excluiu_contato: { texto: 'Você excluiu um contato de emergência', icone: HeartHandshake, cor: 'revogado' },
   gerou_codigo: { texto: 'Você gerou um código de acesso', icone: ICONES.acessoMedico, cor: 'consulta' },
+  consultou_vacinas: { texto: 'Você abriu a carteira de vacinação', icone: ICONES.vacinas, cor: 'consulta' },
+  registrou_vacina: { texto: 'Você registrou uma dose de vacina', icone: ICONES.vacinas, cor: 'consulta' },
+  removeu_vacina: { texto: 'Você desfez o registro de uma dose', icone: ICONES.vacinas, cor: 'revogado' },
+  atualizou_perfil: { texto: 'Você alterou dados do cadastro', icone: User, cor: 'consulta' },
+  solicitou_senha: { texto: 'Você pediu a recuperação da senha', icone: ShieldCheck, cor: 'consulta' },
+  redefiniu_senha: { texto: 'Você trocou a senha', icone: ShieldCheck, cor: 'revogado' },
+  definiu_referencia: { texto: 'Você escolheu sua unidade de referência', icone: ShieldCheck, cor: 'consulta' },
 };
 
 const PADRAO = { texto: 'Ação registrada', icone: ShieldCheck, cor: 'consulta' };
@@ -71,6 +78,9 @@ export default function HistoricoAcessos() {
   const [registros, setRegistros] = useState(null);
   const [erro, setErro] = useState(null);
   const [filtro, setFiltro] = useState('todos');
+  // Segundo filtro, por pessoa: quem cuida de dois dependentes quer poder
+  // perguntar "o que andaram fazendo com os dados do meu filho".
+  const [pessoa, setPessoa] = useState('todas');
 
   useEffect(() => {
     let ativo = true;
@@ -86,11 +96,25 @@ export default function HistoricoAcessos() {
     };
   }, []);
 
+  // Pessoas que aparecem na trilha, para o segundo filtro. Sai dos próprios
+  // registros, e não da lista de dependentes: um dependente já excluído
+  // continua na trilha, e sumir com ele do filtro esconderia o que foi feito.
+  const pessoas = useMemo(() => {
+    if (!registros) return [];
+    const nomes = new Set();
+    registros.forEach((r) => { if (r.dependente) nomes.add(r.dependente); });
+    return [...nomes].sort();
+  }, [registros]);
+
   const visiveis = useMemo(() => {
     if (!registros) return [];
-    if (filtro === 'todos') return registros;
-    return registros.filter((r) => r.origem === filtro);
-  }, [registros, filtro]);
+    return registros.filter((r) => {
+      if (filtro !== 'todos' && r.origem !== filtro) return false;
+      if (pessoa === 'todas') return true;
+      if (pessoa === 'titular') return !r.dependente;
+      return r.dependente === pessoa;
+    });
+  }, [registros, filtro, pessoa]);
 
   return (
     <div className="screen-container">
@@ -129,6 +153,23 @@ export default function HistoricoAcessos() {
         })}
       </div>
 
+      {/* Filtro por pessoa. Só aparece quando há dependente na trilha: numa
+          conta sem dependentes ele seria uma linha inteira para dizer "você". */}
+      {pessoas.length > 0 && (
+        <div className="trilha-pessoas">
+          {['todas', 'titular', ...pessoas].map((id) => (
+            <button
+              key={id}
+              type="button"
+              className={`rede-filtro ${pessoa === id ? 'active' : ''}`}
+              onClick={() => setPessoa(id)}
+            >
+              {id === 'todas' ? 'Todas as pessoas' : id === 'titular' ? 'Você' : id}
+            </button>
+          ))}
+        </div>
+      )}
+
       {erro && <p className="empty-state">{erro}</p>}
       {!erro && registros === null && <p className="empty-state">Carregando histórico…</p>}
       {!erro && registros !== null && visiveis.length === 0 && (
@@ -153,6 +194,7 @@ export default function HistoricoAcessos() {
 
                 <div className="timeline-head">
                   <h4 className="font-bold">{info.texto}</h4>
+                  {r.dependente && <span className="trilha-pessoa">{r.dependente}</span>}
                 </div>
                 <p className="text-xs text-muted">{dataHora(r.criadoEm)}</p>
 

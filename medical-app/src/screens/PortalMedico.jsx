@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   Stethoscope, ShieldCheck, Clock, LogOut, AlertCircle, Heart, Pill,
-  Droplet, Plus, Trash2, Check, FileText,
+  Droplet, Plus, Trash2, Check, FileText, PhoneCall,
 } from 'lucide-react';
 import {
   entrarComCodigo, buscarPacienteDoAcesso, registrarConsulta, registrarExame,
@@ -443,7 +443,30 @@ export default function PortalMedico() {
               {calcularIdade(sessao.paciente.data_nascimento)} anos · {sessao.paciente.genero} ·
               {' '}Tipo sanguíneo <strong>{sessao.paciente.tipo_sanguineo}</strong>
             </p>
+            {/* Código gerado para um dependente: o médico precisa saber que
+                está diante do prontuário da criança, e quem responde por ela. */}
+            {sessao.titular && (
+              <p className="text-xs text-muted" style={{ marginTop: '6px' }}>
+                Dependente · responsável: <strong>{sessao.titular}</strong>
+              </p>
+            )}
           </div>
+
+          {/* Contatos de emergência: só chegam aqui quando o paciente marcou
+              essa opção ao gerar o código. Sem isso a lista vem vazia. */}
+          {dados?.contatos?.length > 0 && (
+            <div className="card">
+              <div className="flex items-center gap-4 mb-2">
+                <PhoneCall size={18} />
+                <span className="font-bold text-sm">Contatos de emergência</span>
+              </div>
+              {dados.contatos.map((c) => (
+                <p key={`${c.nome}-${c.telefone}`} className="text-sm">
+                  <strong>{c.nome}</strong> ({c.parentesco}) · {c.telefone}
+                </p>
+              ))}
+            </div>
+          )}
 
           {dados && (
             <>

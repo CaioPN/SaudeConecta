@@ -1428,13 +1428,21 @@ button.record-card:hover { border-color: var(--primary-blue); }
   border: 1px solid #e5e7eb;
   background-color: var(--white);
 }
-.vacina-item.tomada {
+/* A carteira tem três estados desde que as doses passaram a ser registradas:
+   aplicada (verde), prevista (âmbar, ainda vai chegar) e atrasada (vermelho,
+   venceu sem registro). Antes eram dois, porque a tela deduzia da idade que a
+   dose tinha sido tomada e o atraso não existia. */
+.vacina-item.aplicada {
   background-color: #f0fdf4;
   border-color: #bbf7d0;
 }
-.vacina-item.pendente {
+.vacina-item.prevista {
   background-color: #fffbeb;
   border-color: #fde68a;
+}
+.vacina-item.atrasada {
+  background-color: #fef2f2;
+  border-color: #fecaca;
 }
 .vacina-status-icon {
   width: 30px;
@@ -1446,8 +1454,9 @@ button.record-card:hover { border-color: var(--primary-blue); }
   flex-shrink: 0;
   color: var(--white);
 }
-.vacina-status-icon.tomada { background-color: #22c55e; }
-.vacina-status-icon.pendente { background-color: #f59e0b; }
+.vacina-status-icon.aplicada { background-color: #22c55e; }
+.vacina-status-icon.prevista { background-color: #f59e0b; }
+.vacina-status-icon.atrasada { background-color: #ef4444; }
 .vacina-info {
   display: flex;
   flex-direction: column;
@@ -1475,8 +1484,29 @@ button.record-card:hover { border-color: var(--primary-blue); }
 .vacina-dose { font-size: 13px; color: var(--text-gray); }
 .vacina-protege { font-size: 12px; color: var(--text-gray); font-style: italic; }
 .vacina-data { font-size: 12px; font-weight: 600; margin-top: 2px; }
-.vacina-item.tomada .vacina-data { color: #16a34a; }
-.vacina-item.pendente .vacina-data { color: #d97706; }
+.vacina-item.aplicada .vacina-data { color: #16a34a; }
+.vacina-item.prevista .vacina-data { color: #d97706; }
+.vacina-item.atrasada .vacina-data { color: #dc2626; }
+
+/* Botão de confirmar/desfazer a dose. Discreto no repouso: a lista é para
+   ler, e o registro é a exceção, não o que se faz o tempo todo. */
+.vacina-acao {
+  align-self: flex-start;
+  margin-top: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background-color: var(--white);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.vacina-acao.destaque {
+  border-color: var(--primary-blue);
+  color: var(--primary-blue);
+}
+.vacina-acao:disabled { opacity: 0.5; cursor: default; }
 
 /* Dúvidas Frequentes — cada pergunta é um botão que abre a resposta abaixo. */
 .faq-categoria {
@@ -1736,6 +1766,87 @@ button.record-card:hover { border-color: var(--primary-blue); }
   margin: -12px 0 20px;
 }
 
+/* Opção de enviar os contatos de emergência junto com o acesso do médico.
+   Fica visualmente mais leve que os cartões de escopo de propósito: é uma
+   exceção que o paciente marca de vez em quando, não a escolha principal. */
+.acesso-opcao-contatos {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--borda-azul, #e5e7eb);
+  background-color: var(--white);
+  font-size: 13px;
+  cursor: pointer;
+}
+.acesso-opcao-contatos input { margin-top: 2px; }
+
+/* Unidade marcada como "a minha" e a lista de serviços que o CNES informa.
+   O destaque é a borda, e não o fundo: a lista já usa fundo para separar um
+   cartão do outro, e dois fundos brigando deixariam a tela suja. */
+.unidade-item.referencia {
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 1px var(--primary-blue) inset;
+}
+.unidade-acao.ativa {
+  color: var(--primary-blue);
+  font-weight: 700;
+}
+.unidade-servicos {
+  margin: 6px 0 2px;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--text-gray);
+  line-height: 1.6;
+}
+.unidade-servicos li { list-style: disc; }
+
+/* Nome do dependente de quem o aviso fala. Etiqueta pequena acima do título,
+   porque o Dashboard é do titular: o normal é o aviso ser dele, e o nome só
+   aparece quando é exceção. */
+.aviso-pessoa {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--primary-blue);
+  margin-bottom: 2px;
+}
+
+/* Filtro por pessoa e etiqueta de dependente na trilha de auditoria.
+   Reaproveita o visual das pílulas da Rede de Saúde (.rede-filtro) — é o mesmo
+   gesto, escolher um recorte da lista. */
+.trilha-pessoas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.trilha-pessoa {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--primary-blue);
+  background-color: var(--azul-suave, #eff6ff);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+/* Link para a rota da unidade, dentro do campo Local da consulta. */
+.consulta-como-chegar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary-blue);
+}
+
 /* ============================================================
    Detalhes em azul
    Camada que acrescenta as bordas, os filetes e os fundos azuis
@@ -1781,8 +1892,9 @@ button.record-card:hover { border-color: var(--primary-blue); }
 
 /* Exceções: cartões que já usam a cor para dizer alguma coisa (situação da
    vacina, alergia em vermelho) mantêm a borda semântica. */
-:root .vacina-item.tomada { border-color: #bbf7d0; }
-:root .vacina-item.pendente { border-color: #fde68a; }
+:root .vacina-item.aplicada { border-color: #bbf7d0; }
+:root .vacina-item.prevista { border-color: #fde68a; }
+:root .vacina-item.atrasada { border-color: #fecaca; }
 :root .card.border-red { border-color: #fecaca; }
 :root .codigo-card { border: 2px solid var(--primary-blue); }
 
@@ -2083,7 +2195,7 @@ textarea:focus-visible {
 
 /* ---------- 1. Ícones ---------- */
 // GERADO por gerar-icones.mjs — não editar à mão.
-const LUCIDE = {"home":"<path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\"/><path d=\"M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/>","heartPulse":"<path d=\"M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5\"/><path d=\"M3.22 13H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27\"/>","mapPin":"<path d=\"M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0\"/><circle cx=\"12\" cy=\"10\" r=\"3\"/>","menu":"<path d=\"M4 5h16\"/><path d=\"M4 12h16\"/><path d=\"M4 19h16\"/>","fileText":"<path d=\"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z\"/><path d=\"M14 2v5a1 1 0 0 0 1 1h5\"/><path d=\"M10 9H8\"/><path d=\"M16 13H8\"/><path d=\"M16 17H8\"/>","activity":"<path d=\"M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2\"/>","calendar":"<path d=\"M8 2v4\"/><path d=\"M16 2v4\"/><rect width=\"18\" height=\"18\" x=\"3\" y=\"4\" rx=\"2\"/><path d=\"M3 10h18\"/>","syringe":"<path d=\"m18 2 4 4\"/><path d=\"m17 7 3-3\"/><path d=\"M19 9 8.7 19.3c-1 1-2.5 1-3.4 0l-.6-.6c-1-1-1-2.5 0-3.4L15 5\"/><path d=\"m9 11 4 4\"/><path d=\"m5 19-3 3\"/><path d=\"m14 4 6 6\"/>","users":"<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><path d=\"M16 3.128a4 4 0 0 1 0 7.744\"/><path d=\"M22 21v-2a4 4 0 0 0-3-3.87\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/>","keyRound":"<path d=\"M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z\"/><circle cx=\"16.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\"/>","history":"<path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\"/><path d=\"M3 3v5h5\"/><path d=\"M12 7v5l4 2\"/>","lock":"<rect width=\"18\" height=\"11\" x=\"3\" y=\"11\" rx=\"2\" ry=\"2\"/><path d=\"M7 11V7a5 5 0 0 1 10 0v4\"/>","shieldCheck":"<path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\"/><path d=\"m9 12 2 2 4-4\"/>","user":"<path d=\"M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2\"/><circle cx=\"12\" cy=\"7\" r=\"4\"/>","helpCircle":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3\"/><path d=\"M12 17h.01\"/>","scrollText":"<path d=\"M15 12h-5\"/><path d=\"M15 8h-5\"/><path d=\"M19 17V5a2 2 0 0 0-2-2H4\"/><path d=\"M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3\"/>","logOut":"<path d=\"m16 17 5-5-5-5\"/><path d=\"M21 12H9\"/><path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4\"/>","chevronLeft":"<path d=\"m15 18-6-6 6-6\"/>","chevronRight":"<path d=\"m9 18 6-6-6-6\"/>","chevronDown":"<path d=\"m6 9 6 6 6-6\"/>","eye":"<path d=\"M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>","eyeOff":"<path d=\"M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49\"/><path d=\"M14.084 14.158a3 3 0 0 1-4.242-4.242\"/><path d=\"M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143\"/><path d=\"m2 2 20 20\"/>","fingerprint":"<path d=\"M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4\"/><path d=\"M14 13.12c0 2.38 0 6.38-1 8.88\"/><path d=\"M17.29 21.02c.12-.6.43-2.3.5-3.02\"/><path d=\"M2 12a10 10 0 0 1 18-6\"/><path d=\"M2 16h.01\"/><path d=\"M21.8 16c.2-2 .131-5.354 0-6\"/><path d=\"M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2\"/><path d=\"M8.65 22c.21-.66.45-1.32.57-2\"/><path d=\"M9 6.8a6 6 0 0 1 9 5.2v2\"/>","droplet":"<path d=\"M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z\"/>","flask":"<path d=\"M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2\"/><path d=\"M6.453 15h11.094\"/><path d=\"M8.5 2h7\"/>","image":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" ry=\"2\"/><circle cx=\"9\" cy=\"9\" r=\"2\"/><path d=\"m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21\"/>","download":"<path d=\"M12 15V3\"/><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><path d=\"m7 10 5 5 5-5\"/>","building":"<path d=\"M10 12h4\"/><path d=\"M10 8h4\"/><path d=\"M14 21v-3a2 2 0 0 0-4 0v3\"/><path d=\"M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2\"/><path d=\"M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16\"/>","stethoscope":"<path d=\"M11 2v2\"/><path d=\"M5 2v2\"/><path d=\"M5 3H4a2 2 0 0 0-2 2v4a6 6 0 0 0 12 0V5a2 2 0 0 0-2-2h-1\"/><path d=\"M8 15a6 6 0 0 0 12 0v-3\"/><circle cx=\"20\" cy=\"10\" r=\"2\"/>","alertTriangle":"<path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\"/><path d=\"M12 9v4\"/><path d=\"M12 17h.01\"/>","alertCircle":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><line x1=\"12\" x2=\"12\" y1=\"8\" y2=\"12\"/><line x1=\"12\" x2=\"12.01\" y1=\"16\" y2=\"16\"/>","heart":"<path d=\"M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5\"/>","clock":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 6v6l4 2\"/>","pill":"<path d=\"m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z\"/><path d=\"m8.5 8.5 7 7\"/>","check":"<path d=\"M20 6 9 17l-5-5\"/>","baby":"<path d=\"M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5\"/><path d=\"M15 12h.01\"/><path d=\"M19.38 6.813A9 9 0 0 1 20.8 10.2a2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1\"/><path d=\"M9 12h.01\"/>","trash":"<path d=\"M10 11v6\"/><path d=\"M14 11v6\"/><path d=\"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6\"/><path d=\"M3 6h18\"/><path d=\"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\"/>","hospital":"<path d=\"M12 7v4\"/><path d=\"M14 21v-3a2 2 0 0 0-4 0v3\"/><path d=\"M14 9h-4\"/><path d=\"M18 11h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2\"/><path d=\"M18 21V5a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16\"/>","ambulance":"<path d=\"M10 10H6\"/><path d=\"M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2\"/><path d=\"M19 18h2a1 1 0 0 0 1-1v-3.28a1 1 0 0 0-.684-.948l-1.923-.641a1 1 0 0 1-.578-.502l-1.539-3.076A1 1 0 0 0 16.382 8H14\"/><path d=\"M8 8v4\"/><path d=\"M9 18h6\"/><circle cx=\"17\" cy=\"18\" r=\"2\"/><circle cx=\"7\" cy=\"18\" r=\"2\"/>","navigation":"<polygon points=\"3 11 22 2 13 21 11 13 3 11\"/>","phone":"<path d=\"M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384\"/>","bookOpen":"<path d=\"M12 7v14\"/><path d=\"M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z\"/>","penLine":"<path d=\"M13 21h8\"/><path d=\"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z\"/>","ban":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M4.929 4.929 19.07 19.071\"/>","copy":"<rect width=\"14\" height=\"14\" x=\"8\" y=\"8\" rx=\"2\" ry=\"2\"/><path d=\"M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2\"/>","messageCircle":"<path d=\"M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719\"/>","x":"<path d=\"M18 6 6 18\"/><path d=\"m6 6 12 12\"/>","send":"<path d=\"M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z\"/><path d=\"m21.854 2.147-10.94 10.939\"/>","bot":"<path d=\"M12 8V4H8\"/><rect width=\"16\" height=\"12\" x=\"4\" y=\"8\" rx=\"2\"/><path d=\"M2 14h2\"/><path d=\"M20 14h2\"/><path d=\"M15 13v2\"/><path d=\"M9 13v2\"/>","info":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 16v-4\"/><path d=\"M12 8h.01\"/>","mail":"<path d=\"m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7\"/><rect x=\"2\" y=\"4\" width=\"20\" height=\"16\" rx=\"2\"/>","idCard":"<path d=\"M16 10h2\"/><path d=\"M16 14h2\"/><path d=\"M6.17 15a3 3 0 0 1 5.66 0\"/><circle cx=\"9\" cy=\"11\" r=\"2\"/><rect x=\"2\" y=\"5\" width=\"20\" height=\"14\" rx=\"2\"/>","venus":"<path d=\"M12 15v7\"/><path d=\"M9 19h6\"/><circle cx=\"12\" cy=\"9\" r=\"6\"/>","userCheck":"<path d=\"m16 11 2 2 4-4\"/><path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/>","plus":"<path d=\"M5 12h14\"/><path d=\"M12 5v14\"/>","logIn":"<path d=\"m10 17 5-5-5-5\"/><path d=\"M15 12H3\"/><path d=\"M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4\"/>","search":"<path d=\"m21 21-4.34-4.34\"/><circle cx=\"11\" cy=\"11\" r=\"8\"/>","arrowRight":"<path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/>"};
+const LUCIDE = {"home":"<path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\"/><path d=\"M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/>","heartPulse":"<path d=\"M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5\"/><path d=\"M3.22 13H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27\"/>","mapPin":"<path d=\"M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0\"/><circle cx=\"12\" cy=\"10\" r=\"3\"/>","menu":"<path d=\"M4 5h16\"/><path d=\"M4 12h16\"/><path d=\"M4 19h16\"/>","fileText":"<path d=\"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z\"/><path d=\"M14 2v5a1 1 0 0 0 1 1h5\"/><path d=\"M10 9H8\"/><path d=\"M16 13H8\"/><path d=\"M16 17H8\"/>","activity":"<path d=\"M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2\"/>","calendar":"<path d=\"M8 2v4\"/><path d=\"M16 2v4\"/><rect width=\"18\" height=\"18\" x=\"3\" y=\"4\" rx=\"2\"/><path d=\"M3 10h18\"/>","syringe":"<path d=\"m18 2 4 4\"/><path d=\"m17 7 3-3\"/><path d=\"M19 9 8.7 19.3c-1 1-2.5 1-3.4 0l-.6-.6c-1-1-1-2.5 0-3.4L15 5\"/><path d=\"m9 11 4 4\"/><path d=\"m5 19-3 3\"/><path d=\"m14 4 6 6\"/>","users":"<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><path d=\"M16 3.128a4 4 0 0 1 0 7.744\"/><path d=\"M22 21v-2a4 4 0 0 0-3-3.87\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/>","keyRound":"<path d=\"M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z\"/><circle cx=\"16.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\"/>","history":"<path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\"/><path d=\"M3 3v5h5\"/><path d=\"M12 7v5l4 2\"/>","lock":"<rect width=\"18\" height=\"11\" x=\"3\" y=\"11\" rx=\"2\" ry=\"2\"/><path d=\"M7 11V7a5 5 0 0 1 10 0v4\"/>","shieldCheck":"<path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\"/><path d=\"m9 12 2 2 4-4\"/>","user":"<path d=\"M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2\"/><circle cx=\"12\" cy=\"7\" r=\"4\"/>","helpCircle":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3\"/><path d=\"M12 17h.01\"/>","scrollText":"<path d=\"M15 12h-5\"/><path d=\"M15 8h-5\"/><path d=\"M19 17V5a2 2 0 0 0-2-2H4\"/><path d=\"M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3\"/>","logOut":"<path d=\"m16 17 5-5-5-5\"/><path d=\"M21 12H9\"/><path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4\"/>","chevronLeft":"<path d=\"m15 18-6-6 6-6\"/>","chevronRight":"<path d=\"m9 18 6-6-6-6\"/>","chevronDown":"<path d=\"m6 9 6 6 6-6\"/>","eye":"<path d=\"M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>","eyeOff":"<path d=\"M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49\"/><path d=\"M14.084 14.158a3 3 0 0 1-4.242-4.242\"/><path d=\"M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143\"/><path d=\"m2 2 20 20\"/>","fingerprint":"<path d=\"M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4\"/><path d=\"M14 13.12c0 2.38 0 6.38-1 8.88\"/><path d=\"M17.29 21.02c.12-.6.43-2.3.5-3.02\"/><path d=\"M2 12a10 10 0 0 1 18-6\"/><path d=\"M2 16h.01\"/><path d=\"M21.8 16c.2-2 .131-5.354 0-6\"/><path d=\"M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2\"/><path d=\"M8.65 22c.21-.66.45-1.32.57-2\"/><path d=\"M9 6.8a6 6 0 0 1 9 5.2v2\"/>","droplet":"<path d=\"M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z\"/>","flask":"<path d=\"M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2\"/><path d=\"M6.453 15h11.094\"/><path d=\"M8.5 2h7\"/>","image":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" ry=\"2\"/><circle cx=\"9\" cy=\"9\" r=\"2\"/><path d=\"m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21\"/>","download":"<path d=\"M12 15V3\"/><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><path d=\"m7 10 5 5 5-5\"/>","building":"<path d=\"M10 12h4\"/><path d=\"M10 8h4\"/><path d=\"M14 21v-3a2 2 0 0 0-4 0v3\"/><path d=\"M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2\"/><path d=\"M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16\"/>","stethoscope":"<path d=\"M11 2v2\"/><path d=\"M5 2v2\"/><path d=\"M5 3H4a2 2 0 0 0-2 2v4a6 6 0 0 0 12 0V5a2 2 0 0 0-2-2h-1\"/><path d=\"M8 15a6 6 0 0 0 12 0v-3\"/><circle cx=\"20\" cy=\"10\" r=\"2\"/>","alertTriangle":"<path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\"/><path d=\"M12 9v4\"/><path d=\"M12 17h.01\"/>","alertCircle":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><line x1=\"12\" x2=\"12\" y1=\"8\" y2=\"12\"/><line x1=\"12\" x2=\"12.01\" y1=\"16\" y2=\"16\"/>","heart":"<path d=\"M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5\"/>","clock":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 6v6l4 2\"/>","pill":"<path d=\"m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z\"/><path d=\"m8.5 8.5 7 7\"/>","check":"<path d=\"M20 6 9 17l-5-5\"/>","baby":"<path d=\"M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5\"/><path d=\"M15 12h.01\"/><path d=\"M19.38 6.813A9 9 0 0 1 20.8 10.2a2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1\"/><path d=\"M9 12h.01\"/>","trash":"<path d=\"M10 11v6\"/><path d=\"M14 11v6\"/><path d=\"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6\"/><path d=\"M3 6h18\"/><path d=\"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\"/>","hospital":"<path d=\"M12 7v4\"/><path d=\"M14 21v-3a2 2 0 0 0-4 0v3\"/><path d=\"M14 9h-4\"/><path d=\"M18 11h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2\"/><path d=\"M18 21V5a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16\"/>","ambulance":"<path d=\"M10 10H6\"/><path d=\"M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2\"/><path d=\"M19 18h2a1 1 0 0 0 1-1v-3.28a1 1 0 0 0-.684-.948l-1.923-.641a1 1 0 0 1-.578-.502l-1.539-3.076A1 1 0 0 0 16.382 8H14\"/><path d=\"M8 8v4\"/><path d=\"M9 18h6\"/><circle cx=\"17\" cy=\"18\" r=\"2\"/><circle cx=\"7\" cy=\"18\" r=\"2\"/>","navigation":"<polygon points=\"3 11 22 2 13 21 11 13 3 11\"/>","phone":"<path d=\"M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384\"/>","bookOpen":"<path d=\"M12 7v14\"/><path d=\"M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z\"/>","penLine":"<path d=\"M13 21h8\"/><path d=\"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z\"/>","ban":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M4.929 4.929 19.07 19.071\"/>","copy":"<rect width=\"14\" height=\"14\" x=\"8\" y=\"8\" rx=\"2\" ry=\"2\"/><path d=\"M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2\"/>","messageCircle":"<path d=\"M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719\"/>","x":"<path d=\"M18 6 6 18\"/><path d=\"m6 6 12 12\"/>","send":"<path d=\"M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z\"/><path d=\"m21.854 2.147-10.94 10.939\"/>","bot":"<path d=\"M12 8V4H8\"/><rect width=\"16\" height=\"12\" x=\"4\" y=\"8\" rx=\"2\"/><path d=\"M2 14h2\"/><path d=\"M20 14h2\"/><path d=\"M15 13v2\"/><path d=\"M9 13v2\"/>","info":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 16v-4\"/><path d=\"M12 8h.01\"/>","mail":"<path d=\"m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7\"/><rect x=\"2\" y=\"4\" width=\"20\" height=\"16\" rx=\"2\"/>","idCard":"<path d=\"M16 10h2\"/><path d=\"M16 14h2\"/><path d=\"M6.17 15a3 3 0 0 1 5.66 0\"/><circle cx=\"9\" cy=\"11\" r=\"2\"/><rect x=\"2\" y=\"5\" width=\"20\" height=\"14\" rx=\"2\"/>","venus":"<path d=\"M12 15v7\"/><path d=\"M9 19h6\"/><circle cx=\"12\" cy=\"9\" r=\"6\"/>","userCheck":"<path d=\"m16 11 2 2 4-4\"/><path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/>","plus":"<path d=\"M5 12h14\"/><path d=\"M12 5v14\"/>","logIn":"<path d=\"m10 17 5-5-5-5\"/><path d=\"M15 12H3\"/><path d=\"M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4\"/>","search":"<path d=\"m21 21-4.34-4.34\"/><circle cx=\"11\" cy=\"11\" r=\"8\"/>","arrowRight":"<path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/>","star":"<path d=\"M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z\"/>","pencil":"<path d=\"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z\"/><path d=\"m15 5 4 4\"/>","phoneCall":"<path d=\"M13 2a9 9 0 0 1 9 9\"/><path d=\"M13 6a5 5 0 0 1 5 5\"/><path d=\"M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384\"/>"};
 
 
 // Devolve o SVG de um ícone do mapa acima, no mesmo traço do lucide-react.
@@ -2304,9 +2416,24 @@ const FAMILIARES_INICIAIS = [
 // Notificações — no app elas nascem quando um médico registra alguma coisa
 // com um código do paciente. Não confundir com os AVISOS abaixo: aviso é
 // calculado a partir dos dados e some sozinho, notificação é um fato gravado.
+// Doses já registradas quando a demonstração abre. O Lucas (id 2) tem quase
+// tudo em dia e duas doses vencidas sem registro — é o que faz aparecer o
+// aviso de atraso no Dashboard e o bloco "Em atraso" na carteira.
+const VACINAS_APLICADAS_INICIAIS = {
+  titular: {},
+  2: { c0: '2018-03-02', c1: '2018-03-02', c2: '2018-05-04', c3: '2018-05-04', c4: '2018-05-04',
+       c5: '2018-05-04', c6: '2018-06-05', c7: '2018-07-06', c8: '2018-07-06', c9: '2018-07-06',
+       c10: '2018-07-06', c11: '2018-08-07', c12: '2018-09-08', c13: '2018-09-08',
+       c14: '2018-12-10', c15: '2019-03-05', c16: '2019-03-05', c17: '2019-03-05' },
+};
+
 const NOTIFICACOES_INICIAIS = [
-  { id: 2, tipo: 'exame', mensagem: 'Dra. Ana Souza registrou um novo exame no seu prontuário.' },
-  { id: 1, tipo: 'consulta', mensagem: 'Dra. Ana Souza registrou uma consulta no seu prontuário.' },
+  // Lembrete gerado pelo próprio app a partir da data da consulta — no
+  // aplicativo isso nasce em ApiServer.gerarLembretes, com uma chave que
+  // impede a repetição a cada abertura do Dashboard.
+  { id: 3, tipo: 'lembrete', mensagem: 'Você tem consulta em 2 dias às 14:30 com Dr. Rafael Lima.' },
+  { id: 2, tipo: 'exame', mensagem: 'Dra. Ana Souza registrou um novo exame no prontuário de você.' },
+  { id: 1, tipo: 'consulta', mensagem: 'Dra. Ana Souza registrou uma consulta no prontuário de você.' },
 ];
 
 // Avisos do Dashboard. No app eles saem do AvisoDAO; aqui já vêm prontos,
@@ -2314,6 +2441,9 @@ const NOTIFICACOES_INICIAIS = [
 const AVISOS = [
   { tipo: 'resultado', severidade: 'alta', titulo: '1 resultado fora da faixa na última coleta', detalhe: 'Vitamina D (25-OH): 28 ng/mL — referência de 30 a 100 ng/mL. Leve o resultado à próxima consulta.' },
   { tipo: 'consulta', severidade: 'media', titulo: 'Consulta em 2 dias', detalhe: 'Retorno cardiológico com Dr. Rafael Lima em 20/08/2026, às 14:30, no Instituto do Coração.' },
+  // Aviso de um DEPENDENTE: o Dashboard passou a olhar a casa inteira, e o
+  // campo `pessoa` é o que diz de quem ele fala.
+  { tipo: 'vacina', severidade: 'media', pessoa: 'Lucas', titulo: '2 doses de vacina em atraso', detalhe: 'Confira a carteira de vacinação e leve o cartão ao posto.' },
   { tipo: 'campanha', severidade: 'baixa', titulo: 'Campanha Nacional de Multivacinação', detalhe: 'Crianças e adolescentes menores de 15 anos. A campanha vai até 01/09/2026.' },
   { tipo: 'exame', severidade: 'baixa', titulo: 'Seu último exame foi há 1 mês', detalhe: 'Coleta de sangue em 16/07/2026, no Laboratório Central — UBS Jardim América.' },
 ];
@@ -2344,9 +2474,27 @@ const UNIDADES_SAO_PAULO = [
   { id: 6, tipo: 'pronto_socorro', nome: 'Pronto-Socorro do Hospital das Clínicas', endereco: 'Avenida Dr. Enéas de Carvalho Aguiar, 255', bairro: 'Cerqueira César', turno: '24 horas', telefone: '1126610000', distancia: 3.2 },
   { id: 7, tipo: 'ubs', nome: 'UBS Vila Mariana', endereco: 'Rua Sena Madureira, 1108', bairro: 'Vila Mariana', turno: 'Manhã e tarde', telefone: '1150844567', distancia: 3.9 },
   { id: 8, tipo: 'upa', nome: 'UPA 24h Cidade Ademar', endereco: 'Avenida Cupecê, 4020', bairro: 'Cidade Ademar', turno: '24 horas', telefone: '1155628900', distancia: 9.6 },
+  // Unidade de outro município dentro do raio: quem mora perto da divisa vê a
+  // UBS do outro lado, marcada como tal. No app isso vem do espelho do CNES
+  // filtrado por distância, não por cidade.
+  { id: 9, tipo: 'ubs', nome: 'UBS Jardim Vila Galvão', endereco: 'Rua Ana Nery, 90', bairro: 'Jardim Vila Galvão', turno: 'Manhã e tarde', telefone: '1124085566', distancia: 11.4, vizinha: true },
 ];
 
 // A cidade do cadastro é a primeira; a outra só aparece se for pesquisada.
+// O que cada unidade oferece. No app isto é uma chamada ao CNES por
+// estabelecimento, feita quando o paciente toca em "O que tem lá"; aqui é uma
+// lista fixa, porque a demonstração não faz requisição nenhuma.
+const SERVICOS_DEMO = {
+  1: ['Atendimento ambulatorial pelo SUS', 'Serviço de apoio (exames e diagnóstico)'],
+  2: ['Aberto 24 horas', 'Atendimento ambulatorial pelo SUS', 'Serviço de apoio (exames e diagnóstico)'],
+  3: ['Atendimento ambulatorial pelo SUS', 'Serviço de apoio (exames e diagnóstico)'],
+  4: ['Aberto 24 horas', 'Internação hospitalar', 'Centro cirúrgico'],
+  5: ['Atendimento ambulatorial pelo SUS'],
+  6: ['Aberto 24 horas', 'Internação hospitalar', 'Centro cirúrgico', 'Centro obstétrico', 'Cuidado neonatal'],
+  7: ['Atendimento ambulatorial pelo SUS'],
+  8: ['Aberto 24 horas', 'Atendimento ambulatorial pelo SUS'],
+};
+
 const REDES = {
   sp: { cidade: 'São Paulo', estado: 'SP', unidades: UNIDADES_SAO_PAULO },
   guarulhos: { cidade: 'Guarulhos', estado: 'SP', unidades: UNIDADES_GUARULHOS },
@@ -2365,6 +2513,8 @@ const HISTORICO_ACESSOS = [
   { id: 'med-2', origem: 'medico', acao: 'leu_prontuario', criadoEm: '2026-07-14T11:05:00', medico: 'Dra. Ana Souza', crm: '123456-SP', especialidade: 'Clínico Geral', escopo: 'escrita' },
   { id: 'med-1', origem: 'medico', acao: 'entrou', criadoEm: '2026-07-14T11:04:00', medico: 'Dra. Ana Souza', crm: '123456-SP', especialidade: 'Clínico Geral', escopo: 'escrita' },
   { id: 'pac-4', origem: 'paciente', acao: 'gerou_codigo', criadoEm: '2026-07-14T11:00:00', ip: '187.45.9.120', detalhe: 'Leitura e registro · 30 min' },
+  { id: 'pac-7', origem: 'paciente', acao: 'registrou_vacina', criadoEm: '2026-07-20T10:05:00', ip: '187.45.9.120', dependente: 'Lucas', detalhe: 'Tríplice Viral · 1ª dose' },
+  { id: 'pac-6b', origem: 'paciente', acao: 'consultou_exames', criadoEm: '2026-07-19T21:15:00', ip: '187.45.9.120', dependente: 'Lucas' },
   { id: 'pac-3', origem: 'paciente', acao: 'cadastrou_dependente', criadoEm: '2026-06-02T19:40:00', ip: '187.45.9.120', detalhe: 'Lucas' },
   { id: 'pac-2', origem: 'paciente', acao: 'login', criadoEm: '2026-06-02T19:38:00', ip: '187.45.9.120' },
   { id: 'pac-1', origem: 'paciente', acao: 'login_falhou', criadoEm: '2026-06-01T23:12:00', ip: '201.17.88.4', detalhe: 'Senha incorreta.' },
@@ -2542,9 +2692,17 @@ function montarLinhaDoTempo(consultas, coletas, imagens) {
 }
 
 // Calendário Nacional de Vacinação (PNI — Ministério da Saúde / SUS).
-// Usado para montar a Carteira de Vacinação automaticamente a partir da
-// data de nascimento da pessoa: cada dose tem uma idade recomendada, então
-// conseguimos calcular a data prevista e se ela já deveria ter sido tomada.
+//
+// ATENÇÃO — quem usa este arquivo hoje é a versão de demonstração (demo/).
+// No aplicativo, o calendário mora no banco (tabela `calendario_vacinal`) e a
+// carteira é montada pela API, porque ela tem dois leitores: a tela e o
+// AvisoDAO, que conta as doses atrasadas para o Dashboard. A demo não tem
+// backend nenhum, então continua montando a carteira aqui, com as mesmas
+// regras — ao mexer no calendário, mexa nos dois (o seed.sql é gerado a
+// partir desta lista).
+//
+// Cada dose tem uma idade recomendada, então dá para calcular a data prevista
+// e comparar com o que foi registrado como aplicado.
 
 // --- Calendário da Criança (0 a 4 anos) ---
 // `idadeMeses` = idade recomendada para a dose (em meses).
@@ -2614,22 +2772,40 @@ function formatarDataDaDose(d) {
 /**
  * Monta a carteira de vacinação de uma pessoa.
  *
+ * São três estados, e não dois. A primeira versão dava a dose por tomada
+ * sempre que a data prevista já tinha passado, o que é o oposto de um alerta
+ * útil: a criança que não foi ao posto aparecia em dia. Agora "aplicada" é só
+ * o que alguém registrou, e o que venceu sem registro fica "atrasada".
+ *
  * @param {string} dataNascimento  Data de nascimento em ISO (YYYY-MM-DD).
  * @param {object} opts
- * @param {boolean} opts.adulto     Usa o calendário adulto (tudo em dia).
- * @returns {Array} lista de doses com `status` ('tomada' | 'pendente') e datas.
+ * @param {boolean} opts.adulto     Usa o calendário adulto (sem idade fixa).
+ * @param {object} opts.aplicadas   Mapa `{ [idDaDose]: dataISO }` do que já foi
+ *                                  registrado como aplicado.
+ * @returns {Array} doses com `id`, `status` ('aplicada' | 'atrasada' |
+ *                  'prevista'), `dataPrevista` e `aplicadaEm`.
  */
-function montarCarteira(dataNascimento, { adulto = false } = {}) {
-  if (adulto || !dataNascimento) {
-    // Titular / adulto: carteira considerada completa.
-    return CALENDARIO_ADULTO.map((v) => ({ ...v, status: 'tomada' }));
-  }
-
+function montarCarteira(dataNascimento, { adulto = false, aplicadas = {} } = {}) {
+  const usarAdulto = adulto || !dataNascimento;
+  const base = usarAdulto ? CALENDARIO_ADULTO : CALENDARIO_CRIANCA;
   const hoje = new Date();
-  return CALENDARIO_CRIANCA.map((v) => {
+
+  return base.map((v, i) => {
+    const id = (usarAdulto ? 'a' : 'c') + i;
+    const aplicadaEm = aplicadas[id] || null;
+
+    // Doses do calendário adulto não têm idade recomendada: dependem de
+    // campanha e de histórico que o app não guarda, então nunca "atrasam".
+    if (v.idadeMeses == null) {
+      return { ...v, id, aplicadaEm, status: aplicadaEm ? 'aplicada' : 'prevista' };
+    }
+
     const prevista = adicionarMeses(dataNascimento, v.idadeMeses);
-    const status = prevista <= hoje ? 'tomada' : 'pendente';
-    return { ...v, dataPrevista: formatarDataDaDose(prevista), status };
+    let status = 'prevista';
+    if (aplicadaEm) status = 'aplicada';
+    else if (prevista <= hoje) status = 'atrasada';
+
+    return { ...v, id, aplicadaEm, dataPrevista: formatarDataDaDose(prevista), status };
   });
 }
 
@@ -2685,6 +2861,10 @@ const FAQ = [
         r: 'Toque em "Esqueceu a senha?" na tela de login. Para provar que a conta é sua, o aplicativo pede três dados do seu cadastro — e-mail, CPF e data de nascimento —; conferindo os três, você escolhe a nova senha na hora. O pedido vale por 15 minutos e a troca fica registrada no seu histórico de acessos, para você perceber se alguém tentar fazer isso no seu lugar.',
       },
       {
+        p: 'Consigo corrigir os meus dados de cadastro?',
+        r: 'O telefone e o endereço, sim: abra "Perfil" e toque em "Editar". Nome, CPF, data de nascimento, gênero e tipo sanguíneo não são editáveis pela tela, porque identificam você no atendimento — para mudá-los, escreva para o suporte. Toda alteração fica registrada no seu histórico de acessos.',
+      },
+      {
         p: 'Como saio da minha conta?',
         r: 'Toque em "Mais" na barra inferior e escolha "Sair". Isso apaga a sessão guardada no aparelho.',
       },
@@ -2708,7 +2888,7 @@ const FAQ = [
       },
       {
         p: 'O médico com um código meu enxerga os meus dependentes?',
-        r: 'Não. O acesso temporário mostra apenas os seus dados — nada dos dependentes. Para que um profissional veja os dados de um dependente, isso ainda precisa ser feito por você, mostrando a tela.',
+        r: 'Só se você escolher. Ao gerar o código em "Acesso do médico", o seletor do topo define de quem é o prontuário que aquele código abre: você ou um dependente. Um código gerado para você não mostra nada dos dependentes, e vice-versa.',
       },
       {
         p: 'O dependente tem login próprio?',
@@ -2778,6 +2958,18 @@ const FAQ = [
         p: 'Consigo marcar atendimento por aqui?',
         r: 'Ainda não. A tela mostra a unidade, o endereço e o telefone: o agendamento é feito diretamente com a unidade. O botão "Como chegar" abre a rota no aplicativo de mapas do seu aparelho.',
       },
+      {
+        p: 'Dá para marcar qual é a minha UBS?',
+        r: 'Sim. Na lista, toque em "Definir como minha" na unidade que você usa. Ela passa a aparecer destacada, e você não precisa procurá-la de novo a cada visita.',
+      },
+      {
+        p: 'Como sei o que uma unidade oferece?',
+        r: 'Toque em "O que tem lá" no cartão da unidade. O app consulta o CNES na hora e mostra o que consta lá: atendimento 24 horas, internação, centro cirúrgico, serviço de apoio para exames. O CNES não publica a lista de especialidades por unidade, então essa informação não existe no app.',
+      },
+      {
+        p: 'A lista mostra unidades de outra cidade?',
+        r: 'Mostra as que estiverem a até 12 km de você, desde que aquela cidade já tenha sido consultada alguma vez no app — elas aparecem marcadas como "cidade vizinha". Para ver a rede completa de outro município, use "Ver outra cidade" e informe um CEP de lá.',
+      },
     ],
   },
   {
@@ -2786,11 +2978,19 @@ const FAQ = [
     perguntas: [
       {
         p: 'Como a minha carteira é montada?',
-        r: 'A partir da sua data de nascimento, seguindo o calendário oficial do Programa Nacional de Imunizações (PNI). O app mostra as doses previstas para a sua idade e as que ainda vão chegar.',
+        r: 'A partir da sua data de nascimento, seguindo o calendário oficial do Programa Nacional de Imunizações (PNI). Cada dose aparece em um de três estados: registrada, prevista (ainda vai chegar) ou em atraso (a data recomendada passou e ninguém confirmou a aplicação).',
       },
       {
         p: 'Posso ver a carteira de um dependente?',
         r: 'Sim. Em "Minha Saúde" → "Carteira de Vacinação", use o seletor no topo da tela para alternar entre você e cada dependente.',
+      },
+      {
+        p: 'Como marco uma dose que já foi tomada?',
+        r: 'Abra "Carteira de Vacinação", encontre a dose e toque em "Marcar como aplicada". O app registra a data de hoje. Se marcar por engano, o botão "Desfazer" apaga o registro. Enquanto uma dose vencida não é marcada, ela aparece em atraso e vira um aviso na tela inicial.',
+      },
+      {
+        p: 'O app sabe sozinho quais vacinas eu tomei?',
+        r: 'Não. O app não é ligado ao sistema do posto de saúde, então quem confirma cada dose é você (ou o profissional, quando ele registra pelo acesso temporário). Antes disso, a dose vencida aparece como em atraso.',
       },
       {
         p: 'Onde vejo as campanhas de vacinação abertas?',
@@ -2807,6 +3007,10 @@ const FAQ = [
         r: 'Na tela inicial, toque em "Acesso do médico" e gere um código. O profissional digita esse código no portal do médico e passa a ver o seu resumo clínico.',
       },
       {
+        p: 'O médico vê os meus contatos de emergência?',
+        r: 'Só se você marcar a opção "Enviar também meus contatos de emergência" na hora de gerar o código. Ela vem desmarcada de propósito: o nome e o telefone de um familiar são dados de outra pessoa, que não foi quem cadastrou a conta.',
+      },
+      {
         p: 'Por quanto tempo o código vale?',
         r: 'O código expira em 30 minutos e serve para um único profissional. Depois de usado, a sessão do médico também dura 30 minutos.',
       },
@@ -2821,6 +3025,10 @@ const FAQ = [
       {
         p: 'O que exatamente o médico consegue escrever no meu prontuário?',
         r: 'Com o acesso de "Leitura e registro", ele pode lançar a consulta do dia, um exame com os resultados e itens do prontuário: alergias, condições acompanhadas e medicações em uso. Não existe "editar": para corrigir algo lançado errado, o profissional remove o item e lança o certo — e as duas ações aparecem separadas no seu histórico de acessos.',
+      },
+      {
+        p: 'O app me lembra das consultas?',
+        r: 'Sim. Quando falta um ou dois dias para uma consulta agendada — sua ou de um dependente —, aparece um lembrete no card "Novidades" da tela inicial. Ele continua lá depois da data, para você ver que foi avisado.',
       },
       {
         p: 'Fico sabendo quando um médico registra alguma coisa?',
@@ -2842,7 +3050,7 @@ const FAQ = [
       },
       {
         p: 'A minha senha fica guardada em texto no sistema?',
-        r: 'Não. O sistema guarda apenas uma versão criptografada (hash) da senha — nem a equipe do aplicativo consegue lê-la.',
+        r: 'Não. O sistema guarda apenas uma versão embaralhada da senha (hash PBKDF2, com um valor aleatório próprio para cada conta) — nem a equipe do aplicativo consegue lê-la, e duas pessoas com a mesma senha ficam com registros diferentes.',
       },
       {
         p: 'O assistente virtual tem acesso ao meu prontuário?',
@@ -2982,12 +3190,21 @@ const estado = {
   faqAberta: null,
   filtroRede: 'todas',
   filtroHistorico: 'todos',    // Tudo / Profissionais / Você, no histórico de acessos
+  pessoaHistorico: 'todas',    // segundo filtro do histórico: por pessoa da casa
   redeCidade: 'sp',        // cidade mostrada na Rede de Saúde
   redeEscolhida: false,    // true quando veio de uma pesquisa, não do cadastro
   redeBuscaAberta: false,
   redeErroBusca: null,
   pessoa: 'titular',            // titular ou dependente: vale para Exames, Consultas, Prontuário e Vacinas
   escopoAcesso: 'escrita',
+  compartilhaContatos: false,   // enviar os contatos de emergência junto com o código
+  // Doses registradas, por pessoa: { titular: { c3: '2026-01-10' }, 1: {...} }.
+  // No app isso é a tabela vacinas_aplicadas; aqui mora na memória da página e
+  // some ao recarregar, como todo o resto da demonstração.
+  vacinasAplicadas: VACINAS_APLICADAS_INICIAIS,
+  editandoPerfil: false,        // formulário de contato e endereço no Perfil
+  unidadeReferencia: null,      // codigo_cnes da UBS marcada como "a minha"
+  servicosUnidade: {},          // { [codigo_cnes]: [serviços] } já consultados
   dependentes: DEPENDENTES_INICIAIS.slice(),
   acessos: ACESSOS_INICIAIS.slice(),
   familiares: FAMILIARES_INICIAIS.slice(),
@@ -3230,6 +3447,7 @@ function telaDashboard() {
     return '<div class="aviso-item ' + a.severidade + '">' +
       '<div class="aviso-icone">' + ic(ICONES_AVISO[a.tipo] || 'flask', 18) + '</div>' +
       '<div class="aviso-texto">' +
+        (a.pessoa ? '<span class="aviso-pessoa">' + esc(a.pessoa) + '</span>' : '') +
         '<p class="aviso-titulo' + (escondido ? ' valor-oculto' : '') + '">' +
         esc(escondido ? mascararTexto(a.titulo) : a.titulo) + '</p>' +
         '<p class="aviso-detalhe' + (escondido ? ' valor-oculto' : '') + '">' +
@@ -3312,8 +3530,25 @@ function telaPerfil() {
       '<p class="text-sm text-muted">' + esc(detalhes) + '</p>' +
     '</div>' +
 
+    (estado.editandoPerfil
+      ? '<form class="card" data-form="perfil">' +
+          '<h3 class="section-title">Editar contato e endereço</h3>' +
+          campoTexto('telefone', 'Telefone', PACIENTE.telefone) +
+          campoTexto('cep', 'CEP', PACIENTE.cep) +
+          campoTexto('rua', 'Rua', PACIENTE.rua) +
+          campoTexto('numero', 'Número', PACIENTE.numero) +
+          campoTexto('bairro', 'Bairro', PACIENTE.bairro) +
+          campoTexto('cidade', 'Cidade', PACIENTE.cidade) +
+          '<button class="btn-primary" type="submit">Salvar alterações</button>' +
+          '<button type="button" class="btn-secondary" data-acao="cancelarPerfil">Cancelar</button>' +
+        '</form>'
+      : '') +
+
     '<div class="section-header"><h3 class="section-title">Dados Cadastrais</h3>' +
-    botaoPrivacidade('meus dados') + '</div>' +
+    '<div class="flex items-center" style="gap:8px">' +
+    (estado.editandoPerfil ? '' :
+      '<button class="privacidade-btn" data-acao="editarPerfil">' + ic('pencil', 14) + ' Editar</button>') +
+    botaoPrivacidade('meus dados') + '</div></div>' +
     '<div class="card">' +
       linhaInfo('mail', 'E-mail', PACIENTE.email, true) +
       linhaInfo('phone', 'Telefone', formatarTelefone(PACIENTE.telefone), true) +
@@ -3331,6 +3566,12 @@ function telaPerfil() {
 
     blocoContatos() +
   '</div>';
+}
+
+// Um campo de texto do formulário de perfil, já preenchido com o valor atual.
+function campoTexto(nome, rotulo, valor) {
+  return '<div class="input-group"><label class="input-label">' + esc(rotulo) + '</label>' +
+    '<input class="input-field" name="' + nome + '" value="' + esc(valor || '') + '"></div>';
 }
 
 /**
@@ -3680,21 +3921,46 @@ function classePorGenero(pessoa) {
   return '';
 }
 
+// "2026-04-12" -> "12/04/2026", sem passar por new Date() (que mudaria o dia
+// por causa do fuso).
+function dataIsoBr(iso) {
+  if (!iso || iso.length < 10) return iso || '';
+  return iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4);
+}
+
 function itemVacina(v) {
-  const tomada = v.status === 'tomada';
+  const icone = v.status === 'aplicada' ? 'check' : (v.status === 'atrasada' ? 'alertCircle' : 'clock');
+
+  let quando;
+  if (v.status === 'aplicada') {
+    quando = v.aplicadaEm ? 'Aplicada em ' + dataIsoBr(v.aplicadaEm) : 'Aplicada';
+  } else if (v.status === 'atrasada') {
+    quando = v.dataPrevista ? 'Era para ter sido tomada em ' + v.dataPrevista : 'Em atraso';
+  } else {
+    quando = v.dataPrevista ? 'Prevista para ' + v.dataPrevista : v.periodo;
+  }
+
+  const acao = v.status === 'aplicada'
+    ? '<button class="vacina-acao" data-acao="desmarcarVacina" data-dose="' + v.id + '">Desfazer</button>'
+    : '<button class="vacina-acao destaque" data-acao="marcarVacina" data-dose="' + v.id + '">Marcar como aplicada</button>';
+
   return '<div class="vacina-item ' + v.status + '">' +
-    '<div class="vacina-status-icon ' + v.status + '">' + ic(tomada ? 'check' : 'clock', 16) + '</div>' +
+    '<div class="vacina-status-icon ' + v.status + '">' + ic(icone, 16) + '</div>' +
     '<div class="vacina-info">' +
       '<div class="vacina-top"><span class="vacina-nome">' + esc(v.vacina) + '</span>' +
       '<span class="vacina-periodo">' + esc(v.periodo) + '</span></div>' +
       '<span class="vacina-dose">' + esc(v.dose) + '</span>' +
       (v.protege ? '<span class="vacina-protege">Protege contra: ' + esc(v.protege) + '</span>' : '') +
-      '<span class="vacina-data">' +
-      (tomada
-        ? (v.dataPrevista ? 'Aplicada em ' + esc(v.dataPrevista) : 'Aplicada — em dia')
-        : 'Prevista para ' + esc(v.dataPrevista)) +
-      '</span>' +
+      '<span class="vacina-data">' + esc(quando) + '</span>' +
+      acao +
     '</div></div>';
+}
+
+// Doses registradas da pessoa que está selecionada no seletor do topo.
+function vacinasDaPessoa() {
+  const chave = String(pessoaAtual().id);
+  if (!estado.vacinasAplicadas[chave]) estado.vacinasAplicadas[chave] = {};
+  return estado.vacinasAplicadas[chave];
 }
 
 // Titular + dependentes, na mesma ordem que o app monta no PessoasContext.
@@ -3733,11 +3999,15 @@ function telaVacinas() {
   const idade = calcularIdade(pessoa.data_nascimento);
   // O titular usa o calendário adulto; dependentes de até 12 anos, o infantil.
   const adulto = pessoa.titular || (idade != null && idade >= 13);
-  const carteira = montarCarteira(pessoa.data_nascimento, { adulto: adulto });
+  const carteira = montarCarteira(pessoa.data_nascimento, {
+    adulto: adulto,
+    aplicadas: vacinasDaPessoa(),
+  });
 
-  const tomadas = carteira.filter(function (v) { return v.status === 'tomada'; });
-  const pendentes = carteira.filter(function (v) { return v.status === 'pendente'; });
-  const percentual = carteira.length ? Math.round((tomadas.length / carteira.length) * 100) : 0;
+  const aplicadas = carteira.filter(function (v) { return v.status === 'aplicada'; });
+  const atrasadas = carteira.filter(function (v) { return v.status === 'atrasada'; });
+  const previstas = carteira.filter(function (v) { return v.status === 'prevista'; });
+  const percentual = carteira.length ? Math.round((aplicadas.length / carteira.length) * 100) : 0;
 
   return '<div class="screen-container vacinas-screen">' +
     '<div class="vacinas-topo">' +
@@ -3749,18 +4019,23 @@ function telaVacinas() {
         '<div class="icon-box">' + ic('shieldCheck', 26) + '</div>' +
         '<div style="flex:1"><div class="flex justify-between items-center mb-2">' +
         '<span class="font-bold">' + (idade != null ? idade + (idade === 1 ? ' ano' : ' anos') : 'Titular da conta') + '</span>' +
-        '<span class="text-sm text-muted">' + tomadas.length + ' de ' + carteira.length + ' em dia</span></div>' +
+        '<span class="text-sm text-muted">' + aplicadas.length + ' de ' + carteira.length + ' registradas</span></div>' +
         '<div class="vacina-progress-bg"><div class="vacina-progress-fill" style="width:' + percentual + '%"></div></div>' +
         '</div></div></div>' +
     '</div>' +
 
     '<div class="vacinas-lista">' +
-      (pendentes.length
-        ? '<h3 class="section-title">Próximas doses</h3>' + pendentes.map(itemVacina).join('')
+      (atrasadas.length
+        ? '<h3 class="section-title">Em atraso</h3>' + atrasadas.map(itemVacina).join('')
         : '') +
-      '<h3 class="section-title" style="margin-top:' + (pendentes.length ? '24px' : '0') + '">' +
-      (adulto ? 'Vacinas em dia' : 'Doses já aplicadas') + '</h3>' +
-      tomadas.map(itemVacina).join('') +
+      (previstas.length
+        ? '<h3 class="section-title" style="margin-top:' + (atrasadas.length ? '24px' : '0') + '">Próximas doses</h3>' +
+          previstas.map(itemVacina).join('')
+        : '') +
+      (aplicadas.length
+        ? '<h3 class="section-title" style="margin-top:' + (carteira.length > aplicadas.length ? '24px' : '0') + '">Doses registradas</h3>' +
+          aplicadas.map(itemVacina).join('')
+        : '') +
     '</div></div>';
 }
 
@@ -3786,17 +4061,35 @@ function formatarDistancia(km) {
 
 function itemUnidade(u) {
   const tipo = TIPOS_UNIDADE[u.tipo] || TIPOS_UNIDADE.ubs;
-  return '<div class="unidade-item">' +
+  const ehReferencia = estado.unidadeReferencia === u.id;
+  const servicos = estado.servicosUnidade[u.id];
+
+  const listaServicos = servicos
+    ? (servicos.length
+        ? '<ul class="unidade-servicos">' +
+          servicos.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul>'
+        : '<span class="unidade-meta">O CNES não informa os serviços desta unidade.</span>')
+    : '';
+
+  return '<div class="unidade-item' + (ehReferencia ? ' referencia' : '') + '">' +
     '<div class="unidade-icone ' + u.tipo + '">' + ic(tipo.icone, 20) + '</div>' +
     '<div class="unidade-body">' +
       '<div class="unidade-top"><span class="font-bold">' + esc(u.nome) + '</span>' +
       '<span class="unidade-distancia">' + esc(formatarDistancia(u.distancia)) + '</span></div>' +
-      '<span class="unidade-tipo">' + tipo.rotulo + '</span>' +
+      '<span class="unidade-tipo">' + tipo.rotulo +
+      (u.vizinha ? ' · cidade vizinha' : '') + '</span>' +
       '<span class="unidade-meta">' + ic('mapPin', 12) + esc(u.endereco + ' - ' + u.bairro) + '</span>' +
       '<span class="unidade-meta">' + ic('clock', 12) + ' ' + esc(u.turno) + '</span>' +
+      listaServicos +
       '<div class="unidade-acoes">' +
         '<button class="unidade-acao" data-acao="mapa">' + ic('navigation', 14) + ' Como chegar</button>' +
         '<button class="unidade-acao" data-acao="ligar">' + ic('phone', 14) + ' Ligar</button>' +
+        (servicos ? '' :
+          '<button class="unidade-acao" data-acao="servicosUnidade" data-cnes="' + u.id + '">' +
+          ic('info', 14) + ' O que tem lá</button>') +
+        '<button class="unidade-acao' + (ehReferencia ? ' ativa' : '') +
+        '" data-acao="unidadeReferencia" data-cnes="' + u.id + '">' + ic('star', 14) + ' ' +
+        (ehReferencia ? 'Minha UBS' : 'Definir como minha') + '</button>' +
       '</div>' +
     '</div></div>';
 }
@@ -3884,7 +4177,9 @@ function telaAcessoMedico() {
           '<span class="codigo-timer">' + ic('clock', 14) + ' expira em <span id="timer-codigo">' + restante + '</span></span>' +
           '<button class="codigo-copiar" data-acao="copiar-codigo">' + ic('copy', 14) + ' Copiar</button>' +
         '</div>' +
-        '<p class="codigo-aviso">Anote agora: por segurança o código não fica guardado e não pode ser consultado depois.</p>' +
+        '<p class="codigo-aviso">Abre o prontuário de <strong>' +
+        esc(estado.codigoNovo.dependente || 'você') + '</strong>. Anote agora: por segurança o ' +
+        'código não fica guardado e não pode ser consultado depois.</p>' +
       '</div>'
     : '';
 
@@ -3897,7 +4192,9 @@ function telaAcessoMedico() {
           '<div class="acesso-item-topo"><div>' +
             '<p class="font-bold">' + esc(a.medico || 'Ainda não utilizado') + '</p>' +
             '<p class="text-xs text-muted">' + (a.crm ? 'CRM ' + esc(a.crm) + ' · ' : '') +
-            (a.escopo === 'escrita' ? 'Leitura e registro' : 'Somente leitura') + '</p>' +
+            (a.escopo === 'escrita' ? 'Leitura e registro' : 'Somente leitura') +
+            ' · ' + esc(a.dependente || 'você') +
+            (a.compartilhaContatos ? ' · com contatos' : '') + '</p>' +
           '</div>' + selo(STATUS_BADGE_ACESSO[situacao], ROTULO_SITUACAO[situacao]) + '</div>' +
           '<p class="text-xs text-muted">Gerado em ' + dataHoraCurta(a.criadoEm) +
           (a.usadoEm ? ' · usado em ' + dataHoraCurta(a.usadoEm) : '') +
@@ -3916,6 +4213,13 @@ function telaAcessoMedico() {
     cartaoCodigo +
 
     '<h3 class="section-title">Novo acesso</h3>' +
+
+    // De quem é o prontuário que o código abre — mesmo seletor das telas
+    // clínicas, para quem já estava vendo o filho não ter que reescolher.
+    seletorPessoa() +
+    '<p class="text-sm text-muted mb-2">O código vai abrir o prontuário de <strong>' +
+    esc(pessoaAtual().titular ? 'você' : pessoaAtual().nome) + '</strong>.</p>' +
+
     '<div class="escopo-opcoes">' +
       '<button class="escopo-opcao' + (estado.escopoAcesso === 'leitura' ? ' active' : '') + '" data-escopo="leitura">' +
       ic('bookOpen', 18) + '<span class="escopo-titulo">Somente leitura</span>' +
@@ -3924,6 +4228,13 @@ function telaAcessoMedico() {
       ic('penLine', 18) + '<span class="escopo-titulo">Leitura e registro</span>' +
       '<span class="escopo-desc">O médico também registra a consulta e os exames.</span></button>' +
     '</div>' +
+
+    // Contato de emergência é dado de OUTRA pessoa: nunca vai por padrão.
+    '<label class="acesso-opcao-contatos" data-acao="alternarContatosAcesso">' +
+      '<input type="checkbox"' + (estado.compartilhaContatos ? ' checked' : '') + ' />' +
+      '<span>Enviar também meus contatos de emergência' +
+      '<small class="text-xs text-muted"> — nome e telefone de quem avisar</small></span>' +
+    '</label>' +
 
     '<button class="btn-primary" data-acao="gerar-codigo">' + ic('keyRound', 18) + ' Gerar código</button>' +
 
@@ -3966,12 +4277,37 @@ const ACOES_LOG = {
   cadastrou_contato: { texto: 'Você cadastrou um contato de emergência', icone: 'heart', cor: 'consulta' },
   excluiu_contato: { texto: 'Você excluiu um contato de emergência', icone: 'heart', cor: 'revogado' },
   gerou_codigo: { texto: 'Você gerou um código de acesso', icone: 'keyRound', cor: 'consulta' },
+  consultou_vacinas: { texto: 'Você abriu a carteira de vacinação', icone: 'syringe', cor: 'consulta' },
+  registrou_vacina: { texto: 'Você registrou uma dose de vacina', icone: 'syringe', cor: 'consulta' },
+  removeu_vacina: { texto: 'Você desfez o registro de uma dose', icone: 'syringe', cor: 'revogado' },
+  atualizou_perfil: { texto: 'Você alterou dados do cadastro', icone: 'user', cor: 'consulta' },
+  definiu_referencia: { texto: 'Você escolheu sua unidade de referência', icone: 'hospital', cor: 'consulta' },
 };
 
 function telaHistoricoAcessos() {
-  const visiveis = estado.filtroHistorico === 'todos'
-    ? HISTORICO_ACESSOS
-    : HISTORICO_ACESSOS.filter(function (r) { return r.origem === estado.filtroHistorico; });
+  // Pessoas que aparecem na trilha, para o segundo filtro. Sai dos próprios
+  // registros: um dependente já excluído continua na trilha, e sumir com ele
+  // do filtro esconderia o que foi feito com os dados dele.
+  const pessoasTrilha = [];
+  HISTORICO_ACESSOS.forEach(function (r) {
+    if (r.dependente && pessoasTrilha.indexOf(r.dependente) === -1) pessoasTrilha.push(r.dependente);
+  });
+
+  const visiveis = HISTORICO_ACESSOS.filter(function (r) {
+    if (estado.filtroHistorico !== 'todos' && r.origem !== estado.filtroHistorico) return false;
+    if (estado.pessoaHistorico === 'todas') return true;
+    if (estado.pessoaHistorico === 'titular') return !r.dependente;
+    return r.dependente === estado.pessoaHistorico;
+  });
+
+  const filtroPessoas = pessoasTrilha.length
+    ? '<div class="trilha-pessoas">' +
+      ['todas', 'titular'].concat(pessoasTrilha).map(function (id) {
+        const rotulo = id === 'todas' ? 'Todas as pessoas' : (id === 'titular' ? 'Você' : id);
+        return '<button class="rede-filtro' + (estado.pessoaHistorico === id ? ' active' : '') +
+          '" data-pessoa-historico="' + esc(id) + '">' + esc(rotulo) + '</button>';
+      }).join('') + '</div>'
+    : '';
 
   const abas = FILTROS_HISTORICO.map(function (f) {
     return '<button class="tab-btn' + (estado.filtroHistorico === f.id ? ' active' : '') +
@@ -3997,7 +4333,8 @@ function telaHistoricoAcessos() {
 
     return '<div class="timeline-item">' +
       '<div class="timeline-dot ' + info.cor + '">' + ic(info.icone, 10) + '</div>' +
-      '<div class="timeline-head"><h4 class="font-bold">' + info.texto + '</h4></div>' +
+      '<div class="timeline-head"><h4 class="font-bold">' + info.texto + '</h4>' +
+      (r.dependente ? '<span class="trilha-pessoa">' + esc(r.dependente) + '</span>' : '') + '</div>' +
       '<p class="text-xs text-muted">' + esc(dataHoraLonga(r.criadoEm)) + '</p>' +
       '<div class="acesso-log-quem">' +
         '<p class="font-bold text-sm">' + esc(r.medico || 'Você') + '</p>' +
@@ -4021,6 +4358,7 @@ function telaHistoricoAcessos() {
     'automático e não pode ser apagado pelo médico nem por você.</p>' +
 
     '<div class="tabs-wrapper">' + abas + '</div>' +
+    filtroPessoas +
 
     (registros
       ? '<div class="timeline-container">' + registros + '</div>'
@@ -4134,6 +4472,14 @@ function telaPortalMedico() {
       '</div></div>';
   }
 
+  // De quem é o prontuário: o titular ou o dependente escolhido no código.
+  const dependenteAtendido = estado.medico.dependente
+    ? estado.dependentes.filter(function (d) {
+        return d.nome.split(' ')[0] === estado.medico.dependente;
+      })[0]
+    : null;
+  const atendido = dependenteAtendido || PACIENTE;
+
   const idade = calcularIdade(PACIENTE.data_nascimento);
   const escrita = estado.medico.escopo === 'escrita';
   const consulta = estado.abaMedico === 'consulta';
@@ -4192,9 +4538,25 @@ function telaPortalMedico() {
       '<button class="sessao-sair" data-acao="medico-sair">' + ic('logOut', 14) + ' Encerrar</button>' +
     '</div>' +
 
-    '<div class="card"><h3 class="font-bold" style="font-size:18px">' + esc(PACIENTE.nome) + '</h3>' +
-    '<p class="text-sm text-muted">' + idade + ' anos · ' + esc(PACIENTE.genero) +
-    ' · Tipo sanguíneo <strong>' + esc(PACIENTE.tipo_sanguineo) + '</strong></p></div>' +
+    '<div class="card"><h3 class="font-bold" style="font-size:18px">' + esc(atendido.nome) + '</h3>' +
+    '<p class="text-sm text-muted">' + calcularIdade(atendido.data_nascimento) + ' anos · ' +
+    esc(atendido.genero) + ' · Tipo sanguíneo <strong>' + esc(atendido.tipo_sanguineo) + '</strong></p>' +
+    (estado.medico.dependente
+      ? '<p class="text-xs text-muted" style="margin-top:6px">Dependente · responsável: <strong>' +
+        esc(PACIENTE.nome.split(' ')[0]) + '</strong></p>'
+      : '') +
+    '</div>' +
+
+    // Contatos de emergência: só aparecem quando o paciente autorizou ao
+    // gerar o código. Sem isso o portal não recebe a lista.
+    (estado.medico.contatos && estado.familiares.length
+      ? '<div class="card"><div class="flex items-center gap-4 mb-2">' + ic('phoneCall', 18) +
+        '<span class="font-bold text-sm">Contatos de emergência</span></div>' +
+        estado.familiares.map(function (c) {
+          return '<p class="text-sm"><strong>' + esc(c.nome) + '</strong> (' + esc(c.parentesco) +
+            ') · ' + esc(formatarTelefone(c.telefone)) + '</p>';
+        }).join('') + '</div>'
+      : '') +
 
     '<div class="quick-actions-grid mb-6">' +
       listaSimples('border-red', 'text-red', 'alertCircle', 'Alergias', PRONTUARIO.alergias) +
@@ -4327,10 +4689,27 @@ const BASE_CONHECIMENTO = [
             'não traz diagnóstico nem resultado — para isso você abre a tela correspondente.',
     },
     {
+        chaves: ['código do médico', 'codigo do medico', 'acesso do médico', 'acesso do medico',
+                 'mostrar ao médico', 'mostrar ao medico', 'consultório', 'consultorio'],
+        resposta:
+            'Em "Mais" → "Acesso do médico" você gera um código de 30 minutos. O seletor do topo decide de quem ' +
+            'é o prontuário que ele abre: você ou um dependente. Há duas permissões, "somente leitura" e ' +
+            '"leitura e registro", e uma opção separada para enviar junto os seus contatos de emergência — ' +
+            'desmarcada por padrão, porque são dados de outra pessoa. Você pode revogar o acesso a qualquer momento.',
+    },
+    {
         chaves: ['prontuário', 'prontuario', 'histórico', 'historico', 'alergia', 'condição', 'condicao'],
         resposta:
             'No seu prontuário ("Minha Saúde" → "Prontuário") você encontra alergias, condições de saúde e os registros ' +
             'recentes das suas consultas.',
+    },
+    {
+        chaves: ['editar perfil', 'corrigir', 'mudar telefone', 'trocar endereço', 'trocar endereco',
+                 'atualizar cadastro', 'meus dados'],
+        resposta:
+            'Telefone e endereço você mesmo corrige: abra "Perfil" e toque em "Editar". Nome, CPF, data de ' +
+            'nascimento, gênero e tipo sanguíneo não são editáveis pela tela, porque identificam você no ' +
+            'atendimento. Toda alteração fica registrada no seu histórico de acessos.',
     },
     {
         chaves: ['senha', 'login', 'entrar', 'esqueci', 'acesso', 'biometria', 'recuperar senha'],
@@ -4340,10 +4719,13 @@ const BASE_CONHECIMENTO = [
             'do seu cadastro e deixa você escolher a nova senha na hora. A troca fica no histórico de acessos.',
     },
     {
-        chaves: ['vacina', 'vacinação', 'vacinacao', 'imunização', 'imunizacao'],
+        chaves: ['vacina', 'vacinação', 'vacinacao', 'imunização', 'imunizacao', 'dose', 'atraso'],
         resposta:
             'A Carteira de Vacinação fica em "Minha Saúde" → "Carteira de Vacinação". Ela é montada pelo calendário ' +
-            'do PNI a partir da data de nascimento, e o seletor do topo alterna entre você e cada dependente.',
+            'do PNI a partir da data de nascimento, e o seletor do topo alterna entre você e cada dependente. ' +
+            'Cada dose fica em um de três estados: registrada, prevista ou em atraso. Quem confirma a dose é ' +
+            'você, no botão "Marcar como aplicada" — o app não é ligado ao sistema do posto. Dose vencida sem ' +
+            'registro vira aviso na tela inicial.',
     },
     {
         chaves: ['ubs', 'upa', 'posto de saude', 'posto de saúde', 'rede de saude', 'rede de saúde',
@@ -4351,7 +4733,9 @@ const BASE_CONHECIMENTO = [
         resposta:
             'Na aba "Rede" da barra inferior você vê as UBS, UPAs e prontos-socorros da sua cidade, do mais perto ' +
             'para o mais longe, com endereço, telefone e horário. A distância sai da sua localização (se você ' +
-            'autorizar) ou do CEP do seu cadastro, e o botão "Como chegar" abre a rota no seu app de mapas.',
+            'autorizar) ou do CEP do seu cadastro, e o botão "Como chegar" abre a rota no seu app de mapas. ' +
+            'Você pode marcar uma unidade como "a minha" e tocar em "O que tem lá" para ver o que o CNES informa ' +
+            'sobre ela. Unidades de cidades vizinhas aparecem quando estão a até 12 km — vêm marcadas como tal.',
     },
     {
         chaves: ['quem viu', 'quem acessou', 'historico de acesso', 'histórico de acesso',
@@ -4577,6 +4961,7 @@ document.addEventListener('click', function (evento) {
   if (d.abaMedico) { estado.abaMedico = d.abaMedico; render(true); return; }
   if (d.filtroRede) { estado.filtroRede = d.filtroRede; render(true); return; }
   if (d.filtroHistorico) { estado.filtroHistorico = d.filtroHistorico; render(true); return; }
+  if (d.pessoaHistorico) { estado.pessoaHistorico = d.pessoaHistorico; render(true); return; }
   if (d.pessoa) { estado.pessoa = d.pessoa; render(false); return; }
   if (d.escopo) { estado.escopoAcesso = d.escopo; render(true); return; }
   if (d.faq) { estado.faqAberta = estado.faqAberta === d.faq ? null : d.faq; render(true); return; }
@@ -4606,7 +4991,48 @@ document.addEventListener('click', function (evento) {
     return;
   }
 
+  // Registrar e desfazer uma dose. No app isso é POST/DELETE /api/vacinas;
+  // aqui fica na memória da página e some ao recarregar, como o resto.
+  if (d.acao === 'marcarVacina' && d.dose) {
+    vacinasDaPessoa()[d.dose] = new Date().toISOString().slice(0, 10);
+    render(false);
+    return;
+  }
+  if (d.acao === 'desmarcarVacina' && d.dose) {
+    delete vacinasDaPessoa()[d.dose];
+    render(false);
+    return;
+  }
+
+  // O que a unidade oferece. No app vem de uma chamada ao CNES; aqui a lista
+  // é fixa por unidade, porque a demonstração não faz requisição nenhuma.
+  if (d.acao === 'servicosUnidade' && d.cnes) {
+    estado.servicosUnidade[d.cnes] = SERVICOS_DEMO[d.cnes] || [];
+    render(false);
+    return;
+  }
+  if (d.acao === 'unidadeReferencia' && d.cnes) {
+    estado.unidadeReferencia = estado.unidadeReferencia === d.cnes ? null : d.cnes;
+    render(false);
+    return;
+  }
+
   switch (d.acao) {
+    case 'editarPerfil':
+      estado.editandoPerfil = true;
+      render(true);
+      break;
+
+    case 'cancelarPerfil':
+      estado.editandoPerfil = false;
+      render(true);
+      break;
+
+    case 'alternarContatosAcesso':
+      estado.compartilhaContatos = !estado.compartilhaContatos;
+      render(false);
+      break;
+
     case 'lerNotificacoes':
       estado.notificacoes = [];
       render(true);
@@ -4671,9 +5097,19 @@ document.addEventListener('click', function (evento) {
       for (let i = 0; i < 6; i++) codigo += alfabeto[Math.floor(Math.random() * alfabeto.length)];
       const id = Date.now();
       const expiraEm = new Date(Date.now() + 30 * 60000).toISOString();
-      estado.codigoNovo = { id: id, codigo: codigo, escopo: estado.escopoAcesso, expiraEm: expiraEm };
+      // De quem é o prontuário que este código abre, e se os contatos de
+      // emergência vão junto — as duas coisas ficam gravadas no acesso, como
+      // no app (colunas dependente_id e compartilha_contatos).
+      const pessoaCodigo = pessoaAtual();
+      const dependente = pessoaCodigo.titular ? null : pessoaCodigo.nome.split(' ')[0];
+
+      estado.codigoNovo = {
+        id: id, codigo: codigo, escopo: estado.escopoAcesso,
+        dependente: dependente, expiraEm: expiraEm,
+      };
       estado.acessos = [{
         id: id, medico: null, crm: null, escopo: estado.escopoAcesso,
+        dependente: dependente, compartilhaContatos: estado.compartilhaContatos,
         criadoEm: new Date().toISOString(), usadoEm: null, expiraEm: expiraEm, revogadoEm: null,
       }].concat(estado.acessos);
       render(false);
@@ -4751,6 +5187,21 @@ document.addEventListener('submit', function (evento) {
       estado.autenticado = true;
       ir('/dashboard');
       break;
+
+    // Edição do cadastro. No app isto é PUT /api/auth/me e entra na trilha de
+    // auditoria; aqui os valores mudam só na memória da página.
+    case 'perfil': {
+      const dados = new FormData(form);
+      PACIENTE.telefone = String(dados.get('telefone') || '').replace(/\D/g, '') || PACIENTE.telefone;
+      PACIENTE.cep = String(dados.get('cep') || '').replace(/\D/g, '') || PACIENTE.cep;
+      PACIENTE.rua = dados.get('rua') || PACIENTE.rua;
+      PACIENTE.numero = dados.get('numero') || PACIENTE.numero;
+      PACIENTE.bairro = dados.get('bairro') || PACIENTE.bairro;
+      PACIENTE.cidade = dados.get('cidade') || PACIENTE.cidade;
+      estado.editandoPerfil = false;
+      render(true);
+      break;
+    }
 
     case 'contato': {
       const dados = new FormData(form);
@@ -4843,9 +5294,17 @@ document.addEventListener('submit', function (evento) {
       const gerado = estado.codigoNovo && estado.codigoNovo.codigo === codigo.toUpperCase()
         ? estado.codigoNovo : null;
       estado.erroTela = null;
+      const acessoUsado = gerado
+        ? estado.acessos.filter(function (a) { return a.id === gerado.id; })[0]
+        : null;
+
       estado.medico = {
         id: gerado ? gerado.id : null,
         escopo: gerado ? gerado.escopo : 'escrita',
+        // De quem é o prontuário aberto por este código, e se os contatos de
+        // emergência foram autorizados junto.
+        dependente: gerado ? gerado.dependente : null,
+        contatos: acessoUsado ? Boolean(acessoUsado.compartilhaContatos) : false,
         expiraEm: new Date(Date.now() + 30 * 60000).toISOString(),
       };
       if (gerado) {

@@ -7,6 +7,10 @@ function normalizarConsulta(c) {
     data: c.data,
     hora: c.hora,
     local: c.local,
+    // Unidade da Rede de Saúde onde a consulta acontece, quando ela foi
+    // marcada em uma. É o que permite oferecer "Como chegar" com a coordenada
+    // oficial do CNES em vez do texto livre do campo local.
+    unidadeCnes: c.unidade_cnes ?? null,
     motivo: c.motivo,
     status: c.status,
     resumo: c.resumo,

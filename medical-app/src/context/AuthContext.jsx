@@ -35,6 +35,16 @@ export function AuthProvider({ children }) {
     return data;
   }
 
+  // Troca os dados do paciente logado sem mexer no token.
+  //
+  // Existe por causa da edição de perfil: o telefone e o endereço vivem também
+  // no localStorage (é de lá que a tela lê ao abrir), então salvar no banco e
+  // não atualizar aqui faria a tela voltar ao valor antigo no próximo refresh.
+  function atualizarPaciente(novo) {
+    localStorage.setItem('sc_paciente', JSON.stringify(novo));
+    setPaciente(novo);
+  }
+
   // Encerra a sessão.
   function sair() {
     localStorage.removeItem('sc_token');
@@ -43,7 +53,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ paciente, cadastrar, entrar, sair }}>
+    <AuthContext.Provider value={{ paciente, cadastrar, entrar, sair, atualizarPaciente }}>
       {children}
     </AuthContext.Provider>
   );

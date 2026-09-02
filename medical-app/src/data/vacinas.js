@@ -1,7 +1,15 @@
 // Calendário Nacional de Vacinação (PNI — Ministério da Saúde / SUS).
-// Usado para montar a Carteira de Vacinação automaticamente a partir da
-// data de nascimento da pessoa: cada dose tem uma idade recomendada, então
-// conseguimos calcular a data prevista e se ela já deveria ter sido tomada.
+//
+// ATENÇÃO — quem usa este arquivo hoje é a versão de demonstração (demo/).
+// No aplicativo, o calendário mora no banco (tabela `calendario_vacinal`) e a
+// carteira é montada pela API, porque ela tem dois leitores: a tela e o
+// AvisoDAO, que conta as doses atrasadas para o Dashboard. A demo não tem
+// backend nenhum, então continua montando a carteira aqui, com as mesmas
+// regras — ao mexer no calendário, mexa nos dois (o seed.sql é gerado a
+// partir desta lista).
+//
+// Cada dose tem uma idade recomendada, então dá para calcular a data prevista
+// e comparar com o que foi registrado como aplicado.
 
 // --- Calendário da Criança (0 a 4 anos) ---
 // `idadeMeses` = idade recomendada para a dose (em meses).
@@ -71,21 +79,39 @@ function formatarData(d) {
 /**
  * Monta a carteira de vacinação de uma pessoa.
  *
+ * São três estados, e não dois. A primeira versão dava a dose por tomada
+ * sempre que a data prevista já tinha passado, o que é o oposto de um alerta
+ * útil: a criança que não foi ao posto aparecia em dia. Agora "aplicada" é só
+ * o que alguém registrou, e o que venceu sem registro fica "atrasada".
+ *
  * @param {string} dataNascimento  Data de nascimento em ISO (YYYY-MM-DD).
  * @param {object} opts
- * @param {boolean} opts.adulto     Usa o calendário adulto (tudo em dia).
- * @returns {Array} lista de doses com `status` ('tomada' | 'pendente') e datas.
+ * @param {boolean} opts.adulto     Usa o calendário adulto (sem idade fixa).
+ * @param {object} opts.aplicadas   Mapa `{ [idDaDose]: dataISO }` do que já foi
+ *                                  registrado como aplicado.
+ * @returns {Array} doses com `id`, `status` ('aplicada' | 'atrasada' |
+ *                  'prevista'), `dataPrevista` e `aplicadaEm`.
  */
-export function montarCarteira(dataNascimento, { adulto = false } = {}) {
-  if (adulto || !dataNascimento) {
-    // Titular / adulto: carteira considerada completa.
-    return CALENDARIO_ADULTO.map((v) => ({ ...v, status: 'tomada' }));
-  }
-
+export function montarCarteira(dataNascimento, { adulto = false, aplicadas = {} } = {}) {
+  const usarAdulto = adulto || !dataNascimento;
+  const base = usarAdulto ? CALENDARIO_ADULTO : CALENDARIO_CRIANCA;
   const hoje = new Date();
-  return CALENDARIO_CRIANCA.map((v) => {
+
+  return base.map((v, i) => {
+    const id = (usarAdulto ? 'a' : 'c') + i;
+    const aplicadaEm = aplicadas[id] || null;
+
+    // Doses do calendário adulto não têm idade recomendada: dependem de
+    // campanha e de histórico que o app não guarda, então nunca "atrasam".
+    if (v.idadeMeses == null) {
+      return { ...v, id, aplicadaEm, status: aplicadaEm ? 'aplicada' : 'prevista' };
+    }
+
     const prevista = adicionarMeses(dataNascimento, v.idadeMeses);
-    const status = prevista <= hoje ? 'tomada' : 'pendente';
-    return { ...v, dataPrevista: formatarData(prevista), status };
+    let status = 'prevista';
+    if (aplicadaEm) status = 'aplicada';
+    else if (prevista <= hoje) status = 'atrasada';
+
+    return { ...v, id, aplicadaEm, dataPrevista: formatarData(prevista), status };
   });
 }

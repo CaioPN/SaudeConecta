@@ -56,10 +56,27 @@ const BASE_CONHECIMENTO = [
             'não traz diagnóstico nem resultado — para isso você abre a tela correspondente.',
     },
     {
+        chaves: ['código do médico', 'codigo do medico', 'acesso do médico', 'acesso do medico',
+                 'mostrar ao médico', 'mostrar ao medico', 'consultório', 'consultorio'],
+        resposta:
+            'Em "Mais" → "Acesso do médico" você gera um código de 30 minutos. O seletor do topo decide de quem ' +
+            'é o prontuário que ele abre: você ou um dependente. Há duas permissões, "somente leitura" e ' +
+            '"leitura e registro", e uma opção separada para enviar junto os seus contatos de emergência — ' +
+            'desmarcada por padrão, porque são dados de outra pessoa. Você pode revogar o acesso a qualquer momento.',
+    },
+    {
         chaves: ['prontuário', 'prontuario', 'histórico', 'historico', 'alergia', 'condição', 'condicao'],
         resposta:
             'No seu prontuário ("Minha Saúde" → "Prontuário") você encontra alergias, condições de saúde e os registros ' +
             'recentes das suas consultas.',
+    },
+    {
+        chaves: ['editar perfil', 'corrigir', 'mudar telefone', 'trocar endereço', 'trocar endereco',
+                 'atualizar cadastro', 'meus dados'],
+        resposta:
+            'Telefone e endereço você mesmo corrige: abra "Perfil" e toque em "Editar". Nome, CPF, data de ' +
+            'nascimento, gênero e tipo sanguíneo não são editáveis pela tela, porque identificam você no ' +
+            'atendimento. Toda alteração fica registrada no seu histórico de acessos.',
     },
     {
         chaves: ['senha', 'login', 'entrar', 'esqueci', 'acesso', 'biometria', 'recuperar senha'],
@@ -69,10 +86,13 @@ const BASE_CONHECIMENTO = [
             'do seu cadastro e deixa você escolher a nova senha na hora. A troca fica no histórico de acessos.',
     },
     {
-        chaves: ['vacina', 'vacinação', 'vacinacao', 'imunização', 'imunizacao'],
+        chaves: ['vacina', 'vacinação', 'vacinacao', 'imunização', 'imunizacao', 'dose', 'atraso'],
         resposta:
             'A Carteira de Vacinação fica em "Minha Saúde" → "Carteira de Vacinação". Ela é montada pelo calendário ' +
-            'do PNI a partir da data de nascimento, e o seletor do topo alterna entre você e cada dependente.',
+            'do PNI a partir da data de nascimento, e o seletor do topo alterna entre você e cada dependente. ' +
+            'Cada dose fica em um de três estados: registrada, prevista ou em atraso. Quem confirma a dose é ' +
+            'você, no botão "Marcar como aplicada" — o app não é ligado ao sistema do posto. Dose vencida sem ' +
+            'registro vira aviso na tela inicial.',
     },
     {
         chaves: ['ubs', 'upa', 'posto de saude', 'posto de saúde', 'rede de saude', 'rede de saúde',
@@ -80,7 +100,9 @@ const BASE_CONHECIMENTO = [
         resposta:
             'Na aba "Rede" da barra inferior você vê as UBS, UPAs e prontos-socorros da sua cidade, do mais perto ' +
             'para o mais longe, com endereço, telefone e horário. A distância sai da sua localização (se você ' +
-            'autorizar) ou do CEP do seu cadastro, e o botão "Como chegar" abre a rota no seu app de mapas.',
+            'autorizar) ou do CEP do seu cadastro, e o botão "Como chegar" abre a rota no seu app de mapas. ' +
+            'Você pode marcar uma unidade como "a minha" e tocar em "O que tem lá" para ver o que o CNES informa ' +
+            'sobre ela. Unidades de cidades vizinhas aparecem quando estão a até 12 km — vêm marcadas como tal.',
     },
     {
         chaves: ['quem viu', 'quem acessou', 'historico de acesso', 'histórico de acesso',

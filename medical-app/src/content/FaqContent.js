@@ -50,6 +50,10 @@ export const FAQ = [
         r: 'Toque em "Esqueceu a senha?" na tela de login. Para provar que a conta é sua, o aplicativo pede três dados do seu cadastro — e-mail, CPF e data de nascimento —; conferindo os três, você escolhe a nova senha na hora. O pedido vale por 15 minutos e a troca fica registrada no seu histórico de acessos, para você perceber se alguém tentar fazer isso no seu lugar.',
       },
       {
+        p: 'Consigo corrigir os meus dados de cadastro?',
+        r: 'O telefone e o endereço, sim: abra "Perfil" e toque em "Editar". Nome, CPF, data de nascimento, gênero e tipo sanguíneo não são editáveis pela tela, porque identificam você no atendimento — para mudá-los, escreva para o suporte. Toda alteração fica registrada no seu histórico de acessos.',
+      },
+      {
         p: 'Como saio da minha conta?',
         r: 'Toque em "Mais" na barra inferior e escolha "Sair". Isso apaga a sessão guardada no aparelho.',
       },
@@ -73,7 +77,7 @@ export const FAQ = [
       },
       {
         p: 'O médico com um código meu enxerga os meus dependentes?',
-        r: 'Não. O acesso temporário mostra apenas os seus dados — nada dos dependentes. Para que um profissional veja os dados de um dependente, isso ainda precisa ser feito por você, mostrando a tela.',
+        r: 'Só se você escolher. Ao gerar o código em "Acesso do médico", o seletor do topo define de quem é o prontuário que aquele código abre: você ou um dependente. Um código gerado para você não mostra nada dos dependentes, e vice-versa.',
       },
       {
         p: 'O dependente tem login próprio?',
@@ -143,6 +147,18 @@ export const FAQ = [
         p: 'Consigo marcar atendimento por aqui?',
         r: 'Ainda não. A tela mostra a unidade, o endereço e o telefone: o agendamento é feito diretamente com a unidade. O botão "Como chegar" abre a rota no aplicativo de mapas do seu aparelho.',
       },
+      {
+        p: 'Dá para marcar qual é a minha UBS?',
+        r: 'Sim. Na lista, toque em "Definir como minha" na unidade que você usa. Ela passa a aparecer destacada, e você não precisa procurá-la de novo a cada visita.',
+      },
+      {
+        p: 'Como sei o que uma unidade oferece?',
+        r: 'Toque em "O que tem lá" no cartão da unidade. O app consulta o CNES na hora e mostra o que consta lá: atendimento 24 horas, internação, centro cirúrgico, serviço de apoio para exames. O CNES não publica a lista de especialidades por unidade, então essa informação não existe no app.',
+      },
+      {
+        p: 'A lista mostra unidades de outra cidade?',
+        r: 'Mostra as que estiverem a até 12 km de você, desde que aquela cidade já tenha sido consultada alguma vez no app — elas aparecem marcadas como "cidade vizinha". Para ver a rede completa de outro município, use "Ver outra cidade" e informe um CEP de lá.',
+      },
     ],
   },
   {
@@ -151,11 +167,19 @@ export const FAQ = [
     perguntas: [
       {
         p: 'Como a minha carteira é montada?',
-        r: 'A partir da sua data de nascimento, seguindo o calendário oficial do Programa Nacional de Imunizações (PNI). O app mostra as doses previstas para a sua idade e as que ainda vão chegar.',
+        r: 'A partir da sua data de nascimento, seguindo o calendário oficial do Programa Nacional de Imunizações (PNI). Cada dose aparece em um de três estados: registrada, prevista (ainda vai chegar) ou em atraso (a data recomendada passou e ninguém confirmou a aplicação).',
       },
       {
         p: 'Posso ver a carteira de um dependente?',
         r: 'Sim. Em "Minha Saúde" → "Carteira de Vacinação", use o seletor no topo da tela para alternar entre você e cada dependente.',
+      },
+      {
+        p: 'Como marco uma dose que já foi tomada?',
+        r: 'Abra "Carteira de Vacinação", encontre a dose e toque em "Marcar como aplicada". O app registra a data de hoje. Se marcar por engano, o botão "Desfazer" apaga o registro. Enquanto uma dose vencida não é marcada, ela aparece em atraso e vira um aviso na tela inicial.',
+      },
+      {
+        p: 'O app sabe sozinho quais vacinas eu tomei?',
+        r: 'Não. O app não é ligado ao sistema do posto de saúde, então quem confirma cada dose é você (ou o profissional, quando ele registra pelo acesso temporário). Antes disso, a dose vencida aparece como em atraso.',
       },
       {
         p: 'Onde vejo as campanhas de vacinação abertas?',
@@ -172,6 +196,10 @@ export const FAQ = [
         r: 'Na tela inicial, toque em "Acesso do médico" e gere um código. O profissional digita esse código no portal do médico e passa a ver o seu resumo clínico.',
       },
       {
+        p: 'O médico vê os meus contatos de emergência?',
+        r: 'Só se você marcar a opção "Enviar também meus contatos de emergência" na hora de gerar o código. Ela vem desmarcada de propósito: o nome e o telefone de um familiar são dados de outra pessoa, que não foi quem cadastrou a conta.',
+      },
+      {
         p: 'Por quanto tempo o código vale?',
         r: 'O código expira em 30 minutos e serve para um único profissional. Depois de usado, a sessão do médico também dura 30 minutos.',
       },
@@ -186,6 +214,10 @@ export const FAQ = [
       {
         p: 'O que exatamente o médico consegue escrever no meu prontuário?',
         r: 'Com o acesso de "Leitura e registro", ele pode lançar a consulta do dia, um exame com os resultados e itens do prontuário: alergias, condições acompanhadas e medicações em uso. Não existe "editar": para corrigir algo lançado errado, o profissional remove o item e lança o certo — e as duas ações aparecem separadas no seu histórico de acessos.',
+      },
+      {
+        p: 'O app me lembra das consultas?',
+        r: 'Sim. Quando falta um ou dois dias para uma consulta agendada — sua ou de um dependente —, aparece um lembrete no card "Novidades" da tela inicial. Ele continua lá depois da data, para você ver que foi avisado.',
       },
       {
         p: 'Fico sabendo quando um médico registra alguma coisa?',
@@ -207,7 +239,7 @@ export const FAQ = [
       },
       {
         p: 'A minha senha fica guardada em texto no sistema?',
-        r: 'Não. O sistema guarda apenas uma versão criptografada (hash) da senha — nem a equipe do aplicativo consegue lê-la.',
+        r: 'Não. O sistema guarda apenas uma versão embaralhada da senha (hash PBKDF2, com um valor aleatório próprio para cada conta) — nem a equipe do aplicativo consegue lê-la, e duas pessoas com a mesma senha ficam com registros diferentes.',
       },
       {
         p: 'O assistente virtual tem acesso ao meu prontuário?',

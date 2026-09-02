@@ -25,7 +25,7 @@ import java.util.List;
 public class ConsultaDAO {
 
     private static final String SELECT_BASE =
-            "SELECT c.id, c.paciente_id, c.dependente_id, c.data, c.hora, c.local, c.motivo, "
+            "SELECT c.id, c.paciente_id, c.dependente_id, c.data, c.hora, c.local, c.motivo, c.unidade_cnes, "
             + "       c.status, c.resumo, c.conduta, "
             + "       m.id AS medico_id, m.nome AS medico_nome, m.especialidade, m.crm "
             + "FROM consultas c "
@@ -82,11 +82,49 @@ public class ConsultaDAO {
      * INSERT — registra uma consulta. Usado pelo médico que entrou com um
      * acesso temporário; `idAcesso` fica gravado como autoria do registro.
      */
+    /**
+     * SELECT — consultas agendadas que acontecem nos próximos dias, do titular
+     * e dos dependentes, para o gerador de lembretes.
+     *
+     * Devolve linhas cruas ({id, data, hora, médico, dependente}) em vez de
+     * objetos Consulta porque quem chama só monta uma frase: carregar o modelo
+     * inteiro seria buscar resumo e conduta que ninguém vai ler.
+     */
+    public List<String[]> listarParaLembrete(int idPaciente, int dias) throws SQLException {
+        String sql = "SELECT c.id, c.data, c.hora, m.nome AS medico, d.nome AS dependente "
+                + "FROM consultas c "
+                + "JOIN medicos m ON m.id = c.medico_id "
+                + "LEFT JOIN dependentes d ON d.id = c.dependente_id "
+                + "WHERE c.paciente_id = ? AND c.status = 'agendada' "
+                + "  AND c.data BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL ? DAY) "
+                + "ORDER BY c.data, c.hora";
+
+        List<String[]> lista = new ArrayList<>();
+        try (Connection con = Conexao.abrir();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, idPaciente);
+            ps.setInt(2, dias);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    lista.add(new String[] {
+                        String.valueOf(rs.getInt("id")),
+                        rs.getString("data"),
+                        rs.getString("hora"),
+                        rs.getString("medico"),
+                        rs.getString("dependente"),
+                    });
+                }
+            }
+        }
+        return lista;
+    }
+
     public int inserir(Consulta c, int idAcesso) throws SQLException {
         String sql = "INSERT INTO consultas "
                 + "(paciente_id, dependente_id, medico_id, data, hora, local, motivo, status, "
-                + " resumo, conduta, acesso_id) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                + " resumo, conduta, unidade_cnes, acesso_id) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (Connection con = Conexao.abrir();
              PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
@@ -104,7 +142,12 @@ public class ConsultaDAO {
             ps.setString(8, c.getStatus());
             ps.setString(9, c.getResumo());
             ps.setString(10, c.getConduta());
-            ps.setInt(11, idAcesso);
+            if (c.getUnidadeCnes() == null) {
+                ps.setNull(11, Types.INTEGER);
+            } else {
+                ps.setInt(11, c.getUnidadeCnes());
+            }
+            ps.setInt(12, idAcesso);
             ps.executeUpdate();
 
             try (ResultSet rs = ps.getGeneratedKeys()) {
@@ -135,6 +178,9 @@ public class ConsultaDAO {
         c.setStatus(rs.getString("status"));
         c.setResumo(rs.getString("resumo"));
         c.setConduta(rs.getString("conduta"));
+
+        int cnes = rs.getInt("unidade_cnes");
+        c.setUnidadeCnes(rs.wasNull() ? null : cnes);
 
         Medico m = new Medico();
         m.setIdMedico(rs.getInt("medico_id"));

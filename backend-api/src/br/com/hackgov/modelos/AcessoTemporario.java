@@ -13,7 +13,11 @@ public class AcessoTemporario {
 
     private int idAcesso;
     private int idPaciente;
+    /** Null = o código abre os dados do titular; preenchido, os do dependente. */
+    private Integer idDependente;
+    private String nomeDependente;
     private String escopo;
+    private boolean compartilhaContatos;
     private String criadoEm;
     private String expiraEm;
     private String usadoEm;
@@ -37,6 +41,30 @@ public class AcessoTemporario {
     }
 
     /** "leitura" (só consulta) ou "escrita" (também registra consultas e exames). */
+    public Integer getIdDependente() {
+        return idDependente;
+    }
+
+    public void setIdDependente(Integer idDependente) {
+        this.idDependente = idDependente;
+    }
+
+    public String getNomeDependente() {
+        return nomeDependente;
+    }
+
+    public void setNomeDependente(String nomeDependente) {
+        this.nomeDependente = nomeDependente;
+    }
+
+    public boolean isCompartilhaContatos() {
+        return compartilhaContatos;
+    }
+
+    public void setCompartilhaContatos(boolean compartilhaContatos) {
+        this.compartilhaContatos = compartilhaContatos;
+    }
+
     public String getEscopo() {
         return escopo;
     }

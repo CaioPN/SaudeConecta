@@ -48,6 +48,28 @@ public class UnidadeSaudeDAO {
      */
     private static final int LIMITE_PADRAO = 60;
 
+    /**
+     * Raio, em km, para incluir na lista unidades de OUTROS municípios já
+     * espelhados.
+     *
+     * Resolve o caso da divisa sem precisar saber quais cidades fazem divisa
+     * com quais: quem mora perto do limite passa a ver a UBS do outro lado
+     * desde que aquela cidade já tenha sido baixada alguma vez (por este
+     * paciente ou por outro). 12 km é a distância que ainda dá para percorrer
+     * para um atendimento — acima disso a lista encheria de unidades que
+     * ninguém vai procurar.
+     *
+     * Não substitui o "Ver outra cidade": a cidade vizinha que nunca foi
+     * pesquisada continua fora do espelho, e é a busca por CEP que a traz.
+     */
+    private static final double RAIO_VIZINHANCA_KM = 12.0;
+
+    /** Depois de quantos dias sem ninguém abrir um município ele sai do espelho. */
+    private static final int DIAS_MUNICIPIO_ABANDONADO = 180;
+
+    /** De quanto em quanto tempo os serviços de uma unidade são reconferidos. */
+    private static final int DIAS_VALIDADE_SERVICOS = 90;
+
     /** Municípios com atualização em andamento, para não baixar duas vezes. */
     private static final Set<Integer> EM_ATUALIZACAO = new HashSet<>();
 
@@ -118,11 +140,23 @@ public class UnidadeSaudeDAO {
                 + "  * POWER(SIN(RADIANS(? - longitude) / 2), 2)))"
                 : "-1";
 
+        // Sem saber onde o paciente está, a vizinhança não faz sentido: não há
+        // como dizer que a unidade de outra cidade está perto de coisa nenhuma.
+        // Com origem, a caixa de latitude/longitude corta a maior parte do
+        // espelho antes de calcular distância — é filtro barato antes do caro.
+        String vizinhanca = "";
+        if (temOrigem) {
+            vizinhanca = " OR (latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ?)";
+        }
+
         String sql = "SELECT codigo_cnes, codigo_municipio, nome, tipo, logradouro, numero, "
-                + "       bairro, cep, telefone, turno, latitude, longitude, "
+                + "       bairro, cep, telefone, turno, latitude, longitude, servicos, "
                 + "       " + distancia + " AS distancia_km "
                 + "FROM unidades_saude "
-                + "WHERE codigo_municipio = ? "
+                + "WHERE (codigo_municipio = ?" + vizinhanca + ") "
+                // O HAVING é o que aplica o raio de verdade: a caixa acima é um
+                // quadrado, e sem isto a esquina dele entraria na lista.
+                + (temOrigem ? "HAVING codigo_municipio = ? OR distancia_km <= ? " : "")
                 + "ORDER BY " + (temOrigem ? "distancia_km" : "nome") + " "
                 + "LIMIT ?";
 
@@ -138,6 +172,18 @@ public class UnidadeSaudeDAO {
                 ps.setDouble(i++, longitude);
             }
             ps.setInt(i++, codigoMunicipio);
+            if (temOrigem) {
+                // 1 grau de latitude ~ 111 km em qualquer lugar; o de longitude
+                // encurta conforme se afasta do equador, daí o cosseno.
+                double grausLat = RAIO_VIZINHANCA_KM / 111.0;
+                double grausLon = grausLat / Math.max(0.1, Math.cos(Math.toRadians(latitude)));
+                ps.setDouble(i++, latitude - grausLat);
+                ps.setDouble(i++, latitude + grausLat);
+                ps.setDouble(i++, longitude - grausLon);
+                ps.setDouble(i++, longitude + grausLon);
+                ps.setInt(i++, codigoMunicipio);
+                ps.setDouble(i++, RAIO_VIZINHANCA_KM);
+            }
             ps.setInt(i, LIMITE_PADRAO);
 
             try (ResultSet rs = ps.executeQuery()) {
@@ -150,6 +196,134 @@ public class UnidadeSaudeDAO {
         return unidades;
     }
 
+    // ===================== SERVIÇOS DE UMA UNIDADE =====================
+
+    /**
+     * O que a unidade oferece, buscado no CNES na primeira vez que alguém abre
+     * a unidade e guardado depois disso.
+     *
+     * É uma chamada de rede por estabelecimento, então ela acontece só aqui,
+     * sob demanda — nunca na montagem da lista. Se a API não responder, a tela
+     * mostra a unidade sem essa parte, que é um detalhe e não o conteúdo
+     * principal.
+     *
+     * @return os serviços separados por ';', ou null se não há informação
+     */
+    public String servicosDe(int codigoCnes) throws SQLException {
+        String sql = "SELECT servicos, servicos_em FROM unidades_saude WHERE codigo_cnes = ?";
+        try (Connection con = Conexao.abrir();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, codigoCnes);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return null;
+
+                java.sql.Timestamp quando = rs.getTimestamp("servicos_em");
+                boolean vencido = quando == null
+                        || quando.toLocalDateTime().plusDays(DIAS_VALIDADE_SERVICOS)
+                                .isBefore(java.time.LocalDateTime.now());
+                if (!vencido) {
+                    return rs.getString("servicos");
+                }
+            }
+        }
+
+        String servicos = CnesApi.buscarServicos(codigoCnes);
+        gravarServicos(codigoCnes, servicos);
+        return servicos;
+    }
+
+    private void gravarServicos(int codigoCnes, String servicos) throws SQLException {
+        String sql = "UPDATE unidades_saude SET servicos = ?, servicos_em = NOW() WHERE codigo_cnes = ?";
+        try (Connection con = Conexao.abrir();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setString(1, servicos);
+            ps.setInt(2, codigoCnes);
+            ps.executeUpdate();
+        }
+    }
+
+    /** SELECT — uma unidade pelo código do CNES, ou null se não está espelhada. */
+    public UnidadeSaude buscarPorCnes(int codigoCnes) throws SQLException {
+        String sql = "SELECT codigo_cnes, codigo_municipio, nome, tipo, logradouro, numero, "
+                + "       bairro, cep, telefone, turno, latitude, longitude, servicos, "
+                + "       -1 AS distancia_km "
+                + "FROM unidades_saude WHERE codigo_cnes = ?";
+        try (Connection con = Conexao.abrir();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, codigoCnes);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? montar(rs) : null;
+            }
+        }
+    }
+
+    // ===================== LIMPEZA DO ESPELHO =====================
+
+    /**
+     * Marca que alguém pediu a lista deste município agora.
+     *
+     * A marca fica em municipios_espelhados, e não numa coluna de
+     * unidades_saude, porque aquela tabela tem ON UPDATE CURRENT_TIMESTAMP:
+     * um UPDATE por visita faria o cache do CNES parecer recém-baixado e a
+     * renovação de 30 dias nunca aconteceria.
+     */
+    private void marcarAcesso(int codigoMunicipio) throws SQLException {
+        String sql = "INSERT INTO municipios_espelhados (codigo_municipio, acessado_em) "
+                + "VALUES (?, NOW()) ON DUPLICATE KEY UPDATE acessado_em = NOW()";
+        try (Connection con = Conexao.abrir();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, codigoMunicipio);
+            ps.executeUpdate();
+        }
+    }
+
+    /**
+     * Apaga do espelho os municípios que ninguém abre há muito tempo.
+     *
+     * Sem isto a tabela só cresce: cada CEP pesquisado em "Ver outra cidade"
+     * traz uma cidade inteira (São Paulo são 547 linhas), e a cidade que
+     * alguém olhou uma vez ficaria guardada para sempre. O que sai daqui é
+     * espelho de dado público, recuperável do CNES a qualquer momento — não
+     * há nada do paciente nessa tabela.
+     *
+     * Roda em segundo plano, junto com a primeira consulta da execução.
+     */
+    public void limparMunicipiosAbandonados() throws SQLException {
+        String sqlVelhos = "SELECT codigo_municipio FROM municipios_espelhados "
+                + "WHERE acessado_em < (NOW() - INTERVAL ? DAY)";
+        List<Integer> abandonados = new ArrayList<>();
+
+        try (Connection con = Conexao.abrir();
+             PreparedStatement ps = con.prepareStatement(sqlVelhos)) {
+
+            ps.setInt(1, DIAS_MUNICIPIO_ABANDONADO);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    abandonados.add(rs.getInt(1));
+                }
+            }
+        }
+        if (abandonados.isEmpty()) return;
+
+        try (Connection con = Conexao.abrir();
+             PreparedStatement apagaUnidades = con.prepareStatement(
+                     "DELETE FROM unidades_saude WHERE codigo_municipio = ?");
+             PreparedStatement apagaMarca = con.prepareStatement(
+                     "DELETE FROM municipios_espelhados WHERE codigo_municipio = ?")) {
+
+            for (int municipio : abandonados) {
+                apagaUnidades.setInt(1, municipio);
+                apagaUnidades.executeUpdate();
+                apagaMarca.setInt(1, municipio);
+                apagaMarca.executeUpdate();
+            }
+        }
+    }
+
     // ===================== CACHE DO CNES =====================
 
     /**
@@ -159,6 +333,8 @@ public class UnidadeSaudeDAO {
      * daí a renovação acontece por fora, em segundo plano.
      */
     private void garantirCache(int codigoMunicipio) throws SQLException {
+        marcarAcesso(codigoMunicipio);
+
         int total;
         int pendentes;
         boolean vencido;
@@ -509,6 +685,7 @@ public class UnidadeSaudeDAO {
         u.setLatitude(rs.getDouble("latitude"));
         u.setLongitude(rs.getDouble("longitude"));
         u.setDistanciaKm(rs.getDouble("distancia_km"));
+        u.setServicos(rs.getString("servicos"));
         return u;
     }
 }

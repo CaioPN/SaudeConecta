@@ -33,7 +33,7 @@ backend-api/          API Java (pacote br.com.hackgov)
     api/ApiServer       servidor HTTP + rotas
     dao/                acesso ao banco — Paciente, Dependente, Consulta,
                         Exame, Prontuario, Acesso, Medico, Aviso, Auditoria,
-                        UnidadeSaude, Notificacao, Familiar
+                        UnidadeSaude, Notificacao, Familiar, Vacina
     db/Conexao          conexão JDBC com o MySQL
     modelos/            POJOs — Paciente, Dependente, Familiar, Medico,
                         Consulta, Prontuario, HistoricoMedico, Medicacao,
@@ -41,7 +41,8 @@ backend-api/          API Java (pacote br.com.hackgov)
                         AcessoTemporario, AcessoLog, RegistroAuditoria, Aviso
     principal/Principal menu de console antigo (não serve o front)
     util/               Json (parser próprio), Jwt, SenhaUtil,
-                        CodigoAcesso, ChatIA
+                        CodigoAcesso, ChatIA, CarteiraVacinal (regras da
+                        carteira), CnesApi, Localizacao
 database/             scripts SQL (schema, seeds)
 demo/                 versão HTML de demonstração (arquivo único, sem build)
 medical-app/          front-end React + Vite
@@ -92,9 +93,10 @@ sem lógica de banco).
 - Cadastro de paciente
 - Login / `AuthContext` (front) + `Jwt` e `SenhaUtil` (back)
 - Dependentes (tela + `DependenteDAO`)
-- Vacinas (`Vacinas.jsx`): carteira gerada pelo calendário do PNI a partir da
-  data de nascimento, com seletor de pessoa (titular + dependentes). Só a lista
-  de doses rola — cabeçalho, seletor e resumo ficam fixos —, e o ícone do
+- Vacinas (`Vacinas.jsx`): carteira montada pela API a partir do calendário do
+  PNI e da data de nascimento, com seletor de pessoa (titular + dependentes) e
+  registro das doses aplicadas (ver o bloco da carteira mais abaixo). Só a
+  lista de doses rola — cabeçalho, seletor e resumo ficam fixos —, e o ícone do
   dependente é azul para meninos e rosa para meninas (neutro quando o gênero é
   "Outro" ou "Prefiro não informar").
 - Tipo sanguíneo
@@ -150,7 +152,7 @@ sem lógica de banco).
   - O `ChatIA` usa o `HttpClient` do próprio JDK (Java 11+) e o `Json` do
     projeto — nenhuma biblioteca nova, como manda a regra do backend.
 - **Dúvidas frequentes** (`Faq.jsx`, rota `/faq`, texto em
-  `content/FaqContent.js`): sanfona com 43 perguntas em oito categorias — o item
+  `content/FaqContent.js`): sanfona com 51 perguntas em oito categorias — o item
   "Dúvidas frequentes" do menu "Mais" apontava para uma rota que não existia.
   As respostas descrevem o que o app faz **hoje** (dizem, por exemplo, que a
   tela de consultas só lista, não agenda, e explicam a conferência de três
@@ -367,6 +369,119 @@ sem lógica de banco).
   onde ser anotada. Agora registra e remove **alergia, condição acompanhada e
   medicação em uso**, sempre exigindo o escopo de escrita do código e caindo na
   trilha de auditoria do paciente como as outras ações.
+- **Carteira de vacinação de verdade** (tabelas `calendario_vacinal` e
+  `vacinas_aplicadas`, `VacinaDAO`, `util/CarteiraVacinal`, rotas
+  `GET/POST /api/vacinas` e `DELETE /api/vacinas/{doseId}`,
+  `services/vacinas.js`): a tela **adivinhava**. Toda dose com data prevista no
+  passado aparecia como tomada, então a criança que não foi ao posto ficava
+  "em dia" — o oposto de um alerta útil.
+  - Agora são **três estados**: `aplicada` (alguém registrou), `atrasada` (a
+    data recomendada passou e ninguém registrou) e `prevista`. Quem confirma a
+    dose é o paciente, pelo botão da tela, ou o médico com escopo de escrita.
+  - O **calendário do PNI foi para o banco**. Ele tem dois leitores — a tela e
+    o `AvisoDAO`, que conta as doses atrasadas — e duas cópias, uma em JS e
+    outra em Java, sairiam do ar uma da outra no primeiro ajuste do Ministério.
+    O seed é gerado a partir de `data/vacinas.js`, que continua existindo só
+    para a demonstração (que não tem backend).
+  - `vacinas_aplicadas` **não tem chave única**, e isso é limitação do MySQL:
+    `dependente_id` é NULL no titular, NULLs não colidem em índice único, e a
+    coluna gerada que resolveria isso é proibida junto com `ON DELETE CASCADE`.
+    Quem garante uma linha por dose é o `VacinaDAO`, que apaga antes de gravar,
+    numa transação.
+- **Avisos da casa inteira** (`AvisoDAO`): o Dashboard olhava só o titular.
+  Agora cada dependente entra com as três regras que a pessoa responsável
+  precisa ver sem abrir tela nenhuma — consulta chegando, resultado alterado e
+  dose de vacina atrasada. As regras de "faz tempo que não faz exame" ficam só
+  no titular: criança saudável não faz exame de rotina, e o aviso viraria ruído
+  permanente. Cada aviso carrega `pessoa` (primeiro nome, null = titular), e a
+  tela mostra isso como etiqueta.
+  - O atraso de vacina é contado **em SQL**, no próprio AvisoDAO, e não em Java:
+    ali só interessa a contagem, e trazer as 26 doses para contar as vencidas
+    seria buscar dado à toa a cada Dashboard. É a mesma regra do
+    `CarteiraVacinal` — ao mudar o critério de atraso, mude nos dois.
+  - Só o calendário infantil tem idade recomendada, então o adulto praticamente
+    não gera aviso de vacina; a conferência de faixa etária existe porque sem
+    ela o titular aparecia com o calendário da criança inteiro "em atraso".
+- **Acesso do médico a um dependente** (`acessos_temporarios.dependente_id`):
+  o código sempre é gerado pelo titular, que é quem responde pela conta, mas
+  agora ele escolhe **de quem é o prontuário** que aquele código abre — o mesmo
+  `SeletorPessoa` das telas clínicas. O portal do médico mostra o nome do
+  dependente, a idade dele e quem é o responsável, e o que o médico registra
+  (consulta, exame, alergia, condição, medicação) cai no prontuário certo.
+- **Contatos de emergência para o médico, com consentimento**
+  (`acessos_temporarios.compartilha_contatos`): nome e telefone de um familiar
+  são dados de **outra pessoa**, que nunca consentiu com nada aqui. Por isso a
+  opção existe, vem **desmarcada** e é decidida a cada código gerado; quando
+  usada, a leitura dos contatos entra na trilha do acesso (`leu_contatos`).
+- **Edição de perfil** (`PUT /api/auth/me`, `services/perfil.js`): o paciente
+  corrige **telefone e endereço**. Nome, CPF, data de nascimento, gênero, tipo
+  sanguíneo e e-mail continuam travados: os cinco primeiros identificam a
+  pessoa no atendimento (tipo sanguíneo errado num pronto-socorro é o pior erro
+  possível neste app) e o e-mail é a chave do login e da recuperação de senha.
+  A alteração é auditada (`atualizou_perfil`) dizendo **o que** mudou, nunca o
+  valor antigo nem o novo.
+- **Senha com salt** (`SenhaUtil`): era SHA-256 puro. O SHA-256 é rápido de
+  propósito — uma placa de vídeo testa bilhões de tentativas por segundo — e
+  sem salt duas pessoas com a mesma senha ficavam com o mesmo hash, o que
+  entrega senha repetida num vazamento e deixa uma tabela pronta resolver as
+  senhas comuns de uma vez. Agora é **PBKDF2-HMAC-SHA-256, 210 mil iterações e
+  salt por conta** (tudo da biblioteca padrão do Java).
+  - O formato gravado é `pbkdf2$<iterações>$<salt>$<hash>`: as iterações vão
+    junto para que aumentá-las no futuro não invalide as senhas já gravadas.
+  - As contas antigas **não foram trancadas do lado de fora**: `verificar`
+    ainda aceita o hash velho, e o login regrava no formato novo
+    (`migrarHashSeNecessario`). A migração acontece sozinha, na primeira
+    entrada, sem ninguém trocar de senha. O seed continua com o hash antigo de
+    propósito, para esse caminho continuar sendo exercitado.
+  - O `CodigoAcesso` **não** usa o SenhaUtil: o código do médico é procurado no
+    banco por igualdade de hash (`WHERE codigo_hash = ?`), e um salt por linha
+    tornaria a busca impossível. Ele tem SHA-256 próprio, e o que compensa a
+    falta de salt é o segredo ser sorteado, de 8 caracteres, válido por 30
+    minutos e de uso único.
+- **Notificações automáticas** (`notificacoes.chave`,
+  `NotificacaoDAO.criarSeNova`, `ApiServer.gerarLembretes`): antes só nascia
+  notificação do que o médico registrava. Agora a consulta agendada vira
+  **lembrete** um ou dois dias antes, do titular ou de um dependente.
+  - Lembrete não é aviso: aviso é derivado e some sozinho quando o motivo
+    acaba; lembrete é um fato datado que precisa sobreviver ao motivo — quem
+    perdeu a consulta de ontem tem que continuar vendo que foi avisado.
+  - A chave (`consulta_proxima:42`) mais o índice único garantem uma linha por
+    consulta, e não uma por visita ao app.
+  - Ele é gerado na **leitura** de `/api/notificacoes`, e não numa thread de
+    fundo: não há push nem serviço fora da requisição, e um agendador varrendo
+    todos os pacientes trabalharia para avisar quem talvez nem abra o app.
+- **Rede de Saúde: o que tem lá, minha UBS e a cidade vizinha**
+  - `GET /api/rede-saude/unidades/{cnes}` traz **o que a unidade oferece**
+    (24 h, internação, centro cirúrgico, obstétrico, neonatal, serviço de
+    apoio), do endpoint por estabelecimento do CNES, guardado por 90 dias na
+    coluna `servicos`. **Não são especialidades**: o CNES não publica a lista de
+    especialidades por estabelecimento nesta API — o que ele publica é a
+    estrutura da unidade, e é isso que a tela mostra. A busca é sob demanda,
+    quando alguém toca em "O que tem lá": são 547 chamadas para uma capital se
+    fosse feita na listagem.
+  - `POST /api/rede-saude/referencia` guarda a **UBS de referência** do paciente
+    (`pacientes.unidade_referencia`). Só o código do CNES é gravado, porque é
+    dado público e assim a escolha não envelhece junto com o espelho.
+  - A lista passou a incluir unidades de **outros municípios dentro de 12 km**
+    (`RAIO_VIZINHANCA_KM`), marcadas como "cidade vizinha", sem precisar saber
+    quais cidades fazem divisa: a caixa de latitude/longitude corta o espelho
+    barato e o `HAVING` aplica o raio. O município vizinho precisa já estar
+    espelhado — quem nunca foi pesquisado continua saindo por "Ver outra
+    cidade".
+  - `consultas.unidade_cnes` liga a consulta à unidade, e a tela de detalhe
+    oferece "Como chegar" pela coordenada oficial em vez do texto livre.
+  - **A tabela deixou de crescer para sempre**: `municipios_espelhados` guarda
+    quando cada município foi pedido, e uma faxina em segundo plano apaga do
+    espelho quem ninguém abre há 180 dias. A marca não pôde ficar em
+    `unidades_saude` porque aquela tabela tem `ON UPDATE CURRENT_TIMESTAMP`, e
+    um UPDATE por visita faria o cache do CNES parecer sempre novo.
+- **Trilha de auditoria por pessoa** (`auditoria.dependente_id`): a linha
+  continua pertencendo ao titular — é ele quem responde pela conta e quem vê a
+  trilha —, mas agora diz de quem era o dado. A tela ganhou um segundo filtro,
+  por pessoa, montado a partir dos próprios registros (um dependente já
+  excluído continua na trilha, e sumir com ele esconderia o que foi feito).
+  Ações novas: `consultou_vacinas`, `registrou_vacina`, `removeu_vacina`,
+  `atualizou_perfil` e `definiu_referencia`.
 - **Versão HTML de demonstração** (`demo/`, gerada por `node demo/gerar.mjs`):
   o app inteiro — as telas do paciente e o portal do médico — num **arquivo
   só**, sem Node, sem Java e sem MySQL, para mostrar o projeto a quem não vai
@@ -378,10 +493,18 @@ sem lógica de banco).
     embute o logotipo e os ícones do lucide em base64/SVG. Só a marcação das
     telas é escrita à mão, em JavaScript puro, no `app.template.html`.
     **Depois de mexer em algum desses arquivos, rode o `gerar.mjs` de novo.**
-  - Acompanha as telas do app: já traz a trilha do paciente com o filtro
-    "Tudo / Profissionais / Você", o seletor de pessoa em Exames, Consultas,
-    Prontuário e Vacinas, o card "Novidades" do Dashboard, os contatos de
-    emergência do Perfil e a recuperação de senha.
+  - Acompanha as telas do app: a trilha do paciente com os filtros
+    "Tudo / Profissionais / Você" e por pessoa, o seletor de pessoa em Exames,
+    Consultas, Prontuário e Vacinas, o card "Novidades" do Dashboard (com
+    lembrete de consulta), os contatos de emergência do Perfil, a recuperação
+    de senha, a carteira com os três estados e o botão de registrar dose, a
+    edição de contato e endereço, o código de acesso por pessoa com os contatos
+    opcionais, e a Rede de Saúde com "O que tem lá", "Definir como minha" e a
+    unidade de cidade vizinha.
+  - `node demo/testar.mjs` é o teste de fumaça: monta um DOM de mentira e
+    chama cada tela em três cenários. A demo não tem build nem lint, então uma
+    função renomeada num lugar e esquecida em outro só apareceria na hora de
+    mostrar o projeto. Rode depois do `gerar.mjs`.
   - Tudo o que ela mostra é fictício e mora só na memória da página; o que
     depende do que não existe ali (PDF, mapa, ligação, IA do chatbot) avisa em
     vez de fingir que funcionou.
@@ -392,16 +515,18 @@ sem lógica de banco).
 
 ## O que falta
 
-- O **acesso do médico** é só do titular: o código temporário não alcança os
-  dados de um dependente, mesmo com o seletor já pronto no app do paciente.
-- Os avisos do Dashboard são só do titular (não olham dependentes) e não
-  cruzam com a carteira de vacinação: as doses pendentes são calculadas no
-  front, a partir da data de nascimento, e o banco não guarda quais doses
-  foram aplicadas.
-- O hash de senha é SHA-256 sem salt (`SenhaUtil`). A recuperação de senha já
-  existe, mas prova a identidade conferindo três dados do cadastro — sem
-  serviço de e-mail, é o mais forte que dá para fazer aqui; quem souber
-  e-mail, CPF e data de nascimento da pessoa passa.
+- A recuperação de senha prova a identidade conferindo três dados do cadastro.
+  Sem serviço de e-mail é o mais forte que dá para fazer aqui, mas continua
+  sendo mais fraco que um link na caixa de entrada: quem souber e-mail, CPF e
+  data de nascimento da pessoa passa.
+- O registro de vacina é **declaratório**: quem confirma a dose é o paciente ou
+  o médico com acesso de escrita. Não há ligação com o sistema do posto (o
+  OpenDataSUS publica doses agregadas, não o histórico de uma pessoa), então
+  uma carteira em branco pode significar "ninguém marcou" e não "ninguém
+  tomou".
+- O calendário do PNI existe em dois lugares: a tabela `calendario_vacinal`
+  (usada pelo app) e `data/vacinas.js` (usado pela demonstração, que não tem
+  backend). O seed é gerado a partir do arquivo JS, mas a sincronia é manual.
 - O chatbot **não conhece os dados do paciente** — ele explica o app e orienta,
   mas não responde "quando foi meu último exame?". Fazer isso exigiria mandar
   dado clínico para o modelo, o que o nível gratuito do Gemini não permite (usa
@@ -411,18 +536,17 @@ sem lógica de banco).
   a chave. As duas pontas (montagem do JSON e leitura da resposta) já foram
   validadas. Se a API responder 404, é só trocar `gemini.modelo` no
   `config.properties` — não precisa recompilar.
-- A Rede de Saúde não agenda nada e é só do titular: não há vínculo entre a
-  unidade e as consultas, e o paciente não escolhe uma UBS de referência. A
-  tabela `unidades_saude` também não guarda as especialidades da unidade — o
-  CNES tem esse dado em outro endpoint (`/cnes/estabelecimentos/{cnes}`).
-- A Rede de Saúde mostra **uma cidade por vez**: quem mora na divisa precisa
-  pesquisar a cidade vizinha à mão em "Ver outra cidade". Listar as duas de uma
-  vez, por raio, exigiria saber quais municípios fazem divisa — o CNES só
-  consulta por município e não há API pública de vizinhança, então seria uma
-  tabela de municípios com coordenada mantida à mão.
-- Um CEP pesquisado de qualquer canto do país faz o município entrar no espelho
-  `unidades_saude` (é o comportamento normal do cache, mas a tabela cresce com
-  o que os pacientes pesquisarem).
+- A Rede de Saúde **não agenda nada**: a tela mostra a unidade, o telefone e a
+  rota, e o agendamento é feito com a unidade. A consulta já pode apontar para
+  uma unidade (`consultas.unidade_cnes`), mas quem preenche isso é o médico
+  pelo portal — o paciente não marca nada por aqui.
+- O que o app mostra da unidade é a **estrutura** dela (24 h, internação,
+  centro cirúrgico), não as especialidades atendidas: esta API do CNES não
+  publica especialidade por estabelecimento.
+- A vizinhança de 12 km só enxerga município **já espelhado**. A cidade vizinha
+  que ninguém pesquisou continua invisível até alguém buscá-la em "Ver outra
+  cidade" — descobrir quais municípios fazem divisa exigiria uma base de
+  coordenadas de municípios que nenhuma API pública oferece pronta.
 - A conferência de coordenadas só sabe consertar o que tem cara de defeito
   (unidade empilhada ou coordenada arredondada). Uma unidade isolada com
   coordenada errada e 7 casas decimais passa batido — não há como saber sem
@@ -434,15 +558,19 @@ sem lógica de banco).
   `/V 1 /R 2`) e a senha tem 4 dígitos — 10 mil combinações. Para valer como
   proteção de verdade seria preciso AES-256, que exigiria biblioteca nova ou
   gerar o PDF no backend.
-- A trilha de auditoria ainda não cobre a **edição de perfil**, e as ações
-  sobre um dependente continuam na conta do titular (a linha diz o nome dele,
-  mas não existe trilha separada por dependente). Nenhuma tela do paciente tem
-  UPDATE, então também não há ação de "alteração" para auditar.
-- As **notificações** só nascem do que o médico registra pelo acesso
-  temporário. Nada gera notificação sozinho (exame vencendo, consulta amanhã):
-  isso hoje é papel dos avisos, que são calculados na hora e não são gravados.
-- Os **contatos de emergência** são só cadastro: ninguém é avisado de nada, e
-  o médico com acesso temporário não os vê.
+- A trilha de auditoria mostra a ação e a pessoa, mas nunca o **valor** que
+  mudou: um "atualizou_perfil · telefone" não diz qual era o telefone antes.
+  É proposital (a trilha é lida na tela do celular), mas significa que ela não
+  serve para desfazer nada.
+- As **notificações** cobrem o que o médico registra e o lembrete de consulta.
+  Não existe lembrete de exame a vencer nem de dose de vacina: os dois não têm
+  um dia marcado, e viram aviso (recalculado) em vez de linha no banco.
+- Os **contatos de emergência** não avisam ninguém: eles são mostrados ao
+  médico quando o paciente autoriza, mas não existe envio de mensagem — isso
+  exigiria um serviço de SMS ou e-mail, que o projeto não tem.
+- O acesso do médico continua **só de leitura e registro clínico**: ele não
+  edita o cadastro do paciente nem marca vacina de quem não é o dono do
+  código.
 
 ## Convenções
 

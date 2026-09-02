@@ -196,6 +196,69 @@ public class PacienteDAO {
      * UPDATE — troca o hash da senha. A senha chega aqui já com hash
      * (ver SenhaUtil); texto puro nunca passa por este método.
      */
+    /**
+     * UPDATE — dados que o paciente pode corrigir sozinho: telefone e endereço.
+     *
+     * Nome, CPF, data de nascimento, gênero e tipo sanguíneo NÃO entram aqui.
+     * São dados de identificação e de saúde que o atendimento usa para
+     * reconhecer a pessoa: mudá-los pela tela transformaria a conta em outra
+     * pessoa sem nenhuma conferência, e o tipo sanguíneo errado num pronto-
+     * socorro é o pior erro possível neste app. O e-mail também fica de fora,
+     * porque é a chave do login e da recuperação de senha.
+     *
+     * Devolve true se alguma linha foi alterada.
+     */
+    public boolean atualizarContato(int id, String telefone, String cep, String rua,
+                                    String numero, String bairro, String cidade, String estado)
+            throws SQLException {
+        String sql = "UPDATE pacientes SET telefone = ?, cep = ?, rua = ?, numero = ?, "
+                + "       bairro = ?, cidade = ?, estado = ? WHERE id = ?";
+        try (Connection con = Conexao.abrir();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setString(1, telefone);
+            ps.setString(2, cep);
+            ps.setString(3, rua);
+            ps.setString(4, numero);
+            ps.setString(5, bairro);
+            ps.setString(6, cidade);
+            ps.setString(7, estado);
+            ps.setInt(8, id);
+            return ps.executeUpdate() > 0;
+        }
+    }
+
+    /** UPDATE — UBS que o paciente escolheu como referência (null para tirar). */
+    public boolean atualizarUnidadeReferencia(int id, Integer codigoCnes) throws SQLException {
+        String sql = "UPDATE pacientes SET unidade_referencia = ? WHERE id = ?";
+        try (Connection con = Conexao.abrir();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            if (codigoCnes == null) {
+                ps.setNull(1, java.sql.Types.INTEGER);
+            } else {
+                ps.setInt(1, codigoCnes);
+            }
+            ps.setInt(2, id);
+            return ps.executeUpdate() > 0;
+        }
+    }
+
+    /** SELECT — o código CNES da UBS de referência, ou null se não escolheu. */
+    public Integer unidadeReferencia(int id) throws SQLException {
+        String sql = "SELECT unidade_referencia FROM pacientes WHERE id = ?";
+        try (Connection con = Conexao.abrir();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return null;
+                int codigo = rs.getInt(1);
+                return rs.wasNull() ? null : codigo;
+            }
+        }
+    }
+
     public boolean atualizarSenha(int id, String senhaHash) throws SQLException {
         String sql = "UPDATE pacientes SET senha_hash = ? WHERE id = ?";
         try (Connection con = Conexao.abrir();

@@ -357,9 +357,24 @@ const FAMILIARES_INICIAIS = [
 // Notificações — no app elas nascem quando um médico registra alguma coisa
 // com um código do paciente. Não confundir com os AVISOS abaixo: aviso é
 // calculado a partir dos dados e some sozinho, notificação é um fato gravado.
+// Doses já registradas quando a demonstração abre. O Lucas (id 2) tem quase
+// tudo em dia e duas doses vencidas sem registro — é o que faz aparecer o
+// aviso de atraso no Dashboard e o bloco "Em atraso" na carteira.
+const VACINAS_APLICADAS_INICIAIS = {
+  titular: {},
+  2: { c0: '2018-03-02', c1: '2018-03-02', c2: '2018-05-04', c3: '2018-05-04', c4: '2018-05-04',
+       c5: '2018-05-04', c6: '2018-06-05', c7: '2018-07-06', c8: '2018-07-06', c9: '2018-07-06',
+       c10: '2018-07-06', c11: '2018-08-07', c12: '2018-09-08', c13: '2018-09-08',
+       c14: '2018-12-10', c15: '2019-03-05', c16: '2019-03-05', c17: '2019-03-05' },
+};
+
 const NOTIFICACOES_INICIAIS = [
-  { id: 2, tipo: 'exame', mensagem: 'Dra. Ana Souza registrou um novo exame no seu prontuário.' },
-  { id: 1, tipo: 'consulta', mensagem: 'Dra. Ana Souza registrou uma consulta no seu prontuário.' },
+  // Lembrete gerado pelo próprio app a partir da data da consulta — no
+  // aplicativo isso nasce em ApiServer.gerarLembretes, com uma chave que
+  // impede a repetição a cada abertura do Dashboard.
+  { id: 3, tipo: 'lembrete', mensagem: 'Você tem consulta em 2 dias às 14:30 com Dr. Rafael Lima.' },
+  { id: 2, tipo: 'exame', mensagem: 'Dra. Ana Souza registrou um novo exame no prontuário de você.' },
+  { id: 1, tipo: 'consulta', mensagem: 'Dra. Ana Souza registrou uma consulta no prontuário de você.' },
 ];
 
 // Avisos do Dashboard. No app eles saem do AvisoDAO; aqui já vêm prontos,
@@ -367,6 +382,9 @@ const NOTIFICACOES_INICIAIS = [
 const AVISOS = [
   { tipo: 'resultado', severidade: 'alta', titulo: '1 resultado fora da faixa na última coleta', detalhe: 'Vitamina D (25-OH): 28 ng/mL — referência de 30 a 100 ng/mL. Leve o resultado à próxima consulta.' },
   { tipo: 'consulta', severidade: 'media', titulo: 'Consulta em 2 dias', detalhe: 'Retorno cardiológico com Dr. Rafael Lima em 20/08/2026, às 14:30, no Instituto do Coração.' },
+  // Aviso de um DEPENDENTE: o Dashboard passou a olhar a casa inteira, e o
+  // campo `pessoa` é o que diz de quem ele fala.
+  { tipo: 'vacina', severidade: 'media', pessoa: 'Lucas', titulo: '2 doses de vacina em atraso', detalhe: 'Confira a carteira de vacinação e leve o cartão ao posto.' },
   { tipo: 'campanha', severidade: 'baixa', titulo: 'Campanha Nacional de Multivacinação', detalhe: 'Crianças e adolescentes menores de 15 anos. A campanha vai até 01/09/2026.' },
   { tipo: 'exame', severidade: 'baixa', titulo: 'Seu último exame foi há 1 mês', detalhe: 'Coleta de sangue em 16/07/2026, no Laboratório Central — UBS Jardim América.' },
 ];
@@ -397,9 +415,27 @@ const UNIDADES_SAO_PAULO = [
   { id: 6, tipo: 'pronto_socorro', nome: 'Pronto-Socorro do Hospital das Clínicas', endereco: 'Avenida Dr. Enéas de Carvalho Aguiar, 255', bairro: 'Cerqueira César', turno: '24 horas', telefone: '1126610000', distancia: 3.2 },
   { id: 7, tipo: 'ubs', nome: 'UBS Vila Mariana', endereco: 'Rua Sena Madureira, 1108', bairro: 'Vila Mariana', turno: 'Manhã e tarde', telefone: '1150844567', distancia: 3.9 },
   { id: 8, tipo: 'upa', nome: 'UPA 24h Cidade Ademar', endereco: 'Avenida Cupecê, 4020', bairro: 'Cidade Ademar', turno: '24 horas', telefone: '1155628900', distancia: 9.6 },
+  // Unidade de outro município dentro do raio: quem mora perto da divisa vê a
+  // UBS do outro lado, marcada como tal. No app isso vem do espelho do CNES
+  // filtrado por distância, não por cidade.
+  { id: 9, tipo: 'ubs', nome: 'UBS Jardim Vila Galvão', endereco: 'Rua Ana Nery, 90', bairro: 'Jardim Vila Galvão', turno: 'Manhã e tarde', telefone: '1124085566', distancia: 11.4, vizinha: true },
 ];
 
 // A cidade do cadastro é a primeira; a outra só aparece se for pesquisada.
+// O que cada unidade oferece. No app isto é uma chamada ao CNES por
+// estabelecimento, feita quando o paciente toca em "O que tem lá"; aqui é uma
+// lista fixa, porque a demonstração não faz requisição nenhuma.
+const SERVICOS_DEMO = {
+  1: ['Atendimento ambulatorial pelo SUS', 'Serviço de apoio (exames e diagnóstico)'],
+  2: ['Aberto 24 horas', 'Atendimento ambulatorial pelo SUS', 'Serviço de apoio (exames e diagnóstico)'],
+  3: ['Atendimento ambulatorial pelo SUS', 'Serviço de apoio (exames e diagnóstico)'],
+  4: ['Aberto 24 horas', 'Internação hospitalar', 'Centro cirúrgico'],
+  5: ['Atendimento ambulatorial pelo SUS'],
+  6: ['Aberto 24 horas', 'Internação hospitalar', 'Centro cirúrgico', 'Centro obstétrico', 'Cuidado neonatal'],
+  7: ['Atendimento ambulatorial pelo SUS'],
+  8: ['Aberto 24 horas', 'Atendimento ambulatorial pelo SUS'],
+};
+
 const REDES = {
   sp: { cidade: 'São Paulo', estado: 'SP', unidades: UNIDADES_SAO_PAULO },
   guarulhos: { cidade: 'Guarulhos', estado: 'SP', unidades: UNIDADES_GUARULHOS },
@@ -418,6 +454,8 @@ const HISTORICO_ACESSOS = [
   { id: 'med-2', origem: 'medico', acao: 'leu_prontuario', criadoEm: '2026-07-14T11:05:00', medico: 'Dra. Ana Souza', crm: '123456-SP', especialidade: 'Clínico Geral', escopo: 'escrita' },
   { id: 'med-1', origem: 'medico', acao: 'entrou', criadoEm: '2026-07-14T11:04:00', medico: 'Dra. Ana Souza', crm: '123456-SP', especialidade: 'Clínico Geral', escopo: 'escrita' },
   { id: 'pac-4', origem: 'paciente', acao: 'gerou_codigo', criadoEm: '2026-07-14T11:00:00', ip: '187.45.9.120', detalhe: 'Leitura e registro · 30 min' },
+  { id: 'pac-7', origem: 'paciente', acao: 'registrou_vacina', criadoEm: '2026-07-20T10:05:00', ip: '187.45.9.120', dependente: 'Lucas', detalhe: 'Tríplice Viral · 1ª dose' },
+  { id: 'pac-6b', origem: 'paciente', acao: 'consultou_exames', criadoEm: '2026-07-19T21:15:00', ip: '187.45.9.120', dependente: 'Lucas' },
   { id: 'pac-3', origem: 'paciente', acao: 'cadastrou_dependente', criadoEm: '2026-06-02T19:40:00', ip: '187.45.9.120', detalhe: 'Lucas' },
   { id: 'pac-2', origem: 'paciente', acao: 'login', criadoEm: '2026-06-02T19:38:00', ip: '187.45.9.120' },
   { id: 'pac-1', origem: 'paciente', acao: 'login_falhou', criadoEm: '2026-06-01T23:12:00', ip: '201.17.88.4', detalhe: 'Senha incorreta.' },
@@ -564,12 +602,21 @@ const estado = {
   faqAberta: null,
   filtroRede: 'todas',
   filtroHistorico: 'todos',    // Tudo / Profissionais / Você, no histórico de acessos
+  pessoaHistorico: 'todas',    // segundo filtro do histórico: por pessoa da casa
   redeCidade: 'sp',        // cidade mostrada na Rede de Saúde
   redeEscolhida: false,    // true quando veio de uma pesquisa, não do cadastro
   redeBuscaAberta: false,
   redeErroBusca: null,
   pessoa: 'titular',            // titular ou dependente: vale para Exames, Consultas, Prontuário e Vacinas
   escopoAcesso: 'escrita',
+  compartilhaContatos: false,   // enviar os contatos de emergência junto com o código
+  // Doses registradas, por pessoa: { titular: { c3: '2026-01-10' }, 1: {...} }.
+  // No app isso é a tabela vacinas_aplicadas; aqui mora na memória da página e
+  // some ao recarregar, como todo o resto da demonstração.
+  vacinasAplicadas: VACINAS_APLICADAS_INICIAIS,
+  editandoPerfil: false,        // formulário de contato e endereço no Perfil
+  unidadeReferencia: null,      // codigo_cnes da UBS marcada como "a minha"
+  servicosUnidade: {},          // { [codigo_cnes]: [serviços] } já consultados
   dependentes: DEPENDENTES_INICIAIS.slice(),
   acessos: ACESSOS_INICIAIS.slice(),
   familiares: FAMILIARES_INICIAIS.slice(),
@@ -809,6 +856,7 @@ function telaDashboard() {
     return '<div class="aviso-item ' + a.severidade + '">' +
       '<div class="aviso-icone">' + ic(ICONES_AVISO[a.tipo] || 'flask', 18) + '</div>' +
       '<div class="aviso-texto">' +
+        (a.pessoa ? '<span class="aviso-pessoa">' + esc(a.pessoa) + '</span>' : '') +
         '<p class="aviso-titulo' + (escondido ? ' valor-oculto' : '') + '">' +
         esc(escondido ? mascararTexto(a.titulo) : a.titulo) + '</p>' +
         '<p class="aviso-detalhe' + (escondido ? ' valor-oculto' : '') + '">' +
@@ -891,8 +939,25 @@ function telaPerfil() {
       '<p class="text-sm text-muted">' + esc(detalhes) + '</p>' +
     '</div>' +
 
+    (estado.editandoPerfil
+      ? '<form class="card" data-form="perfil">' +
+          '<h3 class="section-title">Editar contato e endereço</h3>' +
+          campoTexto('telefone', 'Telefone', PACIENTE.telefone) +
+          campoTexto('cep', 'CEP', PACIENTE.cep) +
+          campoTexto('rua', 'Rua', PACIENTE.rua) +
+          campoTexto('numero', 'Número', PACIENTE.numero) +
+          campoTexto('bairro', 'Bairro', PACIENTE.bairro) +
+          campoTexto('cidade', 'Cidade', PACIENTE.cidade) +
+          '<button class="btn-primary" type="submit">Salvar alterações</button>' +
+          '<button type="button" class="btn-secondary" data-acao="cancelarPerfil">Cancelar</button>' +
+        '</form>'
+      : '') +
+
     '<div class="section-header"><h3 class="section-title">Dados Cadastrais</h3>' +
-    botaoPrivacidade('meus dados') + '</div>' +
+    '<div class="flex items-center" style="gap:8px">' +
+    (estado.editandoPerfil ? '' :
+      '<button class="privacidade-btn" data-acao="editarPerfil">' + ic('pencil', 14) + ' Editar</button>') +
+    botaoPrivacidade('meus dados') + '</div></div>' +
     '<div class="card">' +
       linhaInfo('mail', 'E-mail', PACIENTE.email, true) +
       linhaInfo('phone', 'Telefone', formatarTelefone(PACIENTE.telefone), true) +
@@ -910,6 +975,12 @@ function telaPerfil() {
 
     blocoContatos() +
   '</div>';
+}
+
+// Um campo de texto do formulário de perfil, já preenchido com o valor atual.
+function campoTexto(nome, rotulo, valor) {
+  return '<div class="input-group"><label class="input-label">' + esc(rotulo) + '</label>' +
+    '<input class="input-field" name="' + nome + '" value="' + esc(valor || '') + '"></div>';
 }
 
 /**
@@ -1259,21 +1330,46 @@ function classePorGenero(pessoa) {
   return '';
 }
 
+// "2026-04-12" -> "12/04/2026", sem passar por new Date() (que mudaria o dia
+// por causa do fuso).
+function dataIsoBr(iso) {
+  if (!iso || iso.length < 10) return iso || '';
+  return iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4);
+}
+
 function itemVacina(v) {
-  const tomada = v.status === 'tomada';
+  const icone = v.status === 'aplicada' ? 'check' : (v.status === 'atrasada' ? 'alertCircle' : 'clock');
+
+  let quando;
+  if (v.status === 'aplicada') {
+    quando = v.aplicadaEm ? 'Aplicada em ' + dataIsoBr(v.aplicadaEm) : 'Aplicada';
+  } else if (v.status === 'atrasada') {
+    quando = v.dataPrevista ? 'Era para ter sido tomada em ' + v.dataPrevista : 'Em atraso';
+  } else {
+    quando = v.dataPrevista ? 'Prevista para ' + v.dataPrevista : v.periodo;
+  }
+
+  const acao = v.status === 'aplicada'
+    ? '<button class="vacina-acao" data-acao="desmarcarVacina" data-dose="' + v.id + '">Desfazer</button>'
+    : '<button class="vacina-acao destaque" data-acao="marcarVacina" data-dose="' + v.id + '">Marcar como aplicada</button>';
+
   return '<div class="vacina-item ' + v.status + '">' +
-    '<div class="vacina-status-icon ' + v.status + '">' + ic(tomada ? 'check' : 'clock', 16) + '</div>' +
+    '<div class="vacina-status-icon ' + v.status + '">' + ic(icone, 16) + '</div>' +
     '<div class="vacina-info">' +
       '<div class="vacina-top"><span class="vacina-nome">' + esc(v.vacina) + '</span>' +
       '<span class="vacina-periodo">' + esc(v.periodo) + '</span></div>' +
       '<span class="vacina-dose">' + esc(v.dose) + '</span>' +
       (v.protege ? '<span class="vacina-protege">Protege contra: ' + esc(v.protege) + '</span>' : '') +
-      '<span class="vacina-data">' +
-      (tomada
-        ? (v.dataPrevista ? 'Aplicada em ' + esc(v.dataPrevista) : 'Aplicada — em dia')
-        : 'Prevista para ' + esc(v.dataPrevista)) +
-      '</span>' +
+      '<span class="vacina-data">' + esc(quando) + '</span>' +
+      acao +
     '</div></div>';
+}
+
+// Doses registradas da pessoa que está selecionada no seletor do topo.
+function vacinasDaPessoa() {
+  const chave = String(pessoaAtual().id);
+  if (!estado.vacinasAplicadas[chave]) estado.vacinasAplicadas[chave] = {};
+  return estado.vacinasAplicadas[chave];
 }
 
 // Titular + dependentes, na mesma ordem que o app monta no PessoasContext.
@@ -1312,11 +1408,15 @@ function telaVacinas() {
   const idade = calcularIdade(pessoa.data_nascimento);
   // O titular usa o calendário adulto; dependentes de até 12 anos, o infantil.
   const adulto = pessoa.titular || (idade != null && idade >= 13);
-  const carteira = montarCarteira(pessoa.data_nascimento, { adulto: adulto });
+  const carteira = montarCarteira(pessoa.data_nascimento, {
+    adulto: adulto,
+    aplicadas: vacinasDaPessoa(),
+  });
 
-  const tomadas = carteira.filter(function (v) { return v.status === 'tomada'; });
-  const pendentes = carteira.filter(function (v) { return v.status === 'pendente'; });
-  const percentual = carteira.length ? Math.round((tomadas.length / carteira.length) * 100) : 0;
+  const aplicadas = carteira.filter(function (v) { return v.status === 'aplicada'; });
+  const atrasadas = carteira.filter(function (v) { return v.status === 'atrasada'; });
+  const previstas = carteira.filter(function (v) { return v.status === 'prevista'; });
+  const percentual = carteira.length ? Math.round((aplicadas.length / carteira.length) * 100) : 0;
 
   return '<div class="screen-container vacinas-screen">' +
     '<div class="vacinas-topo">' +
@@ -1328,18 +1428,23 @@ function telaVacinas() {
         '<div class="icon-box">' + ic('shieldCheck', 26) + '</div>' +
         '<div style="flex:1"><div class="flex justify-between items-center mb-2">' +
         '<span class="font-bold">' + (idade != null ? idade + (idade === 1 ? ' ano' : ' anos') : 'Titular da conta') + '</span>' +
-        '<span class="text-sm text-muted">' + tomadas.length + ' de ' + carteira.length + ' em dia</span></div>' +
+        '<span class="text-sm text-muted">' + aplicadas.length + ' de ' + carteira.length + ' registradas</span></div>' +
         '<div class="vacina-progress-bg"><div class="vacina-progress-fill" style="width:' + percentual + '%"></div></div>' +
         '</div></div></div>' +
     '</div>' +
 
     '<div class="vacinas-lista">' +
-      (pendentes.length
-        ? '<h3 class="section-title">Próximas doses</h3>' + pendentes.map(itemVacina).join('')
+      (atrasadas.length
+        ? '<h3 class="section-title">Em atraso</h3>' + atrasadas.map(itemVacina).join('')
         : '') +
-      '<h3 class="section-title" style="margin-top:' + (pendentes.length ? '24px' : '0') + '">' +
-      (adulto ? 'Vacinas em dia' : 'Doses já aplicadas') + '</h3>' +
-      tomadas.map(itemVacina).join('') +
+      (previstas.length
+        ? '<h3 class="section-title" style="margin-top:' + (atrasadas.length ? '24px' : '0') + '">Próximas doses</h3>' +
+          previstas.map(itemVacina).join('')
+        : '') +
+      (aplicadas.length
+        ? '<h3 class="section-title" style="margin-top:' + (carteira.length > aplicadas.length ? '24px' : '0') + '">Doses registradas</h3>' +
+          aplicadas.map(itemVacina).join('')
+        : '') +
     '</div></div>';
 }
 
@@ -1365,17 +1470,35 @@ function formatarDistancia(km) {
 
 function itemUnidade(u) {
   const tipo = TIPOS_UNIDADE[u.tipo] || TIPOS_UNIDADE.ubs;
-  return '<div class="unidade-item">' +
+  const ehReferencia = estado.unidadeReferencia === u.id;
+  const servicos = estado.servicosUnidade[u.id];
+
+  const listaServicos = servicos
+    ? (servicos.length
+        ? '<ul class="unidade-servicos">' +
+          servicos.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul>'
+        : '<span class="unidade-meta">O CNES não informa os serviços desta unidade.</span>')
+    : '';
+
+  return '<div class="unidade-item' + (ehReferencia ? ' referencia' : '') + '">' +
     '<div class="unidade-icone ' + u.tipo + '">' + ic(tipo.icone, 20) + '</div>' +
     '<div class="unidade-body">' +
       '<div class="unidade-top"><span class="font-bold">' + esc(u.nome) + '</span>' +
       '<span class="unidade-distancia">' + esc(formatarDistancia(u.distancia)) + '</span></div>' +
-      '<span class="unidade-tipo">' + tipo.rotulo + '</span>' +
+      '<span class="unidade-tipo">' + tipo.rotulo +
+      (u.vizinha ? ' · cidade vizinha' : '') + '</span>' +
       '<span class="unidade-meta">' + ic('mapPin', 12) + esc(u.endereco + ' - ' + u.bairro) + '</span>' +
       '<span class="unidade-meta">' + ic('clock', 12) + ' ' + esc(u.turno) + '</span>' +
+      listaServicos +
       '<div class="unidade-acoes">' +
         '<button class="unidade-acao" data-acao="mapa">' + ic('navigation', 14) + ' Como chegar</button>' +
         '<button class="unidade-acao" data-acao="ligar">' + ic('phone', 14) + ' Ligar</button>' +
+        (servicos ? '' :
+          '<button class="unidade-acao" data-acao="servicosUnidade" data-cnes="' + u.id + '">' +
+          ic('info', 14) + ' O que tem lá</button>') +
+        '<button class="unidade-acao' + (ehReferencia ? ' ativa' : '') +
+        '" data-acao="unidadeReferencia" data-cnes="' + u.id + '">' + ic('star', 14) + ' ' +
+        (ehReferencia ? 'Minha UBS' : 'Definir como minha') + '</button>' +
       '</div>' +
     '</div></div>';
 }
@@ -1463,7 +1586,9 @@ function telaAcessoMedico() {
           '<span class="codigo-timer">' + ic('clock', 14) + ' expira em <span id="timer-codigo">' + restante + '</span></span>' +
           '<button class="codigo-copiar" data-acao="copiar-codigo">' + ic('copy', 14) + ' Copiar</button>' +
         '</div>' +
-        '<p class="codigo-aviso">Anote agora: por segurança o código não fica guardado e não pode ser consultado depois.</p>' +
+        '<p class="codigo-aviso">Abre o prontuário de <strong>' +
+        esc(estado.codigoNovo.dependente || 'você') + '</strong>. Anote agora: por segurança o ' +
+        'código não fica guardado e não pode ser consultado depois.</p>' +
       '</div>'
     : '';
 
@@ -1476,7 +1601,9 @@ function telaAcessoMedico() {
           '<div class="acesso-item-topo"><div>' +
             '<p class="font-bold">' + esc(a.medico || 'Ainda não utilizado') + '</p>' +
             '<p class="text-xs text-muted">' + (a.crm ? 'CRM ' + esc(a.crm) + ' · ' : '') +
-            (a.escopo === 'escrita' ? 'Leitura e registro' : 'Somente leitura') + '</p>' +
+            (a.escopo === 'escrita' ? 'Leitura e registro' : 'Somente leitura') +
+            ' · ' + esc(a.dependente || 'você') +
+            (a.compartilhaContatos ? ' · com contatos' : '') + '</p>' +
           '</div>' + selo(STATUS_BADGE_ACESSO[situacao], ROTULO_SITUACAO[situacao]) + '</div>' +
           '<p class="text-xs text-muted">Gerado em ' + dataHoraCurta(a.criadoEm) +
           (a.usadoEm ? ' · usado em ' + dataHoraCurta(a.usadoEm) : '') +
@@ -1495,6 +1622,13 @@ function telaAcessoMedico() {
     cartaoCodigo +
 
     '<h3 class="section-title">Novo acesso</h3>' +
+
+    // De quem é o prontuário que o código abre — mesmo seletor das telas
+    // clínicas, para quem já estava vendo o filho não ter que reescolher.
+    seletorPessoa() +
+    '<p class="text-sm text-muted mb-2">O código vai abrir o prontuário de <strong>' +
+    esc(pessoaAtual().titular ? 'você' : pessoaAtual().nome) + '</strong>.</p>' +
+
     '<div class="escopo-opcoes">' +
       '<button class="escopo-opcao' + (estado.escopoAcesso === 'leitura' ? ' active' : '') + '" data-escopo="leitura">' +
       ic('bookOpen', 18) + '<span class="escopo-titulo">Somente leitura</span>' +
@@ -1503,6 +1637,13 @@ function telaAcessoMedico() {
       ic('penLine', 18) + '<span class="escopo-titulo">Leitura e registro</span>' +
       '<span class="escopo-desc">O médico também registra a consulta e os exames.</span></button>' +
     '</div>' +
+
+    // Contato de emergência é dado de OUTRA pessoa: nunca vai por padrão.
+    '<label class="acesso-opcao-contatos" data-acao="alternarContatosAcesso">' +
+      '<input type="checkbox"' + (estado.compartilhaContatos ? ' checked' : '') + ' />' +
+      '<span>Enviar também meus contatos de emergência' +
+      '<small class="text-xs text-muted"> — nome e telefone de quem avisar</small></span>' +
+    '</label>' +
 
     '<button class="btn-primary" data-acao="gerar-codigo">' + ic('keyRound', 18) + ' Gerar código</button>' +
 
@@ -1545,12 +1686,37 @@ const ACOES_LOG = {
   cadastrou_contato: { texto: 'Você cadastrou um contato de emergência', icone: 'heart', cor: 'consulta' },
   excluiu_contato: { texto: 'Você excluiu um contato de emergência', icone: 'heart', cor: 'revogado' },
   gerou_codigo: { texto: 'Você gerou um código de acesso', icone: 'keyRound', cor: 'consulta' },
+  consultou_vacinas: { texto: 'Você abriu a carteira de vacinação', icone: 'syringe', cor: 'consulta' },
+  registrou_vacina: { texto: 'Você registrou uma dose de vacina', icone: 'syringe', cor: 'consulta' },
+  removeu_vacina: { texto: 'Você desfez o registro de uma dose', icone: 'syringe', cor: 'revogado' },
+  atualizou_perfil: { texto: 'Você alterou dados do cadastro', icone: 'user', cor: 'consulta' },
+  definiu_referencia: { texto: 'Você escolheu sua unidade de referência', icone: 'hospital', cor: 'consulta' },
 };
 
 function telaHistoricoAcessos() {
-  const visiveis = estado.filtroHistorico === 'todos'
-    ? HISTORICO_ACESSOS
-    : HISTORICO_ACESSOS.filter(function (r) { return r.origem === estado.filtroHistorico; });
+  // Pessoas que aparecem na trilha, para o segundo filtro. Sai dos próprios
+  // registros: um dependente já excluído continua na trilha, e sumir com ele
+  // do filtro esconderia o que foi feito com os dados dele.
+  const pessoasTrilha = [];
+  HISTORICO_ACESSOS.forEach(function (r) {
+    if (r.dependente && pessoasTrilha.indexOf(r.dependente) === -1) pessoasTrilha.push(r.dependente);
+  });
+
+  const visiveis = HISTORICO_ACESSOS.filter(function (r) {
+    if (estado.filtroHistorico !== 'todos' && r.origem !== estado.filtroHistorico) return false;
+    if (estado.pessoaHistorico === 'todas') return true;
+    if (estado.pessoaHistorico === 'titular') return !r.dependente;
+    return r.dependente === estado.pessoaHistorico;
+  });
+
+  const filtroPessoas = pessoasTrilha.length
+    ? '<div class="trilha-pessoas">' +
+      ['todas', 'titular'].concat(pessoasTrilha).map(function (id) {
+        const rotulo = id === 'todas' ? 'Todas as pessoas' : (id === 'titular' ? 'Você' : id);
+        return '<button class="rede-filtro' + (estado.pessoaHistorico === id ? ' active' : '') +
+          '" data-pessoa-historico="' + esc(id) + '">' + esc(rotulo) + '</button>';
+      }).join('') + '</div>'
+    : '';
 
   const abas = FILTROS_HISTORICO.map(function (f) {
     return '<button class="tab-btn' + (estado.filtroHistorico === f.id ? ' active' : '') +
@@ -1576,7 +1742,8 @@ function telaHistoricoAcessos() {
 
     return '<div class="timeline-item">' +
       '<div class="timeline-dot ' + info.cor + '">' + ic(info.icone, 10) + '</div>' +
-      '<div class="timeline-head"><h4 class="font-bold">' + info.texto + '</h4></div>' +
+      '<div class="timeline-head"><h4 class="font-bold">' + info.texto + '</h4>' +
+      (r.dependente ? '<span class="trilha-pessoa">' + esc(r.dependente) + '</span>' : '') + '</div>' +
       '<p class="text-xs text-muted">' + esc(dataHoraLonga(r.criadoEm)) + '</p>' +
       '<div class="acesso-log-quem">' +
         '<p class="font-bold text-sm">' + esc(r.medico || 'Você') + '</p>' +
@@ -1600,6 +1767,7 @@ function telaHistoricoAcessos() {
     'automático e não pode ser apagado pelo médico nem por você.</p>' +
 
     '<div class="tabs-wrapper">' + abas + '</div>' +
+    filtroPessoas +
 
     (registros
       ? '<div class="timeline-container">' + registros + '</div>'
@@ -1713,6 +1881,14 @@ function telaPortalMedico() {
       '</div></div>';
   }
 
+  // De quem é o prontuário: o titular ou o dependente escolhido no código.
+  const dependenteAtendido = estado.medico.dependente
+    ? estado.dependentes.filter(function (d) {
+        return d.nome.split(' ')[0] === estado.medico.dependente;
+      })[0]
+    : null;
+  const atendido = dependenteAtendido || PACIENTE;
+
   const idade = calcularIdade(PACIENTE.data_nascimento);
   const escrita = estado.medico.escopo === 'escrita';
   const consulta = estado.abaMedico === 'consulta';
@@ -1771,9 +1947,25 @@ function telaPortalMedico() {
       '<button class="sessao-sair" data-acao="medico-sair">' + ic('logOut', 14) + ' Encerrar</button>' +
     '</div>' +
 
-    '<div class="card"><h3 class="font-bold" style="font-size:18px">' + esc(PACIENTE.nome) + '</h3>' +
-    '<p class="text-sm text-muted">' + idade + ' anos · ' + esc(PACIENTE.genero) +
-    ' · Tipo sanguíneo <strong>' + esc(PACIENTE.tipo_sanguineo) + '</strong></p></div>' +
+    '<div class="card"><h3 class="font-bold" style="font-size:18px">' + esc(atendido.nome) + '</h3>' +
+    '<p class="text-sm text-muted">' + calcularIdade(atendido.data_nascimento) + ' anos · ' +
+    esc(atendido.genero) + ' · Tipo sanguíneo <strong>' + esc(atendido.tipo_sanguineo) + '</strong></p>' +
+    (estado.medico.dependente
+      ? '<p class="text-xs text-muted" style="margin-top:6px">Dependente · responsável: <strong>' +
+        esc(PACIENTE.nome.split(' ')[0]) + '</strong></p>'
+      : '') +
+    '</div>' +
+
+    // Contatos de emergência: só aparecem quando o paciente autorizou ao
+    // gerar o código. Sem isso o portal não recebe a lista.
+    (estado.medico.contatos && estado.familiares.length
+      ? '<div class="card"><div class="flex items-center gap-4 mb-2">' + ic('phoneCall', 18) +
+        '<span class="font-bold text-sm">Contatos de emergência</span></div>' +
+        estado.familiares.map(function (c) {
+          return '<p class="text-sm"><strong>' + esc(c.nome) + '</strong> (' + esc(c.parentesco) +
+            ') · ' + esc(formatarTelefone(c.telefone)) + '</p>';
+        }).join('') + '</div>'
+      : '') +
 
     '<div class="quick-actions-grid mb-6">' +
       listaSimples('border-red', 'text-red', 'alertCircle', 'Alergias', PRONTUARIO.alergias) +
@@ -2037,6 +2229,7 @@ document.addEventListener('click', function (evento) {
   if (d.abaMedico) { estado.abaMedico = d.abaMedico; render(true); return; }
   if (d.filtroRede) { estado.filtroRede = d.filtroRede; render(true); return; }
   if (d.filtroHistorico) { estado.filtroHistorico = d.filtroHistorico; render(true); return; }
+  if (d.pessoaHistorico) { estado.pessoaHistorico = d.pessoaHistorico; render(true); return; }
   if (d.pessoa) { estado.pessoa = d.pessoa; render(false); return; }
   if (d.escopo) { estado.escopoAcesso = d.escopo; render(true); return; }
   if (d.faq) { estado.faqAberta = estado.faqAberta === d.faq ? null : d.faq; render(true); return; }
@@ -2066,7 +2259,48 @@ document.addEventListener('click', function (evento) {
     return;
   }
 
+  // Registrar e desfazer uma dose. No app isso é POST/DELETE /api/vacinas;
+  // aqui fica na memória da página e some ao recarregar, como o resto.
+  if (d.acao === 'marcarVacina' && d.dose) {
+    vacinasDaPessoa()[d.dose] = new Date().toISOString().slice(0, 10);
+    render(false);
+    return;
+  }
+  if (d.acao === 'desmarcarVacina' && d.dose) {
+    delete vacinasDaPessoa()[d.dose];
+    render(false);
+    return;
+  }
+
+  // O que a unidade oferece. No app vem de uma chamada ao CNES; aqui a lista
+  // é fixa por unidade, porque a demonstração não faz requisição nenhuma.
+  if (d.acao === 'servicosUnidade' && d.cnes) {
+    estado.servicosUnidade[d.cnes] = SERVICOS_DEMO[d.cnes] || [];
+    render(false);
+    return;
+  }
+  if (d.acao === 'unidadeReferencia' && d.cnes) {
+    estado.unidadeReferencia = estado.unidadeReferencia === d.cnes ? null : d.cnes;
+    render(false);
+    return;
+  }
+
   switch (d.acao) {
+    case 'editarPerfil':
+      estado.editandoPerfil = true;
+      render(true);
+      break;
+
+    case 'cancelarPerfil':
+      estado.editandoPerfil = false;
+      render(true);
+      break;
+
+    case 'alternarContatosAcesso':
+      estado.compartilhaContatos = !estado.compartilhaContatos;
+      render(false);
+      break;
+
     case 'lerNotificacoes':
       estado.notificacoes = [];
       render(true);
@@ -2131,9 +2365,19 @@ document.addEventListener('click', function (evento) {
       for (let i = 0; i < 6; i++) codigo += alfabeto[Math.floor(Math.random() * alfabeto.length)];
       const id = Date.now();
       const expiraEm = new Date(Date.now() + 30 * 60000).toISOString();
-      estado.codigoNovo = { id: id, codigo: codigo, escopo: estado.escopoAcesso, expiraEm: expiraEm };
+      // De quem é o prontuário que este código abre, e se os contatos de
+      // emergência vão junto — as duas coisas ficam gravadas no acesso, como
+      // no app (colunas dependente_id e compartilha_contatos).
+      const pessoaCodigo = pessoaAtual();
+      const dependente = pessoaCodigo.titular ? null : pessoaCodigo.nome.split(' ')[0];
+
+      estado.codigoNovo = {
+        id: id, codigo: codigo, escopo: estado.escopoAcesso,
+        dependente: dependente, expiraEm: expiraEm,
+      };
       estado.acessos = [{
         id: id, medico: null, crm: null, escopo: estado.escopoAcesso,
+        dependente: dependente, compartilhaContatos: estado.compartilhaContatos,
         criadoEm: new Date().toISOString(), usadoEm: null, expiraEm: expiraEm, revogadoEm: null,
       }].concat(estado.acessos);
       render(false);
@@ -2211,6 +2455,21 @@ document.addEventListener('submit', function (evento) {
       estado.autenticado = true;
       ir('/dashboard');
       break;
+
+    // Edição do cadastro. No app isto é PUT /api/auth/me e entra na trilha de
+    // auditoria; aqui os valores mudam só na memória da página.
+    case 'perfil': {
+      const dados = new FormData(form);
+      PACIENTE.telefone = String(dados.get('telefone') || '').replace(/\D/g, '') || PACIENTE.telefone;
+      PACIENTE.cep = String(dados.get('cep') || '').replace(/\D/g, '') || PACIENTE.cep;
+      PACIENTE.rua = dados.get('rua') || PACIENTE.rua;
+      PACIENTE.numero = dados.get('numero') || PACIENTE.numero;
+      PACIENTE.bairro = dados.get('bairro') || PACIENTE.bairro;
+      PACIENTE.cidade = dados.get('cidade') || PACIENTE.cidade;
+      estado.editandoPerfil = false;
+      render(true);
+      break;
+    }
 
     case 'contato': {
       const dados = new FormData(form);
@@ -2303,9 +2562,17 @@ document.addEventListener('submit', function (evento) {
       const gerado = estado.codigoNovo && estado.codigoNovo.codigo === codigo.toUpperCase()
         ? estado.codigoNovo : null;
       estado.erroTela = null;
+      const acessoUsado = gerado
+        ? estado.acessos.filter(function (a) { return a.id === gerado.id; })[0]
+        : null;
+
       estado.medico = {
         id: gerado ? gerado.id : null,
         escopo: gerado ? gerado.escopo : 'escrita',
+        // De quem é o prontuário aberto por este código, e se os contatos de
+        // emergência foram autorizados junto.
+        dependente: gerado ? gerado.dependente : null,
+        contatos: acessoUsado ? Boolean(acessoUsado.compartilhaContatos) : false,
         expiraEm: new Date(Date.now() + 30 * 60000).toISOString(),
       };
       if (gerado) {

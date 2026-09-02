@@ -16,6 +16,7 @@ const ICONES_AVISO = {
   campanha: Syringe,
   resultado: Activity,
   exame: FlaskConical,
+  vacina: Syringe,
 };
 
 // Atalhos do Início: só os destinos mais usados, em grade compacta. O índice
@@ -40,6 +41,10 @@ function AvisoItem({ aviso }) {
     <div className={`aviso-item ${aviso.severidade}`}>
       <div className="aviso-icone"><Icone size={18} /></div>
       <div className="aviso-texto">
+        {/* De quem é o aviso. O Dashboard passou a olhar também os dependentes,
+            e sem o nome "3 doses em atraso" não diz de quem. O titular não
+            ganha etiqueta: o padrão continua sendo ele. */}
+        {aviso.pessoa && <span className="aviso-pessoa">{aviso.pessoa}</span>}
         <p className={`aviso-titulo ${escondido ? 'valor-oculto' : ''}`}>
           {escondido ? mascararTexto(aviso.titulo) : aviso.titulo}
         </p>

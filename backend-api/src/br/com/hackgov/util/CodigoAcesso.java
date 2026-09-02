@@ -1,5 +1,8 @@
 package br.com.hackgov.util;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 
 /**
@@ -39,8 +42,36 @@ public final class CodigoAcesso {
         return codigo.replaceAll("[^A-Za-z0-9]", "").toUpperCase();
     }
 
-    /** Hash guardado no banco — o código em si nunca é persistido. */
+    /**
+     * Hash guardado no banco — o código em si nunca é persistido.
+     *
+     * <h3>Por que aqui é SHA-256 puro, e não o PBKDF2 do SenhaUtil</h3>
+     * O hash da senha é salgado de propósito: cada conta tem um salt próprio,
+     * então a mesma senha vira hashes diferentes e ninguém consegue procurar
+     * por igualdade — a conferência é feita contra a linha do dono, que já se
+     * conhece pelo e-mail.
+     *
+     * Com o código do médico é o contrário: quem digita não diz de quem é o
+     * código, então a única maneira de encontrá-lo é procurar pelo hash
+     * ({@code WHERE codigo_hash = ?}). Isso exige um hash determinístico, e um
+     * salt por linha tornaria a busca impossível.
+     *
+     * O que compensa a ausência de salt é a natureza do segredo: 8 caracteres
+     * sorteados em 32 símbolos (~10^12 combinações), válidos por 30 minutos e
+     * de uso único. Não é uma senha escolhida por pessoa, que é o caso em que
+     * a tabela pré-computada faz estrago.
+     */
     public static String hash(String codigo) {
-        return SenhaUtil.hash(normalizar(codigo));
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] bytes = md.digest(normalizar(codigo).getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(64);
+            for (byte b : bytes) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("Algoritmo SHA-256 indisponível.", e);
+        }
     }
 }

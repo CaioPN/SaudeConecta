@@ -28,7 +28,32 @@ export async function buscarRedeSaude({ lat, lon, cep } = {}) {
   return {
     origem: data.origem || {},
     unidades: data.unidades || [],
+    // Código CNES da UBS que o paciente marcou como referência, ou null.
+    referencia: data.referencia ?? null,
   };
+}
+
+/**
+ * GET /api/rede-saude/unidades/{cnes} — o que aquela unidade oferece.
+ *
+ * É uma chamada extra ao CNES, uma por estabelecimento, então acontece só
+ * quando o paciente abre a unidade na lista — nunca na montagem da tela.
+ */
+export async function buscarDetalhesUnidade(codigoCnes) {
+  const { data } = await api.get(`/rede-saude/unidades/${codigoCnes}`);
+  return data.unidade;
+}
+
+/**
+ * POST /api/rede-saude/referencia — escolhe (ou tira, com null) a UBS que o
+ * paciente considera a dele.
+ *
+ * Serve para o Dashboard mostrar o posto de sempre sem obrigar a procurar na
+ * lista toda vez.
+ */
+export async function definirUnidadeReferencia(codigoCnes) {
+  const { data } = await api.post('/rede-saude/referencia', { codigoCnes });
+  return data.referencia ?? null;
 }
 
 /**

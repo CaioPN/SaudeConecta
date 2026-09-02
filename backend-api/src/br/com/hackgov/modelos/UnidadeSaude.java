@@ -31,6 +31,13 @@ public class UnidadeSaude {
     /** Distância até o paciente, em km. Calculada na consulta, não gravada. */
     private double distanciaKm;
 
+    /**
+     * O que a unidade oferece, separado por ";" (24 h, centro cirúrgico...).
+     * Vem de uma chamada extra ao CNES, feita só quando alguém abre a unidade,
+     * então costuma ser null na listagem.
+     */
+    private String servicos;
+
     /** Código oficial do estabelecimento no CNES. */
     public int getCodigoCnes() {
         return codigoCnes;
@@ -138,5 +145,13 @@ public class UnidadeSaude {
 
     public void setDistanciaKm(double distanciaKm) {
         this.distanciaKm = distanciaKm;
+    }
+
+    public String getServicos() {
+        return servicos;
+    }
+
+    public void setServicos(String servicos) {
+        this.servicos = servicos;
     }
 }

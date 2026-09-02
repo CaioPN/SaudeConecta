@@ -133,50 +133,70 @@ public class ProntuarioDAO {
     public static final String TABELA_CONDICAO = "condicoes";
     public static final String TABELA_MEDICACAO = "medicacoes";
 
-    /** INSERT — registra uma alergia; devolve o id gerado. */
-    public int inserirAlergia(int idPaciente, String descricao) throws SQLException {
-        String sql = "INSERT INTO alergias (paciente_id, dependente_id, descricao) VALUES (?, NULL, ?)";
+    /**
+     * INSERT — registra uma alergia; devolve o id gerado.
+     *
+     * `idDependente` null grava no prontuário do titular. Ele vem do acesso
+     * temporário, nunca do corpo da requisição: é o código que o paciente
+     * gerou que decide de quem é o prontuário aberto.
+     */
+    public int inserirAlergia(int idPaciente, Integer idDependente, String descricao) throws SQLException {
+        String sql = "INSERT INTO alergias (paciente_id, dependente_id, descricao) VALUES (?, ?, ?)";
         try (Connection con = Conexao.abrir();
              PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             ps.setInt(1, idPaciente);
-            ps.setString(2, descricao);
+            aplicarDependente(ps, 2, idDependente);
+            ps.setString(3, descricao);
             ps.executeUpdate();
             return idGerado(ps);
         }
     }
 
     /** INSERT — registra uma condição acompanhada; `desde` aceita null. */
-    public int inserirCondicao(int idPaciente, String descricao, String desde) throws SQLException {
+    public int inserirCondicao(int idPaciente, Integer idDependente, String descricao, String desde)
+            throws SQLException {
         String sql = "INSERT INTO condicoes (paciente_id, dependente_id, descricao, desde) "
-                + "VALUES (?, NULL, ?, ?)";
+                + "VALUES (?, ?, ?, ?)";
         try (Connection con = Conexao.abrir();
              PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             ps.setInt(1, idPaciente);
-            ps.setString(2, descricao);
-            aplicarData(ps, 3, desde);
+            aplicarDependente(ps, 2, idDependente);
+            ps.setString(3, descricao);
+            aplicarData(ps, 4, desde);
             ps.executeUpdate();
             return idGerado(ps);
         }
     }
 
     /** INSERT — registra uma medicação em uso; `desde` aceita null. */
-    public int inserirMedicacao(int idPaciente, String nome, String dosagem,
+    public int inserirMedicacao(int idPaciente, Integer idDependente, String nome, String dosagem,
                                 String frequencia, String desde) throws SQLException {
         String sql = "INSERT INTO medicacoes "
                 + "(paciente_id, dependente_id, nome, dosagem, frequencia, desde) "
-                + "VALUES (?, NULL, ?, ?, ?, ?)";
+                + "VALUES (?, ?, ?, ?, ?, ?)";
         try (Connection con = Conexao.abrir();
              PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             ps.setInt(1, idPaciente);
-            ps.setString(2, nome);
-            ps.setString(3, dosagem);
-            ps.setString(4, frequencia);
-            aplicarData(ps, 5, desde);
+            aplicarDependente(ps, 2, idDependente);
+            ps.setString(3, nome);
+            ps.setString(4, dosagem);
+            ps.setString(5, frequencia);
+            aplicarData(ps, 6, desde);
             ps.executeUpdate();
             return idGerado(ps);
+        }
+    }
+
+    /** Grava o dependente na posição informada, ou NULL quando é do titular. */
+    private static void aplicarDependente(PreparedStatement ps, int posicao, Integer idDependente)
+            throws SQLException {
+        if (idDependente == null || idDependente <= 0) {
+            ps.setNull(posicao, java.sql.Types.INTEGER);
+        } else {
+            ps.setInt(posicao, idDependente);
         }
     }
 

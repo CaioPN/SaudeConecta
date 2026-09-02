@@ -14,9 +14,20 @@ import java.util.List;
 /**
  * DAO da entidade Notificacao — SQL da tabela "notificacoes".
  *
- * Quem cria notificação hoje é o portal do médico: ao registrar uma consulta
- * ou um exame no prontuário de alguém, o paciente precisa ficar sabendo sem
- * depender de abrir a tela certa por acaso.
+ * Notificação nasce de duas origens. A primeira é o portal do médico: ao
+ * registrar uma consulta ou um exame no prontuário de alguém, o paciente
+ * precisa ficar sabendo sem depender de abrir a tela certa por acaso. A
+ * segunda são os LEMBRETES ({@link #criarSeNova}), gerados pelo próprio app
+ * quando algo tem data marcada — a consulta de amanhã, a dose de vacina que
+ * venceu.
+ *
+ * <h3>Lembrete não é aviso</h3>
+ * O Dashboard tem os dois, e a diferença é o tempo. Aviso é derivado e sempre
+ * atual: some sozinho quando o motivo acaba, e por isso não é gravado.
+ * Lembrete é um fato datado que precisa sobreviver ao motivo — o paciente que
+ * perdeu a consulta de ontem tem que continuar vendo que foi avisado. Só faz
+ * sentido para o que tem dia marcado; "faz um ano que você não faz exame" é
+ * aviso, e viraria uma linha nova no banco por dia se fosse lembrete.
  *
  * A gravação aqui é SÍNCRONA, ao contrário da fila do {@link AuditoriaDAO}.
  * A diferença é o dono da espera: a auditoria atrasaria o paciente que só
@@ -31,6 +42,8 @@ public class NotificacaoDAO {
     public static final String TIPO_EXAME = "exame";
     public static final String TIPO_PRONTUARIO = "prontuario";
     public static final String TIPO_ACESSO = "acesso";
+    /** Gerado pelo app a partir de uma data (consulta amanhã, dose vencida). */
+    public static final String TIPO_LEMBRETE = "lembrete";
 
     /** INSERT — cria a notificação. */
     public void inserir(int idPaciente, String tipo, String mensagem) throws SQLException {
@@ -57,6 +70,36 @@ public class NotificacaoDAO {
             inserir(idPaciente, tipo, mensagem);
         } catch (SQLException e) {
             System.out.println("[notificacao] falha ao criar '" + tipo + "': " + e.getMessage());
+        }
+    }
+
+    /**
+     * INSERT — cria o lembrete só se ele ainda não existir.
+     *
+     * A `chave` é a identidade do fato ("consulta_proxima:42"). O gerador roda
+     * a cada Dashboard aberto, então sem ela o paciente receberia o mesmo
+     * lembrete uma vez por visita; com ela, o índice único (paciente, chave)
+     * deixa o banco recusar a repetição e o INSERT IGNORE engole o conflito.
+     *
+     * Nunca lança: lembrete é conveniência, e uma falha aqui não pode derrubar
+     * o Dashboard.
+     *
+     * @return true se a linha foi realmente criada agora
+     */
+    public boolean criarSeNova(int idPaciente, String tipo, String chave, String mensagem) {
+        String sql = "INSERT IGNORE INTO notificacoes (paciente_id, tipo, chave, mensagem) "
+                + "VALUES (?, ?, ?, ?)";
+        try (Connection con = Conexao.abrir();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, idPaciente);
+            ps.setString(2, tipo);
+            ps.setString(3, chave);
+            ps.setString(4, limitar(mensagem));
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.out.println("[notificacao] falha ao criar lembrete '" + chave + "': " + e.getMessage());
+            return false;
         }
     }
 

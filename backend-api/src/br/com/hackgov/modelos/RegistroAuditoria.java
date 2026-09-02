@@ -16,6 +16,15 @@ public class RegistroAuditoria {
 
     private int idRegistro;
     private int idPaciente;
+    /**
+     * Sobre quem foi a ação: null quando é o próprio titular, preenchido
+     * quando o dado aberto era de um dependente. A linha continua sendo do
+     * titular — é ele quem responde pela conta e quem vê a trilha —, mas com
+     * isto a tela consegue separar o que andaram fazendo com os dados de cada
+     * pessoa da casa.
+     */
+    private Integer idDependente;
+    private String nomeDependente;
     private String acao;
     private String recurso;
     private String detalhe;
@@ -33,9 +42,10 @@ public class RegistroAuditoria {
     public RegistroAuditoria() {
     }
 
-    public RegistroAuditoria(int idPaciente, String acao, String recurso,
+    public RegistroAuditoria(int idPaciente, Integer idDependente, String acao, String recurso,
                              String detalhe, String origemIp, boolean agrupavel) {
         this.idPaciente = idPaciente;
+        this.idDependente = idDependente;
         this.acao = acao;
         this.recurso = recurso;
         this.detalhe = detalhe;
@@ -53,6 +63,22 @@ public class RegistroAuditoria {
 
     public int getIdPaciente() {
         return idPaciente;
+    }
+
+    public Integer getIdDependente() {
+        return idDependente;
+    }
+
+    public void setIdDependente(Integer idDependente) {
+        this.idDependente = idDependente;
+    }
+
+    public String getNomeDependente() {
+        return nomeDependente;
+    }
+
+    public void setNomeDependente(String nomeDependente) {
+        this.nomeDependente = nomeDependente;
     }
 
     public void setIdPaciente(int idPaciente) {

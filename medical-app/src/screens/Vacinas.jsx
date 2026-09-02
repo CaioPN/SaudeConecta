@@ -1,12 +1,12 @@
-import React, { useMemo } from 'react';
-import { ChevronLeft, Check, Clock, ShieldCheck } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ChevronLeft, Check, Clock, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { usePessoas } from '../context/PessoasContext';
 import { usePrivacidade } from '../context/PrivacidadeContext';
 import BotaoPrivacidade from '../components/BotaoPrivacidade';
 import SeletorPessoa from '../components/SeletorPessoa';
 import { mascarar } from '../utils/privacidade';
-import { montarCarteira } from '../data/vacinas';
+import { buscarCarteira, registrarDose, removerDose } from '../services/vacinas';
 
 // Calcula a idade (anos completos) a partir de uma data ISO (YYYY-MM-DD).
 function calcularIdade(dataIso) {
@@ -20,21 +20,35 @@ function calcularIdade(dataIso) {
   return idade;
 }
 
-function VacinaItem({ v, oculto }) {
-  const tomada = v.status === 'tomada';
+// "2026-04-12" -> "12/04/2026". Sem new Date() de propósito: a data vem do
+// banco sem fuso, e o construtor a interpretaria como UTC, o que muda o dia.
+function formatarDataIso(iso) {
+  if (!iso || iso.length < 10) return iso || '';
+  return `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
+}
 
+const ICONE = {
+  aplicada: <Check size={16} />,
+  atrasada: <AlertTriangle size={16} />,
+  prevista: <Clock size={16} />,
+};
+
+function VacinaItem({ v, oculto, onMarcar, onDesmarcar, salvando }) {
   // O olhinho esconde as DATAS, não a lista de vacinas: os nomes e os períodos
   // saem do calendário do PNI, que é público e igual para todo mundo da mesma
-  // idade. A data em que a pessoa tomou (ou vai tomar) é que é dela.
-  const quando = tomada
-    ? v.dataPrevista ? `Aplicada em ${v.dataPrevista}` : 'Aplicada — em dia'
-    : `Prevista para ${v.dataPrevista}`;
+  // idade. A data em que a pessoa tomou (ou deveria ter tomado) é que é dela.
+  let quando;
+  if (v.status === 'aplicada') {
+    quando = v.aplicadaEm ? `Aplicada em ${formatarDataIso(v.aplicadaEm)}` : 'Aplicada';
+  } else if (v.status === 'atrasada') {
+    quando = v.prevista ? `Era para ter sido tomada em ${formatarDataIso(v.prevista)}` : 'Em atraso';
+  } else {
+    quando = v.prevista ? `Prevista para ${formatarDataIso(v.prevista)}` : v.periodo;
+  }
 
   return (
     <div className={`vacina-item ${v.status}`}>
-      <div className={`vacina-status-icon ${v.status}`}>
-        {tomada ? <Check size={16} /> : <Clock size={16} />}
-      </div>
+      <div className={`vacina-status-icon ${v.status}`}>{ICONE[v.status]}</div>
       <div className="vacina-info">
         <div className="vacina-top">
           <span className="vacina-nome">{v.vacina}</span>
@@ -45,6 +59,29 @@ function VacinaItem({ v, oculto }) {
         <span className={`vacina-data ${oculto ? 'valor-oculto' : ''}`}>
           {oculto ? mascarar(quando) : quando}
         </span>
+
+        {/* Quem confirma a dose é a pessoa, não o calendário. Antes a tela
+            deduzia da idade que a dose já tinha sido tomada, e uma criança
+            que não foi ao posto aparecia em dia. */}
+        {v.status === 'aplicada' ? (
+          <button
+            type="button"
+            className="vacina-acao"
+            onClick={() => onDesmarcar(v)}
+            disabled={salvando}
+          >
+            Desfazer{v.origem === 'medico' ? ' (registrado por profissional)' : ''}
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="vacina-acao destaque"
+            onClick={() => onMarcar(v)}
+            disabled={salvando}
+          >
+            Marcar como aplicada
+          </button>
+        )}
       </div>
     </div>
   );
@@ -52,23 +89,52 @@ function VacinaItem({ v, oculto }) {
 
 export default function Vacinas() {
   const navigate = useNavigate();
-  const { pessoa } = usePessoas();
+  const { pessoa, dependenteId } = usePessoas();
   const { oculto } = usePrivacidade();
 
+  const [doses, setDoses] = useState([]);
+  const [resumo, setResumo] = useState({ total: 0, aplicadas: 0, atrasadas: 0 });
+  const [carregando, setCarregando] = useState(true);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState(null);
+
+  const carregar = useCallback(() => {
+    setCarregando(true);
+    return buscarCarteira(dependenteId)
+      .then(({ doses: lista, resumo: r }) => {
+        setDoses(lista);
+        setResumo(r);
+        setErro(null);
+      })
+      .catch(() => setErro('Não foi possível carregar a carteira de vacinação.'))
+      .finally(() => setCarregando(false));
+  }, [dependenteId]);
+
+  useEffect(() => { carregar(); }, [carregar]);
+
+  const marcar = (dose) => {
+    setSalvando(true);
+    registrarDose(dose.id, { dependenteId })
+      .then(carregar)
+      .catch(() => setErro('Não foi possível registrar a dose. Tente de novo.'))
+      .finally(() => setSalvando(false));
+  };
+
+  const desmarcar = (dose) => {
+    setSalvando(true);
+    removerDose(dose.id, dependenteId)
+      .then(carregar)
+      .catch(() => setErro('Não foi possível desfazer o registro.'))
+      .finally(() => setSalvando(false));
+  };
+
   const idade = calcularIdade(pessoa.data_nascimento);
-  // O titular usa o calendário adulto; dependentes de até 12 anos usam o infantil.
-  const adulto = pessoa.titular || (idade != null && idade >= 13);
-
-  const carteira = useMemo(
-    () => montarCarteira(pessoa.data_nascimento, { adulto }),
-    [pessoa.data_nascimento, adulto],
-  );
-
-  const tomadas = carteira.filter((v) => v.status === 'tomada');
-  const pendentes = carteira.filter((v) => v.status === 'pendente');
-  const percentual = carteira.length ? Math.round((tomadas.length / carteira.length) * 100) : 0;
-
   const rotuloIdade = idade != null ? `${idade} ${idade === 1 ? 'ano' : 'anos'}` : 'Titular da conta';
+
+  const atrasadas = doses.filter((v) => v.status === 'atrasada');
+  const previstas = doses.filter((v) => v.status === 'prevista');
+  const aplicadas = doses.filter((v) => v.status === 'aplicada');
+  const percentual = resumo.total ? Math.round((resumo.aplicadas / resumo.total) * 100) : 0;
 
   return (
     <div className="screen-container vacinas-screen">
@@ -98,7 +164,9 @@ export default function Vacinas() {
                 <span className={`font-bold ${oculto ? 'valor-oculto' : ''}`}>
                   {oculto ? mascarar(rotuloIdade) : rotuloIdade}
                 </span>
-                <span className="text-sm text-muted">{tomadas.length} de {carteira.length} em dia</span>
+                <span className="text-sm text-muted">
+                  {resumo.aplicadas} de {resumo.total} registradas
+                </span>
               </div>
               <div className="vacina-progress-bg">
                 <div className="vacina-progress-fill" style={{ width: `${percentual}%` }} />
@@ -106,27 +174,51 @@ export default function Vacinas() {
             </div>
           </div>
         </div>
+
+        {erro && <p className="text-sm text-red">{erro}</p>}
       </div>
 
       {/* Única área rolável da tela */}
       <div className="vacinas-lista">
-        {/* Próximas doses (pendentes) */}
-        {pendentes.length > 0 && (
+        {carregando && <p className="text-sm text-muted">Carregando a carteira…</p>}
+
+        {!carregando && atrasadas.length > 0 && (
           <>
-            <h3 className="section-title">Próximas doses</h3>
-            {pendentes.map((v, i) => (
-              <VacinaItem key={`p-${v.vacina}-${v.dose}-${i}`} v={v} oculto={oculto} />
+            <h3 className="section-title">Em atraso</h3>
+            {atrasadas.map((v) => (
+              <VacinaItem key={v.id} v={v} oculto={oculto} salvando={salvando}
+                onMarcar={marcar} onDesmarcar={desmarcar} />
             ))}
           </>
         )}
 
-        {/* Doses já aplicadas */}
-        <h3 className="section-title" style={{ marginTop: pendentes.length ? '24px' : '0' }}>
-          {adulto ? 'Vacinas em dia' : 'Doses já aplicadas'}
-        </h3>
-        {tomadas.map((v, i) => (
-          <VacinaItem key={`t-${v.vacina}-${v.dose}-${i}`} v={v} oculto={oculto} />
-        ))}
+        {!carregando && previstas.length > 0 && (
+          <>
+            <h3 className="section-title" style={{ marginTop: atrasadas.length ? '24px' : '0' }}>
+              Próximas doses
+            </h3>
+            {previstas.map((v) => (
+              <VacinaItem key={v.id} v={v} oculto={oculto} salvando={salvando}
+                onMarcar={marcar} onDesmarcar={desmarcar} />
+            ))}
+          </>
+        )}
+
+        {!carregando && aplicadas.length > 0 && (
+          <>
+            <h3 className="section-title" style={{ marginTop: doses.length > aplicadas.length ? '24px' : '0' }}>
+              Doses registradas
+            </h3>
+            {aplicadas.map((v) => (
+              <VacinaItem key={v.id} v={v} oculto={oculto} salvando={salvando}
+                onMarcar={marcar} onDesmarcar={desmarcar} />
+            ))}
+          </>
+        )}
+
+        {!carregando && doses.length === 0 && !erro && (
+          <p className="text-sm text-muted">Nenhuma dose no calendário para esta idade.</p>
+        )}
       </div>
     </div>
   );
