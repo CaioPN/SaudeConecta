@@ -585,6 +585,15 @@ function avisar(texto) {
   toastTimer = setTimeout(function () { caixa.remove(); }, 4000);
 }
 
+// Hoje como "AAAA-MM-DD", que é o formato do <input type="date">. Na mão, e
+// não com toISOString(): aquele converte para UTC, e no fuso do Brasil isso
+// vira o dia seguinte à noite.
+function hojeIso() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+    '-' + String(d.getDate()).padStart(2, '0');
+}
+
 // O "?" ao lado do nome de um exame ou de uma vacina. A chave normalizada vai
 // no data-termo para o despachante achar o verbete sem depender do acento.
 function botaoGlossario(tipo, termo) {
@@ -716,6 +725,7 @@ const estado = {
   chatDigitando: false,
   medico: null,              // sessão do portal do médico
   abaMedico: 'consulta',
+  tipoExameMedico: 'sangue',  // sangue | imagem, no formulario do medico
 };
 
 // Rotas que já foram visitadas, para o "Voltar" funcionar como no app.
@@ -2009,19 +2019,44 @@ function telaPortalMedico() {
             '<textarea class="input-field" rows="2" placeholder="Orientações e prescrições"></textarea></div>' +
             '<button class="btn-primary" type="submit">Registrar consulta</button>' +
           '</form>'
-        : '<form class="card" data-form="medico-exame">' +
-            '<div class="input-group"><label class="input-label">Laboratório</label>' +
-            '<input class="input-field" placeholder="Nome do laboratório" required /></div>' +
-            '<div class="item-exame-form">' +
-              '<div class="item-exame-linha"><input class="input-field" placeholder="Exame (ex.: Hemoglobina)" required /></div>' +
-              '<div class="item-exame-linha"><input class="input-field" type="number" step="any" placeholder="Valor" required />' +
-              '<input class="input-field" placeholder="Unidade" /></div>' +
-              '<div class="item-exame-linha"><input class="input-field" type="number" step="any" placeholder="Ref. mín." required />' +
-              '<input class="input-field" type="number" step="any" placeholder="Ref. máx." required /></div>' +
-            '</div>' +
-            '<button type="button" class="btn-secondary" data-acao="mais-resultado">' + ic('plus', 16) + ' Adicionar resultado</button>' +
-            '<button class="btn-primary" type="submit" style="margin-top:16px">Registrar coleta</button>' +
-          '</form>')
+        : (function () {
+            // Sangue e imagem são registros diferentes: um tem resultados com
+            // faixa de referência, o outro tem laudo.
+            const sangue = estado.tipoExameMedico !== 'imagem';
+            return '<form class="card" data-form="medico-exame">' +
+              '<div class="tabs-wrapper">' +
+                '<button type="button" class="tab-btn' + (sangue ? ' active' : '') +
+                '" data-tipo-exame="sangue">' + ic('droplet', 18) + '<span>Sangue</span></button>' +
+                '<button type="button" class="tab-btn' + (!sangue ? ' active' : '') +
+                '" data-tipo-exame="imagem">' + ic('image', 18) + '<span>Imagem</span></button>' +
+              '</div>' +
+              // Data da coleta, não do registro: exame trazido pelo paciente
+              // é de outro dia, e a data alimenta a linha do tempo.
+              '<div class="input-group"><label class="input-label">' +
+              (sangue ? 'Data da coleta' : 'Data do exame') + '</label>' +
+              '<input type="date" class="input-field" max="' + hojeIso() + '" value="' + hojeIso() + '" required /></div>' +
+              '<div class="input-group"><label class="input-label">' +
+              (sangue ? 'Laboratório' : 'Clínica ou setor de imagem') + '</label>' +
+              '<input class="input-field" placeholder="' +
+              (sangue ? 'Nome do laboratório' : 'Nome da clínica') + '" required /></div>' +
+              (sangue
+                ? '<div class="item-exame-form">' +
+                    '<div class="item-exame-linha"><input class="input-field" placeholder="Exame (ex.: Hemoglobina)" required /></div>' +
+                    '<div class="item-exame-linha"><input class="input-field" type="number" step="any" placeholder="Valor" required />' +
+                    '<input class="input-field" placeholder="Unidade" /></div>' +
+                    '<div class="item-exame-linha"><input class="input-field" type="number" step="any" placeholder="Ref. mín." required />' +
+                    '<input class="input-field" type="number" step="any" placeholder="Ref. máx." required /></div>' +
+                  '</div>' +
+                  '<button type="button" class="btn-secondary" data-acao="mais-resultado">' +
+                  ic('plus', 16) + ' Adicionar resultado</button>'
+                : '<div class="input-group"><label class="input-label">Exame</label>' +
+                  '<input class="input-field" placeholder="Ex.: Raio-X de tórax" required /></div>' +
+                  '<div class="input-group"><label class="input-label">Laudo</label>' +
+                  '<textarea class="input-field" rows="4" placeholder="Achados e conclusão"></textarea></div>') +
+              '<button class="btn-primary" type="submit" style="margin-top:16px">' +
+              (sangue ? 'Registrar coleta' : 'Registrar exame') + '</button>' +
+            '</form>';
+          }()))
     : '<p class="acesso-nota">' + ic('shieldCheck', 14) +
       ' Este acesso é somente leitura — o paciente não autorizou o registro de novos dados.</p>';
 
@@ -2301,7 +2336,7 @@ function render(manterRolagem) {
 document.addEventListener('click', function (evento) {
   const alvo = evento.target.closest('[data-ir],[data-voltar],[data-acao],[data-aba-exames],' +
     '[data-faq],[data-filtro-rede],[data-filtro-historico],[data-pessoa],[data-escopo],[data-revogar],' +
-    '[data-remover-dependente],[data-sugestao],[data-aba-medico]');
+    '[data-remover-dependente],[data-sugestao],[data-aba-medico],[data-tipo-exame]');
 
   // Clicar fora fecha o menu "Mais".
   if (!alvo || (!alvo.dataset.acao && alvo.dataset.acao !== 'menu')) {
@@ -2318,6 +2353,7 @@ document.addEventListener('click', function (evento) {
   if (d.voltar !== undefined) { voltar(d.voltar); return; }
   if (d.abaExames) { estado.abaExames = d.abaExames; render(false); return; }
   if (d.abaMedico) { estado.abaMedico = d.abaMedico; render(true); return; }
+  if (d.tipoExame) { estado.tipoExameMedico = d.tipoExame; render(true); return; }
   if (d.filtroRede) { estado.filtroRede = d.filtroRede; render(true); return; }
   if (d.filtroHistorico) { estado.filtroHistorico = d.filtroHistorico; render(true); return; }
   if (d.pessoaHistorico) { estado.pessoaHistorico = d.pessoaHistorico; render(true); return; }

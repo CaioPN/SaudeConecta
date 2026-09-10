@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   Stethoscope, ShieldCheck, Clock, LogOut, AlertCircle, Heart, Pill,
-  Droplet, Plus, Trash2, Check, FileText, PhoneCall,
+  Droplet, Plus, Trash2, Check, FileText, PhoneCall, Image as ImageIcon,
 } from 'lucide-react';
 import {
   entrarComCodigo, buscarPacienteDoAcesso, registrarConsulta, registrarExame,
@@ -9,6 +9,19 @@ import {
 } from '../services/medico';
 
 const ITEM_VAZIO = { nome: '', valor: '', unidade: '', refMin: '', refMax: '' };
+
+/**
+ * Data de hoje como "AAAA-MM-DD", que é o formato do <input type="date"> e o
+ * que o backend espera.
+ *
+ * Feito na mão, e não com toISOString(): aquele converte para UTC, e no fuso
+ * do Brasil isso vira o dia seguinte durante a noite — o exame registrado às
+ * 22h apareceria com a data de amanhã.
+ */
+function hojeIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 /** Minutos e segundos restantes até `iso`; null quando já passou. */
 function tempoRestante(iso, agora) {
@@ -136,7 +149,11 @@ function FormularioConsulta({ token, onPronto }) {
 
 /** Formulário de coleta de sangue, com uma linha por resultado. */
 function FormularioExame({ token }) {
+  const [tipo, setTipo] = useState('sangue');
+  const [data, setData] = useState(hojeIso);
   const [local, setLocal] = useState('');
+  const [nome, setNome] = useState('');
+  const [laudo, setLaudo] = useState('');
   const [itens, setItens] = useState([{ ...ITEM_VAZIO }]);
   const [estado, setEstado] = useState(null);
 
@@ -149,24 +166,37 @@ function FormularioExame({ token }) {
   const adicionar = () => setItens([...itens, { ...ITEM_VAZIO }]);
   const remover = (i) => setItens(itens.filter((_, idx) => idx !== i));
 
+  const limpar = () => {
+    setData(hojeIso());
+    setLocal('');
+    setNome('');
+    setLaudo('');
+    setItens([{ ...ITEM_VAZIO }]);
+  };
+
   const enviar = async (e) => {
     e.preventDefault();
     setEstado('enviando');
     try {
-      await registrarExame(token, {
-        tipo: 'sangue',
-        local,
-        itens: itens.map((it) => ({
-          nome: it.nome,
-          valor: Number(it.valor),
-          unidade: it.unidade,
-          refMin: Number(it.refMin),
-          refMax: Number(it.refMax),
-        })),
-      });
+      // O corpo muda com o tipo: a coleta de sangue leva os resultados, o exame
+      // de imagem leva o nome e o laudo. Mandar os dois confundiria o backend,
+      // que decide o que validar pelo campo "tipo".
+      await registrarExame(token, tipo === 'imagem'
+        ? { tipo: 'imagem', data, local, nome, laudo }
+        : {
+            tipo: 'sangue',
+            data,
+            local,
+            itens: itens.map((it) => ({
+              nome: it.nome,
+              valor: Number(it.valor),
+              unidade: it.unidade,
+              refMin: Number(it.refMin),
+              refMax: Number(it.refMax),
+            })),
+          });
       setEstado('ok');
-      setLocal('');
-      setItens([{ ...ITEM_VAZIO }]);
+      limpar();
     } catch (err) {
       setEstado(err.response?.data?.erro || 'Não foi possível registrar o exame.');
     }
@@ -174,12 +204,76 @@ function FormularioExame({ token }) {
 
   return (
     <form className="card" onSubmit={enviar}>
+      {/* Sangue e imagem são registros diferentes: um tem resultados com faixa
+          de referência, o outro tem laudo. O backend já aceitava os dois — o
+          que faltava era a tela, e por isso só dava para lançar sangue. */}
+      <div className="tabs-wrapper">
+        <button
+          type="button"
+          className={`tab-btn ${tipo === 'sangue' ? 'active' : ''}`}
+          onClick={() => { setTipo('sangue'); setEstado(null); }}
+        >
+          <Droplet size={18} /><span>Sangue</span>
+        </button>
+        <button
+          type="button"
+          className={`tab-btn ${tipo === 'imagem' ? 'active' : ''}`}
+          onClick={() => { setTipo('imagem'); setEstado(null); }}
+        >
+          <ImageIcon size={18} /><span>Imagem</span>
+        </button>
+      </div>
+
+      {/* Data da COLETA, não do registro. Sem este campo tudo entrava como
+          "hoje", e um exame trazido pelo paciente ficava com a data errada na
+          linha do tempo do prontuário. O max impede data no futuro. */}
       <div className="input-group">
-        <label className="input-label">Laboratório</label>
+        <label className="input-label">
+          {tipo === 'imagem' ? 'Data do exame' : 'Data da coleta'}
+        </label>
+        <input
+          className="input-field"
+          type="date"
+          value={data}
+          max={hojeIso()}
+          onChange={(e) => setData(e.target.value)}
+          required
+        />
+      </div>
+
+      <div className="input-group">
+        <label className="input-label">
+          {tipo === 'imagem' ? 'Clínica ou setor de imagem' : 'Laboratório'}
+        </label>
         <input className="input-field" value={local} onChange={(e) => setLocal(e.target.value)} required />
       </div>
 
-      {itens.map((item, i) => (
+      {tipo === 'imagem' && (
+        <>
+          <div className="input-group">
+            <label className="input-label">Exame</label>
+            <input
+              className="input-field"
+              placeholder="Ex.: Raio-X de tórax"
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              required
+            />
+          </div>
+          <div className="input-group">
+            <label className="input-label">Laudo</label>
+            <textarea
+              className="input-field"
+              rows={4}
+              placeholder="Achados e conclusão"
+              value={laudo}
+              onChange={(e) => setLaudo(e.target.value)}
+            />
+          </div>
+        </>
+      )}
+
+      {tipo === 'sangue' && itens.map((item, i) => (
         <div key={i} className="item-exame-form">
           <div className="item-exame-linha">
             <input
@@ -210,15 +304,19 @@ function FormularioExame({ token }) {
         </div>
       ))}
 
-      <button type="button" className="btn-secondary" onClick={adicionar}>
-        <Plus size={16} /> Adicionar resultado
-      </button>
+      {tipo === 'sangue' && (
+        <button type="button" className="btn-secondary" onClick={adicionar}>
+          <Plus size={16} /> Adicionar resultado
+        </button>
+      )}
 
       {estado === 'ok' && <p className="form-ok"><Check size={14} /> Exame registrado no prontuário.</p>}
       {estado && estado !== 'ok' && estado !== 'enviando' && <p className="form-erro">{estado}</p>}
 
       <button className="btn-primary" type="submit" disabled={estado === 'enviando'}>
-        {estado === 'enviando' ? 'Registrando…' : 'Registrar coleta'}
+        {estado === 'enviando'
+          ? 'Registrando…'
+          : tipo === 'imagem' ? 'Registrar exame' : 'Registrar coleta'}
       </button>
     </form>
   );

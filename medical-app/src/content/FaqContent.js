@@ -225,7 +225,11 @@ export const FAQ = [
       },
       {
         p: 'O que exatamente o médico consegue escrever no meu prontuário?',
-        r: 'Com o acesso de "Leitura e registro", ele pode lançar a consulta do dia, um exame com os resultados e itens do prontuário: alergias, condições acompanhadas e medicações em uso. Não existe "editar": para corrigir algo lançado errado, o profissional remove o item e lança o certo — e as duas ações aparecem separadas no seu histórico de acessos.',
+        r: 'Com o acesso de "Leitura e registro", ele pode lançar a consulta do dia, um exame e itens do prontuário: alergias, condições acompanhadas e medicações em uso. Nos exames ele escolhe entre uma coleta de sangue (com os resultados e as faixas de referência) e um exame de imagem (com o nome e o laudo), e informa a data em que o exame foi feito — que pode ser anterior à consulta. Não existe "editar": para corrigir algo lançado errado, o profissional remove o item e lança o certo — e as duas ações aparecem separadas no seu histórico de acessos.',
+      },
+      {
+        p: 'Posso eu mesmo enviar um exame que fiz em outro lugar?',
+        r: 'Não. O aplicativo não recebe arquivos nem fotos: quem registra exame, consulta e prontuário é sempre um profissional, usando um código de acesso que você gera. Se você tem um resultado de fora, leve-o à consulta e peça ao profissional para lançá-lo — ele consegue informar a data original do exame.',
       },
       {
         p: 'O app me lembra das consultas?',
