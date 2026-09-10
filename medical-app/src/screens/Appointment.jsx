@@ -70,15 +70,19 @@ export default function Appointment() {
   const realizada = consulta.status === 'realizada';
 
   return (
-    <div className="screen-container">
-      <button onClick={() => navigate('/appointment')} className="back-btn">
-        <ChevronLeft size={20} /> Voltar
-      </button>
+    <div className="screen-container tela-rolagem">
+      <div className="tela-topo">
+        <button onClick={() => navigate('/appointment')} className="back-btn">
+          <ChevronLeft size={20} /> Voltar
+        </button>
 
-      <div className="section-header">
-        <h2 className="header-title">Detalhes da Consulta</h2>
-        <BotaoPrivacidade rotulo="consulta" />
+        <div className="section-header">
+          <h2 className="header-title">Detalhes da Consulta</h2>
+          <BotaoPrivacidade rotulo="consulta" />
+        </div>
       </div>
+
+      <div className="tela-lista">
 
       {/* Motivo, resumo e conduta são o registro clínico do atendimento — é o
           conteúdo mais sensível da tela e o primeiro a sumir com o olhinho.
@@ -150,6 +154,7 @@ export default function Appointment() {
         )}
         {/* TODO: ligar ao endpoint de reagendamento quando ele existir no ApiServer. */}
         {!realizada && <button className="btn-primary">Remarcar</button>}
+      </div>
       </div>
     </div>
   );

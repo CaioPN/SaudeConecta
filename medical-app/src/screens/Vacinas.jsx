@@ -5,6 +5,7 @@ import { usePessoas } from '../context/PessoasContext';
 import { usePrivacidade } from '../context/PrivacidadeContext';
 import BotaoPrivacidade from '../components/BotaoPrivacidade';
 import SeletorPessoa from '../components/SeletorPessoa';
+import BotaoExplicacao from '../components/BotaoExplicacao';
 import { mascarar } from '../utils/privacidade';
 import { buscarCarteira, registrarDose, removerDose } from '../services/vacinas';
 
@@ -51,7 +52,11 @@ function VacinaItem({ v, oculto, onMarcar, onDesmarcar, salvando }) {
       <div className={`vacina-status-icon ${v.status}`}>{ICONE[v.status]}</div>
       <div className="vacina-info">
         <div className="vacina-top">
-          <span className="vacina-nome">{v.vacina}</span>
+          <span className="vacina-nome">
+            {v.vacina}
+            {/* Nome da vacina é dado público do PNI — só ele sai do app. */}
+            <BotaoExplicacao tipo="vacina" termo={v.vacina} />
+          </span>
           <span className="vacina-periodo">{v.periodo}</span>
         </div>
         <span className="vacina-dose">{v.dose}</span>
@@ -137,9 +142,9 @@ export default function Vacinas() {
   const percentual = resumo.total ? Math.round((resumo.aplicadas / resumo.total) * 100) : 0;
 
   return (
-    <div className="screen-container vacinas-screen">
+    <div className="screen-container tela-rolagem">
       {/* Cabeçalho fixo: só a lista de doses rola. */}
-      <div className="vacinas-topo">
+      <div className="tela-topo">
         <button onClick={() => navigate(-1)} className="back-btn">
           <ChevronLeft size={20} /> Voltar
         </button>
@@ -179,7 +184,7 @@ export default function Vacinas() {
       </div>
 
       {/* Única área rolável da tela */}
-      <div className="vacinas-lista">
+      <div className="tela-lista">
         {carregando && <p className="text-sm text-muted">Carregando a carteira…</p>}
 
         {!carregando && atrasadas.length > 0 && (

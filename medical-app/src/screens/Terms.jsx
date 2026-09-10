@@ -7,7 +7,8 @@ export default function Terms() {
   const navigate = useNavigate();
 
   return (
-    <div className="screen-container">
+    <div className="screen-container tela-rolagem">
+      <div className="tela-topo">
       <button onClick={() => navigate(-1)} className="back-btn">
         <ChevronLeft size={20} /> Voltar
       </button>
@@ -19,9 +20,13 @@ export default function Terms() {
         <h2 className="header-title">Termos de Uso</h2>
       </div>
       <p className="header-subtitle mb-6">Última atualização: 09 de junho de 2026</p>
+      </div>
+
+      <div className="tela-lista">
 
       <div className="card">
         <TermsContent />
+      </div>
       </div>
     </div>
   );

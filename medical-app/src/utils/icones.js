@@ -37,6 +37,10 @@ export const ICONES = {
   // Conta e apoio
   perfil: User,
   duvidas: HelpCircle,
+  // "O que é isto?" — o glossário de exames e vacinas. Usa o mesmo desenho de
+  // "duvidas" de propósito: para o paciente é a mesma pergunta, feita sobre um
+  // item da tela em vez de sobre o app.
+  explicacao: HelpCircle,
   termos: ScrollText,
   sair: LogOut,
 };

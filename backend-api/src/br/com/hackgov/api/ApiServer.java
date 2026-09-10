@@ -28,6 +28,7 @@ import br.com.hackgov.dao.AvisoDAO;
 import br.com.hackgov.dao.ConsultaDAO;
 import br.com.hackgov.dao.DependenteDAO;
 import br.com.hackgov.dao.ExameDAO;
+import br.com.hackgov.dao.ExplicacaoDAO;
 import br.com.hackgov.dao.FamiliarDAO;
 import br.com.hackgov.dao.VacinaDAO;
 import br.com.hackgov.dao.MedicoDAO;
@@ -116,6 +117,7 @@ public class ApiServer {
     private static final ExameDAO exameDAO = new ExameDAO();
     private static final ProntuarioDAO prontuarioDAO = new ProntuarioDAO();
     private static final AvisoDAO avisoDAO = new AvisoDAO();
+    private static final ExplicacaoDAO explicacaoDAO = new ExplicacaoDAO();
     private static final UnidadeSaudeDAO unidadeSaudeDAO = new UnidadeSaudeDAO();
     private static final AcessoDAO acessoDAO = new AcessoDAO();
     private static final MedicoDAO medicoDAO = new MedicoDAO();
@@ -152,6 +154,9 @@ public class ApiServer {
     private static final long JANELA_TENTATIVAS_MS = 10L * 60 * 1000;
     private static final Map<String, long[]> tentativasPorIp = new HashMap<>();
 
+    /** Tamanho máximo do nome de exame/vacina aceito pelo glossário. */
+    private static final int LIMITE_TERMO = 120;
+
     /** Limite de perguntas ao chatbot por paciente, para proteger a cota da IA. */
     private static final int PERGUNTAS_MAXIMAS = 15;
     private static final long JANELA_CHAT_MS = 60L * 1000;
@@ -175,6 +180,7 @@ public class ApiServer {
         server.createContext("/api/avisos", comCors(ApiServer::avisos));
         server.createContext("/api/rede-saude", comCors(ApiServer::redeSaude));
         server.createContext("/api/chat", comCors(ApiServer::chat));
+        server.createContext("/api/explicacoes", comCors(ApiServer::explicacoes));
         server.createContext("/api/acessos", comCors(ApiServer::acessos));
         server.createContext("/api/auditoria", comCors(ApiServer::auditoria));
         server.createContext("/api/medico", comCors(ApiServer::medico));
@@ -1222,6 +1228,95 @@ public class ApiServer {
 
         } catch (IllegalArgumentException e) {
             enviarErro(ex, 400, "Corpo da requisição inválido (JSON).");
+        }
+    }
+
+    /**
+     * POST /api/explicacoes — o glossário: "o que é o exame TGP?", "para que
+     * serve a pentavalente?".
+     *
+     * O texto vem do banco quando alguém já perguntou aquele termo; só na
+     * primeira vez ele é escrito pelo modelo e gravado (ver ExplicacaoDAO).
+     *
+     * <p>LGPD: sai daqui apenas o NOME do exame ou da vacina — vocabulário
+     * público. O resultado, a data e de quem é o exame nunca são enviados ao
+     * modelo, e a explicação gravada não pertence a paciente nenhum.
+     *
+     * <p>É POST, e não GET com o termo na URL, de propósito: a linha do log do
+     * servidor guardaria "termo=HIV" ao lado do paciente autenticado, que é
+     * exatamente o tipo de rastro que este app evita.
+     */
+    private static void explicacoes(HttpExchange ex) throws IOException {
+        if (!"POST".equals(ex.getRequestMethod())) { enviarErro(ex, 405, "Método não permitido."); return; }
+        Integer userId = autenticar(ex);
+        if (userId == null) return;
+
+        try {
+            Map<String, Object> body = lerCorpo(ex);
+            String tipo = campo(body, "tipo");
+            String termo = campo(body, "termo");
+
+            if (!"exame".equals(tipo) && !"vacina".equals(tipo)) {
+                enviarErro(ex, 400, "Tipo inválido.");
+                return;
+            }
+            if (termo == null || termo.isBlank() || termo.length() > LIMITE_TERMO) {
+                enviarErro(ex, 400, "Termo inválido.");
+                return;
+            }
+
+            // Trava: só explica o que existe de verdade. Sem isto, a rota seria
+            // um jeito de mandar texto qualquer ao modelo por conta do projeto.
+            if (!explicacaoDAO.termoConhecido(tipo, termo, userId)) {
+                enviarErro(ex, 404, "Não temos explicação para este item.");
+                return;
+            }
+
+            // 1) o que já está no banco serve todo mundo, na hora e sem cota.
+            String texto = explicacaoDAO.buscar(tipo, termo);
+            if (texto != null) {
+                Map<String, Object> resp = new LinkedHashMap<>();
+                resp.put("texto", texto);
+                resp.put("origem", "banco");
+                enviarJson(ex, 200, resp);
+                return;
+            }
+
+            // 2) primeira vez: só agora o modelo entra, e o limite do chat vale
+            //    aqui também — as duas rotas gastam a mesma cota gratuita.
+            if (!ChatIA.disponivel()) {
+                enviarErro(ex, 503, "As explicações não estão disponíveis agora.");
+                return;
+            }
+            if (!liberarPergunta(userId)) {
+                enviarErro(ex, 429, "Muitas consultas seguidas. Aguarde um minuto.");
+                return;
+            }
+
+            ChatIA.Verbete verbete = ChatIA.explicarTermo(tipo, termo.trim());
+            String escrito = verbete == null ? null : verbete.getTexto();
+            if (escrito == null || escrito.isBlank() || escrito.startsWith("DESCONHECIDO")) {
+                // DESCONHECIDO é a saída que a instrução manda usar quando o
+                // modelo não reconhece o termo. Gravar isso envenenaria o
+                // glossário: o erro ficaria no banco e nunca mais seria tentado.
+                enviarErro(ex, 502, "Não foi possível explicar este item agora.");
+                return;
+            }
+
+            // Grava QUEM escreveu, não o modelo configurado: quando o Gemini
+            // falha, quem responde é a reserva.
+            explicacaoDAO.gravar(tipo, termo, termo.trim(), escrito, verbete.getModelo());
+
+            Map<String, Object> resp = new LinkedHashMap<>();
+            resp.put("texto", escrito);
+            resp.put("origem", "ia");
+            enviarJson(ex, 200, resp);
+
+        } catch (IllegalArgumentException e) {
+            enviarErro(ex, 400, "Corpo da requisição inválido (JSON).");
+        } catch (SQLException e) {
+            System.out.println("[ERRO explicacoes] " + e.getMessage());
+            enviarErro(ex, 500, "Erro ao buscar a explicação.");
         }
     }
 

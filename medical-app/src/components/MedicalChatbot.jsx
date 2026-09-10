@@ -116,6 +116,17 @@ const BASE_CONHECIMENTO = [
             'é automático e não pode ser apagado.',
     },
     {
+        chaves: ['o que e esse exame', 'o que é esse exame', 'o que e este exame',
+                 'significa o exame', 'explicar exame', 'explicacao', 'explicação',
+                 'nao entendi o exame', 'não entendi o exame', 'para que serve a vacina',
+                 'glossario', 'glossário'],
+        resposta:
+            'Ao lado do nome de cada exame e de cada vacina existe um "?". Tocando nele abre uma ' +
+            'explicação em linguagem simples do que aquilo é e por que o profissional costuma pedir ' +
+            'ou aplicar. O texto é escrito por inteligência artificial e fala do item em geral: ele ' +
+            'não avalia o seu resultado. Só o nome do exame sai do aplicativo — nunca o seu valor.',
+    },
+    {
         chaves: ['privacidade', 'dados', 'lgpd', 'termo', 'termos'],
         resposta:
             'No menu "Mais" você encontra os "Termos de Utilização" e o "Portal de Privacidade", ' +
@@ -174,7 +185,7 @@ function buscarNaBase(texto) {
 // Exibida quando a base local não sabe e a IA também não respondeu (sem chave
 // configurada, cota do dia estourada ou sem internet).
 const RESPOSTA_FALLBACK =
-    'Ainda não sei responder isso com certeza. 🤔 Posso ajudar com: agendar consultas, exames, ' +
+    'Ainda não sei responder isso com certeza. 🤔 Posso ajudar com: consultas, exames, ' +
     'dependentes, prontuário, senha/acesso e privacidade. Tente reformular ou escolha um desses temas.';
 
 export default function MedicalChatbot() {
@@ -333,6 +344,14 @@ export default function MedicalChatbot() {
                             <Send size={18} />
                         </button>
                     </form>
+
+                    {/* O assistente não lê o prontuário, mas o que for digitado
+                        aqui pode sair do app para o modelo de IA. Como a caixa
+                        é de texto livre, o paciente precisa saber disso antes
+                        de escrever um sintoma ou um número de documento. */}
+                    <p className="chat-aviso-privacidade">
+                        Não escreva dados pessoais. O assistente não vê o seu prontuário.
+                    </p>
                 </div>
             )}
 

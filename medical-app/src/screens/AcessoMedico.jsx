@@ -109,17 +109,21 @@ export default function AcessoMedico() {
   const restante = novo ? tempoRestante(novo.expiraEm, agora) : null;
 
   return (
-    <div className="screen-container">
-      <button onClick={() => navigate(-1)} className="back-btn">
-        <ChevronLeft size={20} /> Voltar
-      </button>
+    <div className="screen-container tela-rolagem">
+      <div className="tela-topo">
+        <button onClick={() => navigate(-1)} className="back-btn">
+          <ChevronLeft size={20} /> Voltar
+        </button>
 
-      <h2 className="header-title mb-2">Acesso do médico</h2>
-      <p className="text-sm text-muted mb-6">
-        Gere um código e mostre ao profissional durante o atendimento. Ele usa o
-        código no portal do médico para ver seu resumo clínico e registrar o que
-        foi feito na consulta.
-      </p>
+        <h2 className="header-title mb-2">Acesso do médico</h2>
+        <p className="text-sm text-muted mb-6">
+          Gere um código e mostre ao profissional durante o atendimento. Ele usa o
+          código no portal do médico para ver seu resumo clínico e registrar o que
+          foi feito na consulta.
+        </p>
+      </div>
+
+      <div className="tela-lista">
 
       {erro && <p className="empty-state mb-6">{erro}</p>}
 
@@ -237,6 +241,7 @@ export default function AcessoMedico() {
           );
         })
       )}
+      </div>
     </div>
   );
 }

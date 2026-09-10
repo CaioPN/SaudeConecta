@@ -117,7 +117,10 @@ export default function HistoricoAcessos() {
   }, [registros, filtro, pessoa]);
 
   return (
-    <div className="screen-container">
+    <div className="screen-container tela-rolagem">
+      {/* Cabeçalho, explicação e os dois filtros ficam parados: eles comandam
+          a trilha, e numa conta com muito registro sumiam da tela. */}
+      <div className="tela-topo">
       <button onClick={() => navigate(-1)} className="back-btn">
         <ChevronLeft size={20} /> Voltar
       </button>
@@ -169,7 +172,9 @@ export default function HistoricoAcessos() {
           ))}
         </div>
       )}
+      </div>
 
+      <div className="tela-lista">
       {erro && <p className="empty-state">{erro}</p>}
       {!erro && registros === null && <p className="empty-state">Carregando histórico…</p>}
       {!erro && registros !== null && visiveis.length === 0 && (
@@ -224,6 +229,7 @@ export default function HistoricoAcessos() {
           })}
         </div>
       )}
+      </div>
     </div>
   );
 }

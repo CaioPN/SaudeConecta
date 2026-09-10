@@ -321,11 +321,16 @@ export default function Profile() {
   const endereco = montarEndereco(paciente);
 
   return (
-    <div className="screen-container">
-      <button onClick={() => navigate(-1)} className="back-btn">
-        <ChevronLeft size={20} /> Voltar
-      </button>
+    <div className="screen-container tela-rolagem">
+      {/* Só o "Voltar" fica parado. O cartão do avatar é alto e, fixo, comeria
+          metade da área de leitura numa tela de celular. */}
+      <div className="tela-topo">
+        <button onClick={() => navigate(-1)} className="back-btn">
+          <ChevronLeft size={20} /> Voltar
+        </button>
+      </div>
 
+      <div className="tela-lista">
       <div className="card profile-header">
         <div className="profile-avatar">
           <User size={40} />
@@ -369,6 +374,7 @@ export default function Profile() {
       </div>
 
       <ContatosEmergencia />
+      </div>
     </div>
   );
 }

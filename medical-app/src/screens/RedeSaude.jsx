@@ -232,7 +232,10 @@ export default function RedeSaude() {
       }[origem?.tipo];
 
   return (
-    <div className="screen-container">
+    <div className="screen-container tela-rolagem">
+      {/* Cabeçalho, troca de cidade e filtros ficam parados: eles são o
+          controle da lista, e sumiam da tela assim que se descia um pouco. */}
+      <div className="tela-topo">
       <button onClick={() => navigate(-1)} className="back-btn">
         <ChevronLeft size={20} /> Voltar
       </button>
@@ -302,7 +305,9 @@ export default function RedeSaude() {
           ))}
         </div>
       )}
+      </div>
 
+      <div className="tela-lista">
       {carregando && <p className="empty-state">Buscando unidades perto de você…</p>}
       {erro && !carregando && <p className="empty-state">{erro}</p>}
 
@@ -332,6 +337,7 @@ export default function RedeSaude() {
           dados abertos do Ministério da Saúde.
         </p>
       )}
+      </div>
     </div>
   );
 }

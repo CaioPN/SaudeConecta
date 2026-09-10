@@ -7,10 +7,52 @@
 # (nível gratuito: 1.500 requisições por dia, sem cartão de crédito).
 #
 # Alternativa: em vez do arquivo, exportar a variável de ambiente GEMINI_API_KEY.
-# Ela tem prioridade sobre este arquivo.
+# Ela tem prioridade sobre este arquivo (mas o modelo continua saindo daqui).
 
 gemini.api.key=COLE_SUA_CHAVE_AQUI
 
-# Modelo usado. Se a API responder 404, troque aqui pelo nome de um modelo
-# disponível no seu projeto (ex.: gemini-2.5-flash) — não precisa recompilar.
-gemini.modelo=gemini-2.0-flash
+# Modelo usado. Trocar aqui NÃO exige recompilar — mas reinicie a API, que lê
+# este arquivo uma vez ao subir.
+#
+# Se a API responder 404, o modelo foi aposentado — acontece de tempos em
+# tempos, e a mensagem do erro costuma sugerir o substituto. Para ver o que a
+# sua chave enxerga:
+#
+#   curl -H "x-goog-api-key: SUA_CHAVE" \
+#        https://generativelanguage.googleapis.com/v1beta/models
+#
+# Aparecer na lista não basta: um modelo pode estar lá e recusar chaves novas.
+#
+# Prefira um modelo "lite". Os maiores "pensam" antes de responder, e aqui isso
+# custou de 5 a 17 segundos por pergunta (contra ~1 s do lite), com 503 em hora
+# de pico — para um bot que explica o app em 4 frases, não compensa.
+gemini.modelo=gemini-3.5-flash-lite
+
+# ------------------------------------------------------------------
+# IA de reserva (opcional) — quem responde quando o Gemini não responde
+#
+# Deixe em branco e o app funciona como sempre: Gemini e, se ele falhar,
+# o texto de fallback. Preenchido, entra uma tentativa a mais no meio.
+#
+# Vale qualquer provedor COMPATÍVEL COM OpenAI — é por isso que a URL
+# fica aqui em vez de embutida no código: trocar de empresa é trocar
+# estas três linhas, sem recompilar.
+#
+#   Groq (gratuito, sem cartão) — https://console.groq.com/keys
+#     ia.reserva.url=https://api.groq.com/openai/v1/chat/completions
+#     ia.reserva.modelo=openai/gpt-oss-120b
+#
+#   Aqui vale a mesma armadilha do Gemini: os modelos são aposentados. Para
+#   ver o que a sua chave enxerga hoje:
+#     curl -H "Authorization: Bearer SUA_CHAVE" \
+#          https://api.groq.com/openai/v1/models
+#
+#   NVIDIA NIM — https://build.nvidia.com
+#     ia.reserva.url=https://integrate.api.nvidia.com/v1/chat/completions
+#
+# Vale aqui a mesma regra de LGPD do Gemini: só a pergunta digitada e o
+# texto fixo sobre o app. Dois provedores são dois lugares para onde a
+# pergunta pode ir — nenhum deles recebe dado do paciente.
+ia.reserva.url=
+ia.reserva.modelo=
+ia.reserva.key=

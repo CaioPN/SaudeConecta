@@ -9,6 +9,7 @@ import BotaoPrivacidade from '../components/BotaoPrivacidade';
 import SeletorPessoa from '../components/SeletorPessoa';
 import { mascararTexto } from '../utils/privacidade';
 import ResultRow from '../components/ResultRow';
+import BotaoExplicacao from '../components/BotaoExplicacao';
 import InfoField from '../components/InfoField';
 import StatusBadge from '../components/StatusBadge';
 import { buscarExames } from '../services/exames';
@@ -191,7 +192,10 @@ export default function Exams() {
   const protegido = senhaDoPaciente(paciente) !== null;
 
   return (
-    <div className="screen-container">
+    <div className="screen-container tela-rolagem">
+      {/* Cabeçalho, seletor de pessoa e abas ficam parados: as abas são o
+          controle da lista e não podem sumir junto com ela. */}
+      <div className="tela-topo">
       <button onClick={() => navigate(-1)} className="back-btn">
         <ChevronLeft size={20} /> Voltar
       </button>
@@ -230,7 +234,9 @@ export default function Exams() {
           <span>Exames de Imagem</span>
         </button>
       </div>
+      </div>
 
+      <div className="tela-lista">
       {carregando && <p className="empty-state">Carregando exames…</p>}
       {erro && !carregando && <p className="empty-state">{erro}</p>}
 
@@ -289,6 +295,7 @@ export default function Exams() {
               <div className="exam-card-header">
                 <h3 className="exam-card-title">
                   <ImageIcon size={16} /> {exame.nome}
+                  <BotaoExplicacao tipo="exame" termo={exame.nome} />
                 </h3>
               </div>
 
@@ -319,6 +326,7 @@ export default function Exams() {
           ))
         )
       )}
+      </div>
     </div>
   );
 }

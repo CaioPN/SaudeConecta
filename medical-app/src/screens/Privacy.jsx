@@ -7,7 +7,8 @@ export default function Privacy() {
   const navigate = useNavigate();
 
   return (
-    <div className="screen-container">
+    <div className="screen-container tela-rolagem">
+      <div className="tela-topo">
       <button onClick={() => navigate(-1)} className="back-btn">
         <ChevronLeft size={20} /> Voltar
       </button>
@@ -19,6 +20,9 @@ export default function Privacy() {
         <h2 className="header-title">Portal de Privacidade</h2>
       </div>
       <p className="header-subtitle mb-6">Em conformidade com a LGPD (Lei nº 13.709/2018)</p>
+      </div>
+
+      <div className="tela-lista">
 
       <div className="card border-blue" style={{ marginBottom: '16px' }}>
         <div className="flex items-center gap-4 text-blue mb-2">
@@ -33,6 +37,7 @@ export default function Privacy() {
 
       <div className="card">
         <PrivacyContent />
+      </div>
       </div>
     </div>
   );

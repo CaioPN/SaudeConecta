@@ -1,5 +1,6 @@
 import React from 'react';
 import StatusBadge from './StatusBadge';
+import BotaoExplicacao from './BotaoExplicacao';
 import { usePrivacidade } from '../context/PrivacidadeContext';
 import { mascararValor } from '../utils/privacidade';
 import {
@@ -29,7 +30,11 @@ export default function ResultRow({ item }) {
   return (
     <div className="result-row">
       <div className="result-row-top">
-        <span className="result-nome">{item.nome}</span>
+        <span className="result-nome">
+          {item.nome}
+          {/* Só o nome do exame vai para o glossário — nunca o valor. */}
+          <BotaoExplicacao tipo="exame" termo={item.nome} />
+        </span>
         <span className={`result-valor ${oculto ? 'valor-oculto' : ''}`}>
           {oculto ? mascararValor() : item.valor.toLocaleString('pt-BR')}
           <span className="result-unidade"> {item.unidade}</span>

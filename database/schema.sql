@@ -509,3 +509,38 @@ CREATE TABLE IF NOT EXISTS municipios_espelhados (
   acessado_em      DATETIME      NOT NULL,
   criado_em        TIMESTAMP     DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ============================================================
+--  Explicações geradas por IA (glossário)
+--  "O que é o exame TGP?", "para que serve a pentavalente?" — o texto
+--  em linguagem simples que as telas de Exames e de Vacinas mostram.
+--
+--  A tabela existe por três motivos, nessa ordem:
+--
+--  1. LGPD. Aqui só entra VOCABULÁRIO: o nome do exame ou da vacina,
+--     que é público. Nunca o resultado, a data ou de quem é — nada
+--     nesta tabela pertence a um paciente, e é por isso que ela não
+--     tem paciente_id nem ON DELETE CASCADE para lugar nenhum.
+--  2. Cota. A explicação de "TGP" é a mesma para todo mundo e não
+--     muda: gerar uma vez serve o app inteiro para sempre. Sem isto,
+--     cada abertura de tela gastaria o nível gratuito do modelo.
+--  3. Apresentação. Com o texto no banco, a tela responde na hora e
+--     continua funcionando sem internet e sem chave de IA.
+--
+--  A chave única é (tipo, termo) e aqui ela funciona de verdade —
+--  as duas colunas são NOT NULL, então não cai no problema de NULL
+--  que impediu a chave de vacinas_aplicadas.
+--
+--  A coluna modelo guarda quem escreveu o texto. Serve para apagar em
+--  bloco o que veio de um modelo ruim sem perder o resto.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS explicacoes_ia (
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  tipo       VARCHAR(20)  NOT NULL,          -- 'exame' ou 'vacina'
+  termo      VARCHAR(120) NOT NULL,          -- nome normalizado (minúsculas, sem acento)
+  rotulo     VARCHAR(160) NOT NULL,          -- como o termo aparece na tela
+  texto      TEXT         NOT NULL,
+  modelo     VARCHAR(60),
+  criado_em  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_explicacao (tipo, termo)
+);

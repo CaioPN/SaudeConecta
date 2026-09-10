@@ -81,21 +81,25 @@ export default function Appointments() {
   const abrir = (id) => navigate(`/appointment/${id}`);
 
   return (
-    <div className="screen-container">
-      <button onClick={() => navigate(-1)} className="back-btn">
-        <ChevronLeft size={20} /> Voltar
-      </button>
+    <div className="screen-container tela-rolagem">
+      {/* Cabeçalho e seletor de pessoa ficam parados; só a lista rola. */}
+      <div className="tela-topo">
+        <button onClick={() => navigate(-1)} className="back-btn">
+          <ChevronLeft size={20} /> Voltar
+        </button>
 
-      <div className="section-header">
-        <div>
-          <h2 className="header-title mb-2">Consultas</h2>
-          <p className="text-sm text-muted">Agendamentos e atendimentos anteriores</p>
+        <div className="section-header">
+          <div>
+            <h2 className="header-title mb-2">Consultas</h2>
+            <p className="text-sm text-muted">Agendamentos e atendimentos anteriores</p>
+          </div>
+          <BotaoPrivacidade rotulo="consultas" />
         </div>
-        <BotaoPrivacidade rotulo="consultas" />
+
+        <SeletorPessoa />
       </div>
 
-      <SeletorPessoa />
-
+      <div className="tela-lista">
       {carregando && <p className="empty-state">Carregando consultas…</p>}
       {erro && !carregando && <p className="empty-state">{erro}</p>}
 
@@ -120,6 +124,7 @@ export default function Appointments() {
           )}
         </>
       )}
+      </div>
     </div>
   );
 }

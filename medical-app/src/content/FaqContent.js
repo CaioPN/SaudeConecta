@@ -98,6 +98,14 @@ export const FAQ = [
         r: 'Em "Minha Saúde" → "Exames". Os exames de sangue aparecem agrupados por coleta e os de imagem trazem o laudo.',
       },
       {
+        p: 'Não entendi o nome de um exame. O app explica?',
+        r: 'Sim. Ao lado do nome de cada exame há um "?" — toque nele para abrir uma explicação em linguagem simples do que aquele exame é e por que o profissional costuma pedi-lo. O texto é escrito por inteligência artificial e fala do exame em geral: ele NÃO avalia o seu resultado, e quem interpreta o que deu continua sendo o profissional de saúde.',
+      },
+      {
+        p: 'Essa explicação envia o meu resultado para algum lugar?',
+        r: 'Não. Sai do aplicativo apenas o nome do exame (por exemplo, "creatinina"), que é uma palavra do vocabulário médico e não diz nada sobre você. O valor do seu exame, a data e o seu nome nunca são enviados. Como a explicação de um exame é a mesma para todas as pessoas, ela fica guardada depois da primeira vez e passa a aparecer na hora.',
+      },
+      {
         p: 'Como leio o resultado de um exame de sangue?',
         r: 'Cada item mostra o seu valor, a faixa de referência do laboratório e uma barra indicando onde o resultado caiu. O selo ao lado resume a situação: Normal, Limite (perto da borda da faixa) ou Alterado.',
       },
@@ -174,6 +182,10 @@ export const FAQ = [
         r: 'Sim. Em "Minha Saúde" → "Carteira de Vacinação", use o seletor no topo da tela para alternar entre você e cada dependente.',
       },
       {
+        p: 'Para que serve cada vacina?',
+        r: 'Toque no "?" ao lado do nome da vacina: abre uma explicação em linguagem simples do que ela previne e por que faz parte do calendário. O texto é escrito por inteligência artificial e vale para a vacina em geral — quem orienta sobre as doses de cada pessoa é o profissional de saúde.',
+      },
+      {
         p: 'Como marco uma dose que já foi tomada?',
         r: 'Abra "Carteira de Vacinação", encontre a dose e toque em "Marcar como aplicada". O app registra a data de hoje. Se marcar por engano, o botão "Desfazer" apaga o registro. Enquanto uma dose vencida não é marcada, ela aparece em atraso e vira um aviso na tela inicial.',
       },
@@ -243,7 +255,7 @@ export const FAQ = [
       },
       {
         p: 'O assistente virtual tem acesso ao meu prontuário?',
-        r: 'Não. Ele responde dúvidas sobre o aplicativo e recebe apenas a pergunta que você digita. Nenhum exame, consulta ou dado pessoal seu é enviado para fora.',
+        r: 'Não. Ele responde dúvidas sobre o aplicativo e recebe apenas a pergunta que você digita. Nenhum exame, consulta ou dado pessoal seu é enviado para fora. Por isso mesmo, evite escrever dados pessoais na conversa: o que você digita é enviado para o serviço de inteligência artificial que formula a resposta, e ele não precisa saber quem você é para ajudar.',
       },
       {
         p: 'Como sei quem viu os meus dados?',

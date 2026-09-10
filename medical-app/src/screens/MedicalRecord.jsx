@@ -55,21 +55,25 @@ export default function MedicalRecord() {
   const { alergias, condicoes, medicacoes } = prontuario;
 
   return (
-    <div className="screen-container">
-      <button onClick={() => navigate(-1)} className="back-btn">
-        <ChevronLeft size={20} /> Voltar
-      </button>
+    <div className="screen-container tela-rolagem">
+      {/* Cabeçalho e seletor de pessoa ficam parados; só o conteúdo rola. */}
+      <div className="tela-topo">
+        <button onClick={() => navigate(-1)} className="back-btn">
+          <ChevronLeft size={20} /> Voltar
+        </button>
 
-      <div className="section-header">
-        <div>
-          <h2 className="header-title">Prontuário</h2>
-          <p className="header-subtitle">{pessoa.nome}</p>
+        <div className="section-header">
+          <div>
+            <h2 className="header-title">Prontuário</h2>
+            <p className="header-subtitle">{pessoa.nome}</p>
+          </div>
+          <BotaoPrivacidade rotulo="prontuário" />
         </div>
-        <BotaoPrivacidade rotulo="prontuário" />
+
+        <SeletorPessoa />
       </div>
 
-      <SeletorPessoa />
-
+      <div className="tela-lista">
       {carregando && <p className="empty-state">Carregando prontuário…</p>}
       {erro && !carregando && <p className="empty-state">{erro}</p>}
 
@@ -170,6 +174,7 @@ export default function MedicalRecord() {
           )}
         </>
       )}
+      </div>
     </div>
   );
 }

@@ -91,18 +91,22 @@ export default function Dependentes() {
     );
 
     return (
-        <div className="screen-container">
-            <button onClick={() => navigate(-1)} className="back-btn">
-                <ChevronLeft size={20} /> Voltar
-            </button>
+        <div className="screen-container tela-rolagem">
+            <div className="tela-topo">
+                <button onClick={() => navigate(-1)} className="back-btn">
+                    <ChevronLeft size={20} /> Voltar
+                </button>
 
-            <div className="section-header">
-                <h2 className="header-title">Dependentes</h2>
-                <BotaoPrivacidade rotulo="dados dos dependentes" />
+                <div className="section-header">
+                    <h2 className="header-title">Dependentes</h2>
+                    <BotaoPrivacidade rotulo="dados dos dependentes" />
+                </div>
+                <p className="text-sm text-muted" style={{ marginTop: '-8px', marginBottom: '24px' }}>
+                    Cadastre familiares vinculados à sua conta. Eles não possuem acesso próprio.
+                </p>
             </div>
-            <p className="text-sm text-muted" style={{ marginTop: '-8px', marginBottom: '24px' }}>
-                Cadastre familiares vinculados à sua conta. Eles não possuem acesso próprio.
-            </p>
+
+            <div className="tela-lista">
 
             <div className="card">
                 <h3 className="section-title">Novo Dependente</h3>
@@ -193,6 +197,7 @@ export default function Dependentes() {
                     </div>
                 ))
             )}
+            </div>
         </div>
     );
 }

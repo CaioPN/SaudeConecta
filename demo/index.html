@@ -44,7 +44,13 @@ body {
 .app-container {
   max-width: 440px;
   margin: 0 auto;
-  min-height: 100vh;
+  /* ALTURA FIXA, não min-height. Com min-height o quadro crescia junto com o
+     conteúdo — numa lista de 60 unidades ele chegava a 12.000 px — e quem
+     rolava era a JANELA, não a tela. Assim nada dentro do app consegue
+     empurrar o quadro para além do que se vê, e a rolagem acontece onde deve.
+     A unidade dvh desconta a barra do navegador no celular, que o vh ignora. */
+  height: 100vh;
+  height: 100dvh;
   background-color: var(--bg-gray);
   display: flex;
   flex-direction: column;
@@ -55,7 +61,10 @@ body {
 
 @media (min-width: 640px) {
   .app-container {
-    min-height: 850px;
+    /* No computador o quadro tem o tamanho de um celular, mas nunca passa da
+       janela: os 80px são as margens de cima e de baixo. */
+    height: 850px;
+    height: min(850px, calc(100dvh - 80px));
     margin-top: 40px;
     margin-bottom: 40px;
     border-radius: 24px;
@@ -65,12 +74,67 @@ body {
 
 .app-content {
   flex: 1;
+  /* Item de flex não encolhe abaixo do próprio conteúdo sem isto, e o
+     overflow-y nunca chegaria a valer. */
+  min-height: 0;
   overflow-y: auto;
   padding-bottom: 80px;
 }
 
 .screen-container {
   padding: 24px;
+}
+
+/* ------------------------------------------------------------
+   Rolagem interna das telas
+   O cabeçalho (voltar, título, seletor de pessoa, filtros) fica
+   parado e só a lista corre — em vez de a tela inteira subir e o
+   paciente perder de vista onde estava.
+
+   É OPT-IN: a tela pede pela classe .tela-rolagem. Quem não pede
+   continua rolando pelo .app-content como sempre, então acrescentar
+   a rolagem numa tela nova não pode quebrar as outras.
+
+   O :has() desliga a rolagem do quadro só para essas telas. Em
+   navegador sem :has() (anterior a 2023) a regra é ignorada e a
+   tela volta a rolar por inteiro — o comportamento antigo, feio
+   mas funcionando.
+   ------------------------------------------------------------ */
+.app-content:has(> .tela-rolagem) {
+  overflow: hidden;
+  padding-bottom: 0;
+}
+
+.tela-rolagem {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+}
+
+.tela-topo {
+  flex-shrink: 0;
+}
+
+.tela-lista {
+  flex: 1;
+  /* Sem o min-height o flex não deixa o filho encolher abaixo do
+     conteúdo, e a barra de rolagem simplesmente não aparece. */
+  min-height: 0;
+  overflow-y: auto;
+  /* Espaço para o último item subir acima da barra de navegação,
+     que fica por cima do conteúdo (position: absolute). */
+  padding-bottom: 88px;
+  /* Impede que o gesto continue na página quando a lista acaba. */
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* A barra fica sobre o conteúdo, então a lista precisa terminar antes
+   dela; sem barra (portal do médico, telas de fora do app) o respiro
+   extra viraria um buraco no fim da lista. */
+.tela-lista.sem-barra {
+  padding-bottom: 24px;
 }
 
 /* Typography */
@@ -242,7 +306,10 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
+  /* 100% do quadro, não 100vh: o quadro agora tem altura fixa e pode ser
+     menor que a janela (no computador ele tem margem em cima e embaixo).
+     Com 100vh o login sobrava para fora e criava uma rolagem de 80px. */
+  min-height: 100%;
   padding: 24px;
 }
 
@@ -1202,6 +1269,17 @@ button.record-card:hover { border-color: var(--primary-blue); }
 .chat-send-btn { width: 40px; height: 40px; border-radius: 50%; background-color: var(--primary-blue); color: white; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
 .chat-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* Aviso sob a caixa de texto: o que for digitado pode sair do app para a IA. */
+.chat-aviso-privacidade {
+  margin: 0;
+  padding: 0 12px 10px;
+  background-color: white;
+  color: #6b7280;
+  font-size: 11px;
+  line-height: 1.35;
+  text-align: center;
+}
+
 .typing-indicator span { display: inline-block; width: 6px; height: 6px; background-color: #9ca3af; border-radius: 50%; margin: 0 2px; animation: blink 1.4s infinite both; }
 .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
 .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
@@ -1348,21 +1426,8 @@ button.record-card:hover { border-color: var(--primary-blue); }
 
 /* A tela ocupa a altura do frame e só a lista de doses rola: o botão voltar,
    o título, o seletor de pessoa e o resumo ficam parados no topo. */
-.vacinas-screen {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  padding-bottom: 0;
-}
-.vacinas-topo {
-  flex-shrink: 0;
-}
-.vacinas-lista {
-  flex: 1;
-  min-height: 0; /* sem isso o flex não deixa o filho encolher e a rolagem não aparece */
-  overflow-y: auto;
-  padding-bottom: 24px;
-}
+/* A carteira de vacinação usa o padrão compartilhado .tela-rolagem /
+   .tela-topo / .tela-lista, definido junto do .screen-container. */
 
 .vacina-pessoa-selector {
   display: flex;
@@ -1687,7 +1752,10 @@ button.record-card:hover { border-color: var(--primary-blue); }
   line-height: 1.4;
 }
 
-.unidade-acoes { display: flex; gap: 8px; margin-top: 8px; }
+/* Quebra em mais de uma linha: são até quatro ações ("Como chegar", "Ligar",
+   "O que tem lá" e "Definir como minha") e elas não cabem lado a lado na
+   largura do cartão. Sem o wrap, as duas últimas vazavam para fora. */
+.unidade-acoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 
 .unidade-acao {
   display: inline-flex;
@@ -1845,6 +1913,52 @@ button.record-card:hover { border-color: var(--primary-blue); }
   font-size: 12px;
   font-weight: 600;
   color: var(--primary-blue);
+}
+
+/* ------------------------------------------------------------
+   Glossário: o "?" ao lado do nome de um exame ou de uma vacina.
+   Discreto de propósito — quem já sabe o que é o exame não deve
+   ter o olho puxado para ele a cada linha da lista.
+   ------------------------------------------------------------ */
+.botao-explicacao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 5px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #9ca3af;
+  cursor: pointer;
+  vertical-align: middle;
+  line-height: 0;
+}
+.botao-explicacao:hover,
+.botao-explicacao:focus-visible { color: var(--primary-blue); }
+
+.explicacao-texto {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #374151;
+}
+
+.explicacao-estado {
+  margin: 0;
+  font-size: 14px;
+  color: #6b7280;
+}
+.explicacao-estado.erro { color: #b91c1c; }
+
+/* Deixa claro que o texto foi escrito por uma máquina e que ele não fala do
+   resultado de quem está lendo. */
+.explicacao-rodape {
+  margin: 14px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid #e5e7eb;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #6b7280;
 }
 
 /* ============================================================
@@ -2082,17 +2196,10 @@ body {
   min-height: 100vh;
 }
 
-.app-container { height: 100vh; }
-.app-content { min-height: 0; }
-.app-content .login-wrapper { min-height: 100%; }
-
-@media (min-width: 640px) {
-  .app-container {
-    height: calc(100vh - 84px);
-    min-height: 0;
-    max-height: 900px;
-  }
-}
+/* O quadro com altura fixa e o login em 100% eram remendos daqui: o app.css
+   crescia junto com o conteúdo e a demonstração ficava com duas barras de
+   rolagem. Agora isso está resolvido no próprio app.css (.app-container com
+   height, .app-content com min-height: 0), então não há mais o que remendar. */
 
 /* Selo de demonstração: canto superior direito do frame, discreto, para
    ninguém confundir a apresentação com o app em produção. */
@@ -2909,6 +3016,14 @@ const FAQ = [
         r: 'Em "Minha Saúde" → "Exames". Os exames de sangue aparecem agrupados por coleta e os de imagem trazem o laudo.',
       },
       {
+        p: 'Não entendi o nome de um exame. O app explica?',
+        r: 'Sim. Ao lado do nome de cada exame há um "?" — toque nele para abrir uma explicação em linguagem simples do que aquele exame é e por que o profissional costuma pedi-lo. O texto é escrito por inteligência artificial e fala do exame em geral: ele NÃO avalia o seu resultado, e quem interpreta o que deu continua sendo o profissional de saúde.',
+      },
+      {
+        p: 'Essa explicação envia o meu resultado para algum lugar?',
+        r: 'Não. Sai do aplicativo apenas o nome do exame (por exemplo, "creatinina"), que é uma palavra do vocabulário médico e não diz nada sobre você. O valor do seu exame, a data e o seu nome nunca são enviados. Como a explicação de um exame é a mesma para todas as pessoas, ela fica guardada depois da primeira vez e passa a aparecer na hora.',
+      },
+      {
         p: 'Como leio o resultado de um exame de sangue?',
         r: 'Cada item mostra o seu valor, a faixa de referência do laboratório e uma barra indicando onde o resultado caiu. O selo ao lado resume a situação: Normal, Limite (perto da borda da faixa) ou Alterado.',
       },
@@ -2985,6 +3100,10 @@ const FAQ = [
         r: 'Sim. Em "Minha Saúde" → "Carteira de Vacinação", use o seletor no topo da tela para alternar entre você e cada dependente.',
       },
       {
+        p: 'Para que serve cada vacina?',
+        r: 'Toque no "?" ao lado do nome da vacina: abre uma explicação em linguagem simples do que ela previne e por que faz parte do calendário. O texto é escrito por inteligência artificial e vale para a vacina em geral — quem orienta sobre as doses de cada pessoa é o profissional de saúde.',
+      },
+      {
         p: 'Como marco uma dose que já foi tomada?',
         r: 'Abra "Carteira de Vacinação", encontre a dose e toque em "Marcar como aplicada". O app registra a data de hoje. Se marcar por engano, o botão "Desfazer" apaga o registro. Enquanto uma dose vencida não é marcada, ela aparece em atraso e vira um aviso na tela inicial.',
       },
@@ -3054,7 +3173,7 @@ const FAQ = [
       },
       {
         p: 'O assistente virtual tem acesso ao meu prontuário?',
-        r: 'Não. Ele responde dúvidas sobre o aplicativo e recebe apenas a pergunta que você digita. Nenhum exame, consulta ou dado pessoal seu é enviado para fora.',
+        r: 'Não. Ele responde dúvidas sobre o aplicativo e recebe apenas a pergunta que você digita. Nenhum exame, consulta ou dado pessoal seu é enviado para fora. Por isso mesmo, evite escrever dados pessoais na conversa: o que você digita é enviado para o serviço de inteligência artificial que formula a resposta, e ele não precisa saber quem você é para ajudar.',
       },
       {
         p: 'Como sei quem viu os meus dados?',
@@ -3179,6 +3298,99 @@ function avisar(texto) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(function () { caixa.remove(); }, 4000);
 }
+
+// O "?" ao lado do nome de um exame ou de uma vacina. A chave normalizada vai
+// no data-termo para o despachante achar o verbete sem depender do acento.
+function botaoGlossario(tipo, termo) {
+  return '<button type="button" class="botao-explicacao" data-acao="glossario"' +
+    ' data-tipo="' + tipo + '" data-termo="' + esc(chaveGlossario(termo)) + '"' +
+    ' data-rotulo="' + esc(termo) + '" aria-label="O que é ' + esc(termo) + '?">' +
+    ic('helpCircle', 15) + '</button>';
+}
+
+// Mesma normalização do ExplicacaoDAO.normalizar: minúsculas, sem acento.
+function chaveGlossario(termo) {
+  return String(termo || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+// Janelinha do glossário. Reaproveita o .modal-overlay/.modal-box do app.css,
+// que a demonstração já embute — não há CSS novo aqui.
+function abrirGlossario(tipo, chave, rotulo) {
+  const texto = (GLOSSARIO[tipo] || {})[chave];
+  if (!texto) {
+    avisar('No app completo o "?" busca esta explicação e a guarda para as próximas vezes.');
+    return;
+  }
+  fecharGlossario();
+  const fundo = document.createElement('div');
+  fundo.className = 'modal-overlay';
+  fundo.innerHTML =
+    '<div class="modal-box"><div class="modal-header">' +
+    '<h3 class="modal-title">' + esc(rotulo) + '</h3>' +
+    '<button type="button" class="modal-close-btn" data-acao="fecharGlossario" ' +
+    'aria-label="Fechar">' + ic('x', 20) + '</button></div>' +
+    '<div class="modal-body"><p class="explicacao-texto">' + esc(texto) + '</p>' +
+    '<p class="explicacao-rodape">Texto explicativo gerado por inteligência artificial. ' +
+    'Vale para o item em geral e não avalia o seu resultado — quem interpreta é o ' +
+    'profissional de saúde.</p></div></div>';
+  fundo.addEventListener('click', function (e) {
+    if (e.target === fundo) fecharGlossario();
+  });
+  document.body.appendChild(fundo);
+}
+
+function fecharGlossario() {
+  const aberto = document.querySelector('.modal-overlay');
+  if (aberto) aberto.remove();
+}
+
+/* ---------- Glossário: o "?" dos exames e das vacinas ----------
+   Estes textos NÃO foram escritos à mão: saíram do próprio ChatIA do
+   backend, com a mesma instrução que o app usa, e estão aqui porque no
+   app eles vivem na tabela explicacoes_ia — uma vez gerados, é do banco
+   que a tela os lê. A demonstração não tem servidor, então ela carrega o
+   glossário já preenchido, que é exatamente o estado normal do app.
+   Termo fora desta lista cai no aviso, como o PDF e o mapa. */
+const GLOSSARIO = {
+  exame: {
+    'colesterol total': 'O colesterol total é um exame de sangue que mede a quantidade total de gordura circulante no corpo. O profissional de saúde pede esse teste para avaliar a saúde do coração e prevenir problemas cardiovasculares. O resultado ajuda a entender como o organismo está lidando com as gorduras obtidas na alimentação. Lembre-se de que somente o profissional de saúde pode interpretar esse exame corretamente.',
+    'creatinina': 'A creatinina é um exame de sangue que mede como os seus rins estão funcionando através de resíduos que o corpo elimina. O profissional de saúde costuma pedir esse teste para acompanhar a saúde dos rins e ver se eles estão filtrando o sangue do jeito certo. Apenas o profissional de saúde pode avaliar e interpretar o significado deste exame para você.',
+    'ferritina': 'A ferritina é um exame de sangue que mede a quantidade de ferro armazenada no seu corpo. O médico costuma pedir esse exame para investigar se você tem falta ou excesso de ferro. Ele ajuda a entender a causa de sintomas como cansaço excessivo e fraqueza. Lembre-se de que quem interpreta o resultado corretamente é o profissional de saúde.',
+    'glicose (jejum)': 'A glicose de jejum é um exame de sangue que mede a quantidade de açúcar no seu corpo naquele momento. O médico costuma pedir esse teste para investigar e acompanhar problemas como a diabetes. Ficar sem comer por algumas horas antes da coleta é necessário para que o resultado mostre como o seu organismo lida com o açúcar normalmente. Lembre-se de que apenas o profissional de saúde pode interpretar o resultado do seu exame corretamente.',
+    'hdl': 'O HDL é um exame de sangue que mede a quantidade de colesterol considerado bom no nosso organismo. Ele é importante porque esse tipo de gordura ajuda a limpar as artérias, transportando o excesso de gordura de volta para o fígado. O médico costuma pedir esse exame para avaliar a saúde do coração e o risco de doenças cardiovasculares. Lembre-se de que apenas o profissional de saúde pode interpretar o significado correto do exame.',
+    'hemoglobina': 'A hemoglobina é uma proteína presente no sangue que tem a função de transportar oxigênio dos pulmões para o corpo todo. O médico pede este exame geral para avaliar a quantidade dessa proteína e verificar se há sinais de anemia ou outras alterações no sangue. Ele ajuda a entender como o seu organismo está oxigenando os tecidos. Lembre-se de que apenas o profissional de saúde pode interpretar o significado deste exame para o seu caso.',
+    'ldl': 'O exame de LDL mede um tipo de gordura no sangue que, em excesso, pode se acumular nas artérias. O profissional de saúde pede esse teste para avaliar o risco de problemas no coração e nos vasos sanguíneos. O resultado ajuda a planejar cuidados gerais com a saúde e a alimentação. Apenas o profissional de saúde pode interpretar esse exame e orientar os próximos passos.',
+    'leucocitos': 'O exame de leucócitos mede a quantidade de glóbulos blancos no sangue, que são as células de defesa do corpo. Ele serve para ajudar a identificar infecções, inflamações ou problemas no sistema de defesa. O profissional de saúde costuma pedi-lo para investigar os motivos de febre, mal-estar ou para acompanhar a saúde geral. Lembre-se de que quem interpreta o exame é o profissional de saúde.',
+    'plaquetas': 'O exame de plaquetas é um teste de sangue que conta essas pequenas células responsáveis por ajudar na cicatrização e na coagulação. Os profissionais de saúde pedem esse exame para investigar sangramentos, manchas roxas na pele ou para acompanhar a saúde geral em consultas de rotina. Apenas o profissional de saúde pode interpretar o significado desse exame para o seu caso.',
+    'triglicerideos': 'O exame de triglicerídeos mede a quantidade de um tipo de gordura que circula no sangue e serve como reserva de energia para o corpo. O médico costuma pedir esse exame para avaliar o risco de doenças do coração e acompanhar a saúde geral do paciente. Esse teste ajuda a entender como o organismo está processando as gorduras dos alimentos. Apenas o profissional de saúde pode avaliar o significado desse exame no seu atendimento.',
+    'tsh': 'O TSH é um exame de sangue que mede a quantidade do hormônio estimulante da tireoide no organismo. Ele serve para avaliar se a sua glândula tireoide está funcionando bem, trabalhando demais ou de menos. O profissional de saúde costuma pedir esse exame para investigar sintomas de cansaço excessivo, ganho ou perda de peso inesperados. Lembre-se de que somente o profissional de saúde pode interpretar o significado desse exame para você.',
+    'vitamina d (25-oh)': 'A Vitamina D (25-OH) é um exame de sangue que mede a quantidade dessa vitamina no seu organismo. Ele serve para avaliar como o seu corpo está absorvendo nutrientes e cuidando da saúde dos ossos. O profissional de saúde costuma pedir esse exame para investigar cansaço excessivo, dores nos ossos ou prevenir problemas de fraqueza óssea. Lembre-se de que somente o profissional de saúde pode interpretar o resultado do seu exame corretamente.',
+    'raio-x de torax': 'O raio-x de tórax é uma fotografia rápida de dentro do seu peito usando uma radiação segura. Ele mostra os pulmões, o coração e os ossos dessa região para ver se está tudo bem. O médico costuma pedir esse exame para investigar tosses persistentes, falta de ar ou dores no peito. Lembre-se de que apenas o profissional de saúde pode interpretar esse exame corretamente.',
+    'ultrassom abdominal': 'O ultrassom abdominal é um exame de imagem que usa ondas sonoras para ver os órgãos que ficam na barriga, como fígado, rins e vesícula. Ele serve para avaliar o tamanho, a forma e a saúde desses órgãos, ajudando a investigar dores ou outras queixas. O médico pede esse exame para entender melhor o que está acontecendo dentro do seu corpo e orientar o cuidado com a sua saúde. Lembre-se de que somente o profissional de saúde pode interpretar o resultado do seu exame.',
+  },
+  vacina: {
+    'bcg': 'A vacina BCG é uma injeção aplicada logo nos primeiros dias de vida para proteger contra formas graves da tuberculose. Ela ajuda o sistema de defesa do bebê a combater a bactéria da doença, especialmente nos pulmões e no cérebro. O profissional de saúde indica essa aplicação de rotina para todas as crianças logo após o nascimento. Apenas o profissional de saúde pode orientar sobre a caderneta de vacinação e os cuidados necessários.',
+    'covid-19': 'A vacina contra a COVID-19 é uma injeção que protege o corpo contra o coronavírus que causa essa doença. Ela serve para prevenir os casos graves, as internações e as mortes provocadas pelo vírus. Os profissionais de saúde recomendam a aplicação para manter a população protegida e fortalecer a imunidade coletiva. Procure um posto de saúde para tirar suas dúvidas e manter a caderneta de vacinação em dia.',
+    'dt (dupla adulto)': 'A vacina dT, conhecida como dupla adulto, protege contra duas doenças graves: o tétano e a difteria. Ela é aplicada para fortalecer ou manter a imunidade que a pessoa recebeu quando era criança. O profissional de saúde costuma recomendar essa vacina de reforço a cada dez anos para garantir a proteção contínua ao longo da vida. Lembre-se de que quem deve indicar e aplicar a vacina é sempre o profissional de saúde.',
+    'dtp': 'A vacina DTP protege contra três doenças graves que afetam a respiração e os nervos: a difteria, o tétano e a coqueluche. Ela serve para ensinar o corpo a combater essas infecções antes que elas fiquem perigosas. O profissional de saúde costuma aplicá-la para manter a proteção ao longo da infância ou em reforços recomendados. Quem avalia quando você ou seus familiares devem tomar essa vacina é sempre o profissional de saúde no posto.',
+    'febre amarela': 'A vacina contra a febre amarela é uma injeção que protege o corpo contra uma doença grave transmitida por picadas de mosquitos infectados. Ela serve para prevenir a infecção e evitar que a pessoa desenvolva formas graves da doença, que podem afetar o fígado e outros órgãos. O profissional de saúde costuma indicar a aplicação para quem mora ou vai viajar para áreas com circulação do vírus. Lembre-se de que quem avalia a necessidade de tomar a vacina é o profissional de saúde.',
+    'hepatite a': 'A vacina da hepatite A é uma injeção que protege o fígado contra uma infecção grave transmitida por água ou alimentos contaminados. Ela previne a doença e ajuda a evitar surtos na comunidade. O posto de saúde aplica essa vacina para proteger as crianças e grupos com maior risco de contágio. Converse com o profissional de saúde do seu posto para saber mais sobre a caderneta de vacinação.',
+    'hepatite b': 'A vacina da hepatite B é uma injeção que protege o fígado contra uma infecção grave causada por vírus. Ela previne a doença e evita complicações sérias como inflamações crônicas e problemas futuros no órgão. O profissional de saúde indica essa vacinação para todas as pessoas, pois ela é a principal forma de proteção e faz parte do calendário de rotina. Somente o profissional de saúde pode orientar sobre as doses necessárias e esclarecer todas as suas dúvidas.',
+    'hpv quadrivalente': 'A vacina HPV quadrivalente é uma injeção que protege o corpo contra quatro tipos do papilomavírus humano. Ela previne o surgimento de verrugas genitais e de alguns tipos de câncer, como o de colo do útero. O profissional de saúde costuma recomendá-la para jovens antes do início da vida sexual, para garantir maior proteção. Lembre-se de que a aplicação e a indicação devem ser avaliadas e acompanhadas pelo profissional de saúde.',
+    'influenza': 'A vacina Influenza protege contra o vírus da gripe e suas complicações mais graves. Ela é aplicada todos os anos para ajudar o corpo a criar defesas antes do período de maior circulação do vírus. Os profissionais de saúde recomendam a aplicação para prevenir a doença e proteger a comunidade. Lembre que quem orienta sobre a vacinação é o profissional de saúde.',
+    'meningococica acwy': 'A vacina meningocócica ACWY é uma injeção que protege o corpo contra quatro tipos diferentes de bactérias que causam a meningite e infecções graves no sangue. Ela é recomendada para prevenir doenças perigosas que afetam o cérebro e a medula espinal, sendo muito importante na adolescência. O profissional de saúde indica essa proteção para fortalecer o sistema de defesa contra essas bactérias e evitar surtos da doença. Lembre-se de que a indicação e a aplicação devem ser sempre avaliadas e realizadas por um profissional de saúde.',
+    'meningococica c': 'A vacina Meningocócica C é uma injeção que protege contra uma bactéria causadora de infecções graves, como a meningite e a infecção generalizada. Ela é aplicada para prevenir essas doenças perigosas que afetam principalmente bebês, crianças e adolescentes. O profissional de saúde indica essa vacina para fortalecer as defesas do corpo e manter a caderneta de vacinação em dia. Converse sempre com a equipe de saúde do seu posto para saber sobre a caderneta de vacinação.',
+    'pentavalente': 'A vacina pentavalente é uma injeção que protege as crianças contra cinco doenças graves em uma única aplicação. Ela ajuda a prevenir a difteria, o tétano, a coqueluche, a hepatite B e as infecções causadas pela bactéria chamada Haemophilus influenzae do tipo b. O profissional de saúde costuma aplicar essa vacina nos primeiros meses de vida do bebê para fortalecer o sistema de defesa contra essas doenças. Apenas o profissional de saúde pode orientar sobre a caderneta de vacinação e o momento certo de cada dose.',
+    'pneumococica 10': 'A vacina Pneumocócica 10 é uma injeção que protege crianças contra dez tipos de bactérias causadoras de doenças graves. Ela ajuda a prevenir infecções sérias como pneumonia, meningite e infecções de ouvido. O profissional de saúde aplica essa vacina para fortalecer a defesa do corpo logo nos primeiros meses de vida. Converse sempre com o profissional de saúde para tirar dúvidas sobre a caderneta de vacinação.',
+    'rotavirus': 'A vacina contra o rotavírus é aplicada em gotas nas crianças para prevenir uma infecção intestinal grave. Ela protege contra um vírus que causa diarreia forte, vômito e febre alta, problemas que podem levar à desidratação rápida. O posto de saúde indica essa vacina para proteger os bebês logo nos primeiros meses de vida. Converse sempre com o profissional de saúde do SUS para saber a caderneta de vacinação do seu filho.',
+    'tetra viral': 'A vacina Tetra Viral é uma injeção que protege crianças contra quatro doenças de uma só vez: sarampo, caxumba, rubéola e varicela, também conhecida como catapora. Ela serve para prevenir essas infecções que podem causar febre, manchas no corpo e outras complicações de saúde. O profissional de saúde costuma aplicar essa vacina no calendário de rotina da infância para fortalecer as defesas do corpo contra esses vírus. Lembre-se de que quem orienta sobre a caderneta de vacinação e a aplicação correta é o profissional de saúde.',
+    'triplice viral': 'A vacina Tríplice Viral é uma injeção que protege o corpo contra três doenças infecciosas: o sarampo, a caxumba e a rubéola. Ela funciona ensinando o sistema de defesa a reconhecer e combater esses vírus antes que eles causem adoecimento grave. O profissional de saúde aplica essa vacina para prevenir surtos dessas doenças e manter a comunidade protegida. Quem avalia a caderneta de vacinação e indica quando aplicá-la é sempre o profissional de saúde.',
+    'varicela': 'A vacina varicela é a injeção que protege contra a doença conhecida popularmente como catapora. Ela serve para prevenir o surgimento de bolhas na pele, febre e o mal-estar causado por esse vírus. O posto de saúde aplica essa vacina para evitar que a infecção se espalhe e cause complicações mais graves no corpo. Lembre-se de que a indicação e a aplicação correta devem ser avaliadas pelo profissional de saúde do SUS.',
+    'vip (poliomielite)': 'A vacina VIP é a versão injetável contra a poliomielite, uma doença grave que pode causar paralisia nas pernas e nos braços. Ela protege o corpo criando defesas contra os vírus que provocam essa infecção. O posto de saúde aplica essa vacina nas crianças para garantir que elas cresçam protegidas e livres da doença. Converse sempre com o profissional de saúde do SUS para tirar suas dúvidas sobre a caderneta de vacinação.',
+    'vop (poliomielite)': 'A vacina VOP é a famosa gotinha contra a paralisia infantil, aplicada pela boca. Ela previne a poliomielite, uma doença grave que pode causar paralisia nas pernas e nos braços. O profissional de saúde aplica essa vacina para proteger as crianças e manter o país livre dessa doença. Quem indica e garante a caderneta de vacinação em dia é sempre o profissional de saúde.',
+  }
+};
 
 /* ---------- 4. Estado da demonstração ---------- */
 
@@ -3699,7 +3911,7 @@ function linhaResultado(item) {
     : '<div class="result-regua-marcador ' + situacao + '" style="left:' + posicao + '%"></div>';
 
   return '<div class="result-row">' +
-    '<div class="result-row-top"><span class="result-nome">' + esc(item.nome) + '</span>' +
+    '<div class="result-row-top"><span class="result-nome">' + esc(item.nome) + botaoGlossario('exame', item.nome) + '</span>' +
     '<span class="result-valor' + (estado.oculto ? ' valor-oculto' : '') + '">' +
     esc(estado.oculto ? mascararValor() : item.valor.toLocaleString('pt-BR')) +
     '<span class="result-unidade"> ' + esc(item.unidade) + '</span></span></div>' +
@@ -3947,7 +4159,7 @@ function itemVacina(v) {
   return '<div class="vacina-item ' + v.status + '">' +
     '<div class="vacina-status-icon ' + v.status + '">' + ic(icone, 16) + '</div>' +
     '<div class="vacina-info">' +
-      '<div class="vacina-top"><span class="vacina-nome">' + esc(v.vacina) + '</span>' +
+      '<div class="vacina-top"><span class="vacina-nome">' + esc(v.vacina) + botaoGlossario('vacina', v.vacina) + '</span>' +
       '<span class="vacina-periodo">' + esc(v.periodo) + '</span></div>' +
       '<span class="vacina-dose">' + esc(v.dose) + '</span>' +
       (v.protege ? '<span class="vacina-protege">Protege contra: ' + esc(v.protege) + '</span>' : '') +
@@ -4009,8 +4221,8 @@ function telaVacinas() {
   const previstas = carteira.filter(function (v) { return v.status === 'prevista'; });
   const percentual = carteira.length ? Math.round((aplicadas.length / carteira.length) * 100) : 0;
 
-  return '<div class="screen-container vacinas-screen">' +
-    '<div class="vacinas-topo">' +
+  return '<div class="screen-container tela-rolagem">' +
+    '<div class="tela-topo">' +
       botaoVoltar() +
       '<h2 class="header-title mb-2">Carteira de Vacinação</h2>' +
       '<p class="text-sm text-muted mb-6">Calendário Nacional de Vacinação (SUS)</p>' +
@@ -4024,7 +4236,7 @@ function telaVacinas() {
         '</div></div></div>' +
     '</div>' +
 
-    '<div class="vacinas-lista">' +
+    '<div class="tela-lista">' +
       (atrasadas.length
         ? '<h3 class="section-title">Em atraso</h3>' + atrasadas.map(itemVacina).join('')
         : '') +
@@ -4128,17 +4340,22 @@ function telaRedeSaude() {
           : '') +
       '</div>';
 
-  return '<div class="screen-container">' +
-    botaoVoltar() +
-    '<h2 class="header-title mb-2">Rede de Saúde</h2>' +
-    '<p class="text-sm text-muted mb-2">' + esc(rede.cidade + ' - ' + rede.estado) + ' · distâncias a partir do ' +
-    (estado.redeEscolhida ? 'CEP pesquisado' : 'CEP do seu cadastro') + '</p>' +
-    trocarCidade +
-    '<div class="rede-filtros">' + filtros + '</div>' +
-    (lista.length ? lista.map(itemUnidade).join('') : '<p class="empty-state">Nenhuma unidade desse tipo por perto.</p>') +
-    '<p class="rede-fonte">Fonte: CNES — Cadastro Nacional de Estabelecimentos de Saúde, ' +
-    'dados abertos do Ministério da Saúde. Nesta demonstração a lista é um recorte fixo de ' +
-    'São Paulo e de Guarulhos; no app, a cidade inteira é baixada do CNES.</p>' +
+  // Cabeçalho e filtros parados, só a lista rolando — igual ao app.
+  return '<div class="screen-container tela-rolagem">' +
+    '<div class="tela-topo">' +
+      botaoVoltar() +
+      '<h2 class="header-title mb-2">Rede de Saúde</h2>' +
+      '<p class="text-sm text-muted mb-2">' + esc(rede.cidade + ' - ' + rede.estado) + ' · distâncias a partir do ' +
+      (estado.redeEscolhida ? 'CEP pesquisado' : 'CEP do seu cadastro') + '</p>' +
+      trocarCidade +
+      '<div class="rede-filtros">' + filtros + '</div>' +
+    '</div>' +
+    '<div class="tela-lista">' +
+      (lista.length ? lista.map(itemUnidade).join('') : '<p class="empty-state">Nenhuma unidade desse tipo por perto.</p>') +
+      '<p class="rede-fonte">Fonte: CNES — Cadastro Nacional de Estabelecimentos de Saúde, ' +
+      'dados abertos do Ministério da Saúde. Nesta demonstração a lista é um recorte fixo de ' +
+      'São Paulo e de Guarulhos; no app, a cidade inteira é baixada do CNES.</p>' +
+    '</div>' +
   '</div>';
 }
 
@@ -4749,6 +4966,17 @@ const BASE_CONHECIMENTO = [
             'é automático e não pode ser apagado.',
     },
     {
+        chaves: ['o que e esse exame', 'o que é esse exame', 'o que e este exame',
+                 'significa o exame', 'explicar exame', 'explicacao', 'explicação',
+                 'nao entendi o exame', 'não entendi o exame', 'para que serve a vacina',
+                 'glossario', 'glossário'],
+        resposta:
+            'Ao lado do nome de cada exame e de cada vacina existe um "?". Tocando nele abre uma ' +
+            'explicação em linguagem simples do que aquilo é e por que o profissional costuma pedir ' +
+            'ou aplicar. O texto é escrito por inteligência artificial e fala do item em geral: ele ' +
+            'não avalia o seu resultado. Só o nome do exame sai do aplicativo — nunca o seu valor.',
+    },
+    {
         chaves: ['privacidade', 'dados', 'lgpd', 'termo', 'termos'],
         resposta:
             'No menu "Mais" você encontra os "Termos de Utilização" e o "Portal de Privacidade", ' +
@@ -4797,7 +5025,7 @@ function buscarNaBase(texto) {
 }
 
 const RESPOSTA_FALLBACK =
-  'Ainda não sei responder isso com certeza. 🤔 Posso ajudar com: agendar consultas, exames, ' +
+  'Ainda não sei responder isso com certeza. 🤔 Posso ajudar com: consultas, exames, ' +
   'dependentes, prontuário, senha/acesso e privacidade. (Nesta demonstração respondo só pela base ' +
   'de regras local — no app completo a pergunta seguiria para a IA.)';
 
@@ -5068,6 +5296,14 @@ document.addEventListener('click', function (evento) {
 
     case 'biometria':
       avisar('A biometria depende do aparelho e não faz parte da demonstração.');
+      break;
+
+    case 'glossario':
+      abrirGlossario(alvo.dataset.tipo, alvo.dataset.termo, alvo.dataset.rotulo);
+      break;
+
+    case 'fecharGlossario':
+      fecharGlossario();
       break;
 
     case 'pdf':

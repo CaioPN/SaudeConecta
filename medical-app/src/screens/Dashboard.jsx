@@ -185,12 +185,16 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div className="screen-container">
-      <header className="mb-6">
-        <h1 className="header-title">Olá, {primeiroNome}!</h1>
-        <p className="header-subtitle">Resumo de hoje</p>
-      </header>
+    <div className="screen-container tela-rolagem">
+      {/* A saudação fica parada; avisos, novidades e atalhos rolam. */}
+      <div className="tela-topo">
+        <header className="mb-6">
+          <h1 className="header-title">Olá, {primeiroNome}!</h1>
+          <p className="header-subtitle">Resumo de hoje</p>
+        </header>
+      </div>
 
+      <div className="tela-lista">
       <div
         className="card patient-summary"
         onClick={() => navigate('/dependentes')}
@@ -241,6 +245,7 @@ export default function Dashboard() {
             <span className="font-bold text-sm">{atalho.label}</span>
           </button>
         ))}
+      </div>
       </div>
     </div>
   );

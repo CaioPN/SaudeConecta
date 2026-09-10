@@ -33,7 +33,13 @@ body {
 .app-container {
   max-width: 440px;
   margin: 0 auto;
-  min-height: 100vh;
+  /* ALTURA FIXA, não min-height. Com min-height o quadro crescia junto com o
+     conteúdo — numa lista de 60 unidades ele chegava a 12.000 px — e quem
+     rolava era a JANELA, não a tela. Assim nada dentro do app consegue
+     empurrar o quadro para além do que se vê, e a rolagem acontece onde deve.
+     A unidade dvh desconta a barra do navegador no celular, que o vh ignora. */
+  height: 100vh;
+  height: 100dvh;
   background-color: var(--bg-gray);
   display: flex;
   flex-direction: column;
@@ -44,7 +50,10 @@ body {
 
 @media (min-width: 640px) {
   .app-container {
-    min-height: 850px;
+    /* No computador o quadro tem o tamanho de um celular, mas nunca passa da
+       janela: os 80px são as margens de cima e de baixo. */
+    height: 850px;
+    height: min(850px, calc(100dvh - 80px));
     margin-top: 40px;
     margin-bottom: 40px;
     border-radius: 24px;
@@ -54,12 +63,67 @@ body {
 
 .app-content {
   flex: 1;
+  /* Item de flex não encolhe abaixo do próprio conteúdo sem isto, e o
+     overflow-y nunca chegaria a valer. */
+  min-height: 0;
   overflow-y: auto;
   padding-bottom: 80px;
 }
 
 .screen-container {
   padding: 24px;
+}
+
+/* ------------------------------------------------------------
+   Rolagem interna das telas
+   O cabeçalho (voltar, título, seletor de pessoa, filtros) fica
+   parado e só a lista corre — em vez de a tela inteira subir e o
+   paciente perder de vista onde estava.
+
+   É OPT-IN: a tela pede pela classe .tela-rolagem. Quem não pede
+   continua rolando pelo .app-content como sempre, então acrescentar
+   a rolagem numa tela nova não pode quebrar as outras.
+
+   O :has() desliga a rolagem do quadro só para essas telas. Em
+   navegador sem :has() (anterior a 2023) a regra é ignorada e a
+   tela volta a rolar por inteiro — o comportamento antigo, feio
+   mas funcionando.
+   ------------------------------------------------------------ */
+.app-content:has(> .tela-rolagem) {
+  overflow: hidden;
+  padding-bottom: 0;
+}
+
+.tela-rolagem {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+}
+
+.tela-topo {
+  flex-shrink: 0;
+}
+
+.tela-lista {
+  flex: 1;
+  /* Sem o min-height o flex não deixa o filho encolher abaixo do
+     conteúdo, e a barra de rolagem simplesmente não aparece. */
+  min-height: 0;
+  overflow-y: auto;
+  /* Espaço para o último item subir acima da barra de navegação,
+     que fica por cima do conteúdo (position: absolute). */
+  padding-bottom: 88px;
+  /* Impede que o gesto continue na página quando a lista acaba. */
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* A barra fica sobre o conteúdo, então a lista precisa terminar antes
+   dela; sem barra (portal do médico, telas de fora do app) o respiro
+   extra viraria um buraco no fim da lista. */
+.tela-lista.sem-barra {
+  padding-bottom: 24px;
 }
 
 /* Typography */
@@ -231,7 +295,10 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
+  /* 100% do quadro, não 100vh: o quadro agora tem altura fixa e pode ser
+     menor que a janela (no computador ele tem margem em cima e embaixo).
+     Com 100vh o login sobrava para fora e criava uma rolagem de 80px. */
+  min-height: 100%;
   padding: 24px;
 }
 
@@ -1191,6 +1258,17 @@ button.record-card:hover { border-color: var(--primary-blue); }
 .chat-send-btn { width: 40px; height: 40px; border-radius: 50%; background-color: var(--primary-blue); color: white; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
 .chat-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* Aviso sob a caixa de texto: o que for digitado pode sair do app para a IA. */
+.chat-aviso-privacidade {
+  margin: 0;
+  padding: 0 12px 10px;
+  background-color: white;
+  color: #6b7280;
+  font-size: 11px;
+  line-height: 1.35;
+  text-align: center;
+}
+
 .typing-indicator span { display: inline-block; width: 6px; height: 6px; background-color: #9ca3af; border-radius: 50%; margin: 0 2px; animation: blink 1.4s infinite both; }
 .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
 .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
@@ -1337,21 +1415,8 @@ button.record-card:hover { border-color: var(--primary-blue); }
 
 /* A tela ocupa a altura do frame e só a lista de doses rola: o botão voltar,
    o título, o seletor de pessoa e o resumo ficam parados no topo. */
-.vacinas-screen {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  padding-bottom: 0;
-}
-.vacinas-topo {
-  flex-shrink: 0;
-}
-.vacinas-lista {
-  flex: 1;
-  min-height: 0; /* sem isso o flex não deixa o filho encolher e a rolagem não aparece */
-  overflow-y: auto;
-  padding-bottom: 24px;
-}
+/* A carteira de vacinação usa o padrão compartilhado .tela-rolagem /
+   .tela-topo / .tela-lista, definido junto do .screen-container. */
 
 .vacina-pessoa-selector {
   display: flex;
@@ -1676,7 +1741,10 @@ button.record-card:hover { border-color: var(--primary-blue); }
   line-height: 1.4;
 }
 
-.unidade-acoes { display: flex; gap: 8px; margin-top: 8px; }
+/* Quebra em mais de uma linha: são até quatro ações ("Como chegar", "Ligar",
+   "O que tem lá" e "Definir como minha") e elas não cabem lado a lado na
+   largura do cartão. Sem o wrap, as duas últimas vazavam para fora. */
+.unidade-acoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 
 .unidade-acao {
   display: inline-flex;
@@ -1834,6 +1902,52 @@ button.record-card:hover { border-color: var(--primary-blue); }
   font-size: 12px;
   font-weight: 600;
   color: var(--primary-blue);
+}
+
+/* ------------------------------------------------------------
+   Glossário: o "?" ao lado do nome de um exame ou de uma vacina.
+   Discreto de propósito — quem já sabe o que é o exame não deve
+   ter o olho puxado para ele a cada linha da lista.
+   ------------------------------------------------------------ */
+.botao-explicacao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 5px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #9ca3af;
+  cursor: pointer;
+  vertical-align: middle;
+  line-height: 0;
+}
+.botao-explicacao:hover,
+.botao-explicacao:focus-visible { color: var(--primary-blue); }
+
+.explicacao-texto {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #374151;
+}
+
+.explicacao-estado {
+  margin: 0;
+  font-size: 14px;
+  color: #6b7280;
+}
+.explicacao-estado.erro { color: #b91c1c; }
+
+/* Deixa claro que o texto foi escrito por uma máquina e que ele não fala do
+   resultado de quem está lendo. */
+.explicacao-rodape {
+  margin: 14px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid #e5e7eb;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #6b7280;
 }
 
 /* ============================================================

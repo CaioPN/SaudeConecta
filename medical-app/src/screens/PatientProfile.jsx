@@ -47,16 +47,19 @@ export default function PatientProfile() {
   const primeiroNome = paciente?.nome ? paciente.nome.split(' ')[0] : null;
 
   return (
-    <div className="screen-container">
-      <button onClick={() => navigate(-1)} className="back-btn">
-        <ChevronLeft size={20} /> Voltar
-      </button>
+    <div className="screen-container tela-rolagem">
+      <div className="tela-topo">
+        <button onClick={() => navigate(-1)} className="back-btn">
+          <ChevronLeft size={20} /> Voltar
+        </button>
 
-      <h2 className="header-title">Minha Saúde</h2>
-      <p className="header-subtitle mb-6">
-        {primeiroNome ? `Seus registros, ${primeiroNome}` : 'Seus registros de saúde'}
-      </p>
+        <h2 className="header-title">Minha Saúde</h2>
+        <p className="header-subtitle mb-6">
+          {primeiroNome ? `Seus registros, ${primeiroNome}` : 'Seus registros de saúde'}
+        </p>
+      </div>
 
+      <div className="tela-lista">
       <div className="flex-col gap-4">
         {REGISTROS.map((item) => (
           <button
@@ -73,6 +76,7 @@ export default function PatientProfile() {
             </div>
           </button>
         ))}
+      </div>
       </div>
     </div>
   );

@@ -27,19 +27,24 @@ export default function Faq() {
   const alternar = (chave) => setAberta((atual) => (atual === chave ? null : chave));
 
   return (
-    <div className="screen-container">
-      <button onClick={() => navigate(-1)} className="back-btn">
-        <ChevronLeft size={20} /> Voltar
-      </button>
+    <div className="screen-container tela-rolagem">
+      {/* São 51 perguntas: sem o título parado, quem desce perde a referência
+          de onde está. */}
+      <div className="tela-topo">
+        <button onClick={() => navigate(-1)} className="back-btn">
+          <ChevronLeft size={20} /> Voltar
+        </button>
 
-      <div className="flex items-center gap-4 mb-2">
-        <div className="icon-box">
-          <HelpCircle size={24} />
+        <div className="flex items-center gap-4 mb-2">
+          <div className="icon-box">
+            <HelpCircle size={24} />
+          </div>
+          <h2 className="header-title">Dúvidas Frequentes</h2>
         </div>
-        <h2 className="header-title">Dúvidas Frequentes</h2>
+        <p className="header-subtitle mb-6">Toque em uma pergunta para ver a resposta</p>
       </div>
-      <p className="header-subtitle mb-6">Toque em uma pergunta para ver a resposta</p>
 
+      <div className="tela-lista">
       {FAQ.map((categoria) => {
         const Icone = ICONES[categoria.id] || Info;
         return (
@@ -80,6 +85,7 @@ export default function Faq() {
           Pergunte ao assistente virtual pelo botão azul no canto da tela, ou escreva
           para <strong>suporte@saudeconecta.com.br</strong>.
         </p>
+      </div>
       </div>
     </div>
   );
