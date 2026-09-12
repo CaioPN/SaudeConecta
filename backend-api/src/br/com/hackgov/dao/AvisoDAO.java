@@ -165,10 +165,13 @@ public class AvisoDAO {
     private void adicionarProximaConsulta(Connection con, int idPaciente, Integer idDependente,
                                           String pessoa, List<Aviso> avisos)
             throws SQLException {
-        String sql = "SELECT c.data, c.local, m.nome AS medico, "
+        // LEFT JOIN porque a consulta anotada pelo paciente não tem médico
+        // cadastrado: com o JOIN de antes, justamente a consulta que ele mesmo
+        // marcou não viraria aviso no Dashboard.
+        String sql = "SELECT c.data, c.local, COALESCE(m.nome, c.profissional) AS medico, "
                 + "       DATEDIFF(c.data, CURDATE()) AS dias "
                 + "FROM consultas c "
-                + "JOIN medicos m ON m.id = c.medico_id "
+                + "LEFT JOIN medicos m ON m.id = c.medico_id "
                 + "WHERE c.paciente_id = ? AND c.dependente_id <=> ? "
                 + "  AND c.status = 'agendada' "
                 + "  AND c.data BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL ? DAY) "

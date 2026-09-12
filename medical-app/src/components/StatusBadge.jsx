@@ -8,6 +8,7 @@ const ROTULOS = {
   alterado: 'Alterado',
   agendada: 'Agendada',
   realizada: 'Realizada',
+  cancelada: 'Cancelada',
   pendente: 'Pendente',
 };
 

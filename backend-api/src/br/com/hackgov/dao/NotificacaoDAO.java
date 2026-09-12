@@ -42,6 +42,8 @@ public class NotificacaoDAO {
     public static final String TIPO_EXAME = "exame";
     public static final String TIPO_PRONTUARIO = "prontuario";
     public static final String TIPO_ACESSO = "acesso";
+    /** Dose marcada (ou desmarcada) na carteira pelo profissional. */
+    public static final String TIPO_VACINA = "vacina";
     /** Gerado pelo app a partir de uma data (consulta amanhã, dose vencida). */
     public static final String TIPO_LEMBRETE = "lembrete";
 

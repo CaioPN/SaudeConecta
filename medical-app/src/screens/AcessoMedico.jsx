@@ -174,7 +174,7 @@ export default function AcessoMedico() {
         >
           <PenLine size={18} />
           <span className="escopo-titulo">Leitura e registro</span>
-          <span className="escopo-desc">O médico também registra a consulta e os exames.</span>
+          <span className="escopo-desc">O médico também registra a consulta, os exames e as doses de vacina.</span>
         </button>
       </div>
 

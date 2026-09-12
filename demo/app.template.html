@@ -447,7 +447,7 @@ const HISTORICO_ACESSOS = [
   { id: 'med-2', origem: 'medico', acao: 'leu_prontuario', criadoEm: '2026-07-14T11:05:00', medico: 'Dra. Ana Souza', crm: '123456-SP', especialidade: 'Clínico Geral', escopo: 'escrita' },
   { id: 'med-1', origem: 'medico', acao: 'entrou', criadoEm: '2026-07-14T11:04:00', medico: 'Dra. Ana Souza', crm: '123456-SP', especialidade: 'Clínico Geral', escopo: 'escrita' },
   { id: 'pac-4', origem: 'paciente', acao: 'gerou_codigo', criadoEm: '2026-07-14T11:00:00', ip: '187.45.9.120', detalhe: 'Leitura e registro · 30 min' },
-  { id: 'pac-7', origem: 'paciente', acao: 'registrou_vacina', criadoEm: '2026-07-20T10:05:00', ip: '187.45.9.120', dependente: 'Lucas', detalhe: 'Tríplice Viral · 1ª dose' },
+  { id: 'med-5', origem: 'medico', acao: 'registrou_vacina', criadoEm: '2026-07-20T10:05:00', medico: 'Dra. Ana Souza', crm: '123456-SP', especialidade: 'Clínico Geral', escopo: 'escrita', dependente: 'Lucas', detalhe: 'Tríplice Viral · 1ª dose' },
   { id: 'pac-6b', origem: 'paciente', acao: 'consultou_exames', criadoEm: '2026-07-19T21:15:00', ip: '187.45.9.120', dependente: 'Lucas' },
   { id: 'pac-3', origem: 'paciente', acao: 'cadastrou_dependente', criadoEm: '2026-06-02T19:40:00', ip: '187.45.9.120', detalhe: 'Lucas' },
   { id: 'pac-2', origem: 'paciente', acao: 'login', criadoEm: '2026-06-02T19:38:00', ip: '187.45.9.120' },
@@ -1433,7 +1433,9 @@ function dataIsoBr(iso) {
   return iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4);
 }
 
-function itemVacina(v) {
+// `acaoHtml` é o botão de registrar a dose, que só o portal do médico passa: na
+// carteira do paciente ela é só leitura.
+function itemVacina(v, acaoHtml) {
   const icone = v.status === 'aplicada' ? 'check' : (v.status === 'atrasada' ? 'alertCircle' : 'clock');
 
   let quando;
@@ -1445,10 +1447,6 @@ function itemVacina(v) {
     quando = v.dataPrevista ? 'Prevista para ' + v.dataPrevista : v.periodo;
   }
 
-  const acao = v.status === 'aplicada'
-    ? '<button class="vacina-acao" data-acao="desmarcarVacina" data-dose="' + v.id + '">Desfazer</button>'
-    : '<button class="vacina-acao destaque" data-acao="marcarVacina" data-dose="' + v.id + '">Marcar como aplicada</button>';
-
   return '<div class="vacina-item ' + v.status + '">' +
     '<div class="vacina-status-icon ' + v.status + '">' + ic(icone, 16) + '</div>' +
     '<div class="vacina-info">' +
@@ -1457,8 +1455,20 @@ function itemVacina(v) {
       '<span class="vacina-dose">' + esc(v.dose) + '</span>' +
       (v.protege ? '<span class="vacina-protege">Protege contra: ' + esc(v.protege) + '</span>' : '') +
       '<span class="vacina-data">' + esc(quando) + '</span>' +
-      acao +
+      (acaoHtml || '') +
     '</div></div>';
+}
+
+// A mesma dose vista pelo profissional, com o botão de registrar. A carteira do
+// paciente é só leitura: quem confirma que a dose foi aplicada é quem aplicou.
+// `alvo` diz de quem é a carteira ('titular' ou o id do dependente), porque no
+// portal a pessoa vem do código de acesso, não do seletor do app.
+function itemVacinaMedico(v, alvo) {
+  return itemVacina(v, v.status === 'aplicada'
+    ? '<button class="vacina-acao" data-acao="desmarcarVacina" data-dose="' + v.id +
+      '" data-alvo="' + alvo + '">Desfazer</button>'
+    : '<button class="vacina-acao destaque" data-acao="marcarVacina" data-dose="' + v.id +
+      '" data-alvo="' + alvo + '">Marcar como aplicada</button>');
 }
 
 // Doses registradas da pessoa que está selecionada no seletor do topo.
@@ -1527,19 +1537,23 @@ function telaVacinas() {
         '<span class="text-sm text-muted">' + aplicadas.length + ' de ' + carteira.length + ' registradas</span></div>' +
         '<div class="vacina-progress-bg"><div class="vacina-progress-fill" style="width:' + percentual + '%"></div></div>' +
         '</div></div></div>' +
+      // Aqui a carteira é só leitura: sem esta linha o paciente procuraria um
+      // botão de registrar dose que não existe mais.
+      '<p class="text-xs text-muted">O registro das doses é feito pelo profissional de ' +
+      'saúde, com o código de acesso que você gera em Mais › Acesso do médico.</p>' +
     '</div>' +
 
     '<div class="tela-lista">' +
       (atrasadas.length
-        ? '<h3 class="section-title">Em atraso</h3>' + atrasadas.map(itemVacina).join('')
+        ? '<h3 class="section-title">Em atraso</h3>' + atrasadas.map(function (v) { return itemVacina(v); }).join('')
         : '') +
       (previstas.length
         ? '<h3 class="section-title" style="margin-top:' + (atrasadas.length ? '24px' : '0') + '">Próximas doses</h3>' +
-          previstas.map(itemVacina).join('')
+          previstas.map(function (v) { return itemVacina(v); }).join('')
         : '') +
       (aplicadas.length
         ? '<h3 class="section-title" style="margin-top:' + (carteira.length > aplicadas.length ? '24px' : '0') + '">Doses registradas</h3>' +
-          aplicadas.map(itemVacina).join('')
+          aplicadas.map(function (v) { return itemVacina(v); }).join('')
         : '') +
     '</div></div>';
 }
@@ -1736,7 +1750,7 @@ function telaAcessoMedico() {
       '<span class="escopo-desc">O médico vê seu resumo clínico, mas não altera nada.</span></button>' +
       '<button class="escopo-opcao' + (estado.escopoAcesso === 'escrita' ? ' active' : '') + '" data-escopo="escrita">' +
       ic('penLine', 18) + '<span class="escopo-titulo">Leitura e registro</span>' +
-      '<span class="escopo-desc">O médico também registra a consulta e os exames.</span></button>' +
+      '<span class="escopo-desc">O médico também registra a consulta, os exames e as doses de vacina.</span></button>' +
     '</div>' +
 
     // Contato de emergência é dado de OUTRA pessoa: nunca vai por padrão.
@@ -1771,6 +1785,11 @@ const ACOES_LOG = {
   removeu_condicao: { texto: 'Removeu uma condição do prontuário', icone: 'bookOpen', cor: 'revogado' },
   registrou_medicacao: { texto: 'Registrou uma medicação', icone: 'pill', cor: 'consulta' },
   removeu_medicacao: { texto: 'Removeu uma medicação do prontuário', icone: 'pill', cor: 'revogado' },
+  leu_vacinas: { texto: 'Consultou a carteira de vacinação', icone: 'syringe', cor: 'consulta' },
+  // Sem "Você": a dose passou a ser registrada pelo profissional, e as linhas
+  // antigas continuam na trilha. A linha de baixo já diz quem foi.
+  registrou_vacina: { texto: 'Registrou uma dose de vacina', icone: 'syringe', cor: 'consulta' },
+  removeu_vacina: { texto: 'Desfez o registro de uma dose', icone: 'syringe', cor: 'revogado' },
   revogado: { texto: 'Você revogou o acesso', icone: 'ban', cor: 'revogado' },
 
   // Lado do paciente
@@ -1788,8 +1807,6 @@ const ACOES_LOG = {
   excluiu_contato: { texto: 'Você excluiu um contato de emergência', icone: 'heart', cor: 'revogado' },
   gerou_codigo: { texto: 'Você gerou um código de acesso', icone: 'keyRound', cor: 'consulta' },
   consultou_vacinas: { texto: 'Você abriu a carteira de vacinação', icone: 'syringe', cor: 'consulta' },
-  registrou_vacina: { texto: 'Você registrou uma dose de vacina', icone: 'syringe', cor: 'consulta' },
-  removeu_vacina: { texto: 'Você desfez o registro de uma dose', icone: 'syringe', cor: 'revogado' },
   atualizou_perfil: { texto: 'Você alterou dados do cadastro', icone: 'user', cor: 'consulta' },
   definiu_referencia: { texto: 'Você escolheu sua unidade de referência', icone: 'hospital', cor: 'consulta' },
 };
@@ -1938,6 +1955,32 @@ function telaPrivacidade() {
 }
 
 // --- Portal do médico (fora do app do paciente) ---
+// Carteira de vacinação dentro do portal do profissional.
+//
+// Marcar dose saiu do app do paciente: a carteira vale como documento quando
+// quem confirma é quem aplicou (ou viu) a vacina. `alvo` é a chave da pessoa em
+// estado.vacinasAplicadas — no portal ela vem do código de acesso, e não do
+// seletor de pessoa do app.
+function carteiraDoMedico(atendido, alvo) {
+  const idade = calcularIdade(atendido.data_nascimento);
+  const adulto = alvo === 'titular' || (idade != null && idade >= 13);
+  if (!estado.vacinasAplicadas[String(alvo)]) estado.vacinasAplicadas[String(alvo)] = {};
+
+  const carteira = montarCarteira(atendido.data_nascimento, {
+    adulto: adulto,
+    aplicadas: estado.vacinasAplicadas[String(alvo)],
+  });
+  const aplicadas = carteira.filter(function (v) { return v.status === 'aplicada'; });
+
+  return '<div class="card">' +
+    '<h3 class="section-title">Carteira de vacinação</h3>' +
+    '<p class="text-sm text-muted mb-6">' + aplicadas.length + ' de ' + carteira.length +
+    ' doses registradas. O paciente vê a carteira no app dele, mas só o ' +
+    'profissional registra as doses.</p>' +
+    carteira.map(function (v) { return itemVacinaMedico(v, alvo); }).join('') +
+  '</div>';
+}
+
 function telaPortalMedico() {
   const cabecalho = '<header class="portal-header">' +
     '<div class="icon-box">' + ic('stethoscope', 22) + '</div>' +
@@ -1993,15 +2036,20 @@ function telaPortalMedico() {
   const idade = calcularIdade(PACIENTE.data_nascimento);
   const escrita = estado.medico.escopo === 'escrita';
   const consulta = estado.abaMedico === 'consulta';
+  const vacinas = estado.abaMedico === 'vacinas';
 
   const formulario = escrita
     ? '<div class="tabs-wrapper">' +
         '<button class="tab-btn' + (consulta ? ' active' : '') + '" data-aba-medico="consulta">' +
         ic('stethoscope', 18) + '<span>Consulta</span></button>' +
-        '<button class="tab-btn' + (!consulta ? ' active' : '') + '" data-aba-medico="exame">' +
+        '<button class="tab-btn' + (!consulta && !vacinas ? ' active' : '') + '" data-aba-medico="exame">' +
         ic('droplet', 18) + '<span>Exame</span></button>' +
+        '<button class="tab-btn' + (vacinas ? ' active' : '') + '" data-aba-medico="vacinas">' +
+        ic('syringe', 18) + '<span>Vacinas</span></button>' +
       '</div>' +
-      (consulta
+      (vacinas
+        ? carteiraDoMedico(atendido, dependenteAtendido ? dependenteAtendido.id : 'titular')
+        : consulta
         ? '<form class="card" data-form="medico-consulta">' +
             '<div class="input-group"><label class="input-label">Motivo</label>' +
             '<input class="input-field" placeholder="Ex.: Retorno com resultados" required /></div>' +
@@ -2386,15 +2434,17 @@ document.addEventListener('click', function (evento) {
     return;
   }
 
-  // Registrar e desfazer uma dose. No app isso é POST/DELETE /api/vacinas;
-  // aqui fica na memória da página e some ao recarregar, como o resto.
-  if (d.acao === 'marcarVacina' && d.dose) {
-    vacinasDaPessoa()[d.dose] = new Date().toISOString().slice(0, 10);
+  // Registrar e desfazer uma dose, sempre pelo portal do profissional. No app
+  // isso é POST/DELETE /api/medico/vacinas; aqui fica na memória da página e
+  // some ao recarregar, como o resto. O alvo vem do botão porque a pessoa
+  // atendida sai do código de acesso, não do seletor do app.
+  if (d.acao === 'marcarVacina' && d.dose && d.alvo) {
+    estado.vacinasAplicadas[d.alvo][d.dose] = new Date().toISOString().slice(0, 10);
     render(false);
     return;
   }
-  if (d.acao === 'desmarcarVacina' && d.dose) {
-    delete vacinasDaPessoa()[d.dose];
+  if (d.acao === 'desmarcarVacina' && d.dose && d.alvo) {
+    delete estado.vacinasAplicadas[d.alvo][d.dose];
     render(false);
     return;
   }

@@ -54,6 +54,14 @@ export const FAQ = [
         r: 'O telefone e o endereço, sim: abra "Perfil" e toque em "Editar". Nome, CPF, data de nascimento, gênero e tipo sanguíneo não são editáveis pela tela, porque identificam você no atendimento — para mudá-los, escreva para o suporte. Toda alteração fica registrada no seu histórico de acessos.',
       },
       {
+        p: 'O texto está pequeno demais. Dá para aumentar?',
+        r: 'Dá. Em "Mais" → "Meu perfil", no fim da tela, existe a seção "Acessibilidade": escolha entre Padrão, Grande e Maior. O tamanho vale para todas as telas do aplicativo e fica guardado no aparelho, então você só precisa ajustar uma vez.',
+      },
+      {
+        p: 'Alguns textos cinzas são difíceis de ler. O que faço?',
+        r: 'Na mesma seção "Acessibilidade" do seu perfil, toque em "Ativar" na opção "Texto mais escuro". As legendas e os textos de apoio, que aparecem em cinza claro, passam a ser escritos em um tom bem mais escuro. Você pode combinar isso com o texto maior.',
+      },
+      {
         p: 'Como saio da minha conta?',
         r: 'Toque em "Mais" na barra inferior e escolha "Sair". Isso apaga a sessão guardada no aparelho.',
       },
@@ -92,6 +100,18 @@ export const FAQ = [
       {
         p: 'Onde vejo as minhas consultas?',
         r: 'Na tela inicial, toque em "Consultas", ou vá em "Minha Saúde" → "Consultas". As consultas ficam separadas entre as próximas (ainda por acontecer) e as anteriores. Tocando em uma delas você vê o local, o profissional, o resumo e a conduta.',
+      },
+      {
+        p: 'Como coloco no app uma consulta que eu marquei?',
+        r: 'Em "Consultas", toque em "Anotar consulta marcada" e informe o profissional, a especialidade, a data, a hora e o local. Ela passa a aparecer em "Próximas", com a etiqueta "anotado por você", e o app te lembra quando a data se aproximar. Se você já foi atendido por aquele profissional, basta escolher o nome na lista: a especialidade e o local vêm preenchidos.',
+      },
+      {
+        p: 'Anotar a consulta aqui marca ela na unidade?',
+        r: 'Não. O aplicativo não agenda nada com a unidade de saúde: quem marca é você, por telefone ou no balcão. O que você anota aqui é o seu lembrete, para não perder a data e ter o endereço à mão.',
+      },
+      {
+        p: 'Posso corrigir ou apagar uma consulta que anotei?',
+        r: 'Pode. Abra a consulta e use "Corrigir data ou local" ou "Apagar anotação". Isso vale só para o que você anotou: o atendimento registrado pelo profissional faz parte do seu prontuário e não pode ser alterado por aqui — nele o botão que aparece é "Anotar retorno com este profissional", que já vem com o nome e o local preenchidos.',
       },
       {
         p: 'Onde ficam os meus exames?',
@@ -186,12 +206,12 @@ export const FAQ = [
         r: 'Toque no "?" ao lado do nome da vacina: abre uma explicação em linguagem simples do que ela previne e por que faz parte do calendário. O texto é escrito por inteligência artificial e vale para a vacina em geral — quem orienta sobre as doses de cada pessoa é o profissional de saúde.',
       },
       {
-        p: 'Como marco uma dose que já foi tomada?',
-        r: 'Abra "Carteira de Vacinação", encontre a dose e toque em "Marcar como aplicada". O app registra a data de hoje. Se marcar por engano, o botão "Desfazer" apaga o registro. Enquanto uma dose vencida não é marcada, ela aparece em atraso e vira um aviso na tela inicial.',
+        p: 'Como uma dose que já foi tomada entra na carteira?',
+        r: 'Quem registra a dose é o profissional de saúde, usando o código de acesso que você gera em "Mais" → "Acesso do médico" (com a opção "leitura e registro"). Na sua tela a carteira é só de leitura: não há botão de marcar nem de desfazer. É assim para a carteira valer como documento — quem confirma a aplicação é quem aplicou ou viu a vacina, não a memória de quem preenche.',
       },
       {
         p: 'O app sabe sozinho quais vacinas eu tomei?',
-        r: 'Não. O app não é ligado ao sistema do posto de saúde, então quem confirma cada dose é você (ou o profissional, quando ele registra pelo acesso temporário). Antes disso, a dose vencida aparece como em atraso.',
+        r: 'Não. O app não é ligado ao sistema do posto de saúde, então cada dose só aparece como registrada depois que um profissional a lança pelo acesso temporário. Antes disso, a dose vencida aparece como em atraso.',
       },
       {
         p: 'Onde vejo as campanhas de vacinação abertas?',
@@ -221,11 +241,11 @@ export const FAQ = [
       },
       {
         p: 'Posso escolher o que o médico faz com os meus dados?',
-        r: 'Sim. Ao gerar o código você escolhe entre "Somente leitura", em que o médico apenas consulta, e "Leitura e registro", em que ele também pode lançar a consulta e os exames do dia e atualizar o seu prontuário.',
+        r: 'Sim. Ao gerar o código você escolhe entre "Somente leitura", em que o médico apenas consulta, e "Leitura e registro", em que ele também pode lançar a consulta e os exames do dia, atualizar o seu prontuário e registrar doses na carteira de vacinação.',
       },
       {
         p: 'O que exatamente o médico consegue escrever no meu prontuário?',
-        r: 'Com o acesso de "Leitura e registro", ele pode lançar a consulta do dia, um exame e itens do prontuário: alergias, condições acompanhadas e medicações em uso. Nos exames ele escolhe entre uma coleta de sangue (com os resultados e as faixas de referência) e um exame de imagem (com o nome e o laudo), e informa a data em que o exame foi feito — que pode ser anterior à consulta. Não existe "editar": para corrigir algo lançado errado, o profissional remove o item e lança o certo — e as duas ações aparecem separadas no seu histórico de acessos.',
+        r: 'Com o acesso de "Leitura e registro", ele pode lançar a consulta do dia, um exame, itens do prontuário (alergias, condições acompanhadas e medicações em uso) e as doses da carteira de vacinação. Nos exames ele escolhe entre uma coleta de sangue (com os resultados e as faixas de referência) e um exame de imagem (com o nome e o laudo), e informa a data em que o exame foi feito — que pode ser anterior à consulta. Não existe "editar": para corrigir algo lançado errado, o profissional remove o item e lança o certo — e as duas ações aparecem separadas no seu histórico de acessos.',
       },
       {
         p: 'Posso eu mesmo enviar um exame que fiz em outro lugar?',

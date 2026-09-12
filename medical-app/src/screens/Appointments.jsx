@@ -1,14 +1,23 @@
-import React, { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, Calendar, MapPin } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ChevronLeft, ChevronRight, Calendar, MapPin, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import StatusBadge from '../components/StatusBadge';
 import BotaoPrivacidade from '../components/BotaoPrivacidade';
 import SeletorPessoa from '../components/SeletorPessoa';
+import Modal from '../components/Modal';
+import FormularioConsulta from '../components/FormularioConsulta';
 import { usePessoas } from '../context/PessoasContext';
 import { usePrivacidade } from '../context/PrivacidadeContext';
 import { mascararTexto } from '../utils/privacidade';
 import { listarConsultas } from '../services/consultas';
 import { mesAbreviado } from '../utils/exames';
+
+// "2026-04-12" — comparação de texto resolve, porque o formato ISO ordena
+// igual à data. Evita o new Date(), que interpretaria a string como UTC.
+function hojeIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 function ConsultaItem({ consulta, onClick, oculto }) {
   // Com o olho fechado somem o profissional, a especialidade e o local: a
@@ -30,6 +39,12 @@ function ConsultaItem({ consulta, onClick, oculto }) {
           </span>
           <StatusBadge status={consulta.status} />
         </div>
+        {/* Quem anotou. Sem isto, a consulta que o paciente digitou ficaria
+            igual ao atendimento registrado pelo profissional — e as duas coisas
+            valem coisas diferentes na hora de mostrar a alguém. */}
+        {consulta.origem === 'paciente' && (
+          <span className="consulta-item-origem">anotado por você</span>
+        )}
         <span className={`consulta-item-espec ${oculto ? 'valor-oculto' : ''}`}>
           {oculto ? mascararTexto(consulta.especialidade) : consulta.especialidade}
         </span>
@@ -48,35 +63,35 @@ function ConsultaItem({ consulta, onClick, oculto }) {
 
 export default function Appointments() {
   const navigate = useNavigate();
-  const { dependenteId } = usePessoas();
+  const { pessoa, dependenteId } = usePessoas();
   const { oculto } = usePrivacidade();
   const [consultas, setConsultas] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
+  const [anotando, setAnotando] = useState(false);
 
-  useEffect(() => {
-    let ativo = true;
+  const carregar = useCallback(() => {
     setCarregando(true);
     setErro(null);
-    listarConsultas(dependenteId)
-      .then((lista) => {
-        if (ativo) setConsultas(lista);
-      })
-      .catch(() => {
-        if (ativo) setErro('Não foi possível carregar as consultas.');
-      })
-      .finally(() => {
-        if (ativo) setCarregando(false);
-      });
-    return () => {
-      ativo = false;
-    };
+    return listarConsultas(dependenteId)
+      .then(setConsultas)
+      .catch(() => setErro('Não foi possível carregar as consultas.'))
+      .finally(() => setCarregando(false));
   }, [dependenteId]);
+
+  useEffect(() => { carregar(); }, [carregar]);
 
   // A API devolve da mais recente para a mais antiga; as próximas ficam em
   // ordem crescente para que a consulta mais perto de acontecer venha primeiro.
-  const proximas = consultas.filter((c) => c.status === 'agendada').slice().reverse();
-  const anteriores = consultas.filter((c) => c.status !== 'agendada');
+  //
+  // O corte não é só pelo status: a consulta anotada pelo paciente continua
+  // "agendada" para sempre, porque ninguém volta ao app para dizer que foi.
+  // Sem olhar a data, a consulta do mês passado ficaria encalhada no topo,
+  // em "Próximas", empurrando a de amanhã para baixo.
+  const hoje = hojeIso();
+  const emAberto = (c) => c.status === 'agendada' && c.data >= hoje;
+  const proximas = consultas.filter(emAberto).slice().reverse();
+  const anteriores = consultas.filter((c) => !emAberto(c));
 
   const abrir = (id) => navigate(`/appointment/${id}`);
 
@@ -97,6 +112,13 @@ export default function Appointments() {
         </div>
 
         <SeletorPessoa />
+
+        {/* O app não agenda nada — mas é o paciente quem sabe o que marcou na
+            unidade, e sem este botão a tela só mostrava o que o profissional
+            tinha registrado depois do atendimento. */}
+        <button className="btn-primary mb-6" onClick={() => setAnotando(true)}>
+          <Plus size={18} /> Anotar consulta marcada
+        </button>
       </div>
 
       <div className="tela-lista">
@@ -125,6 +147,18 @@ export default function Appointments() {
         </>
       )}
       </div>
+
+      <Modal
+        open={anotando}
+        title={pessoa.titular ? 'Anotar consulta' : `Anotar consulta de ${pessoa.nome.split(' ')[0]}`}
+        onClose={() => setAnotando(false)}
+      >
+        <FormularioConsulta
+          dependenteId={dependenteId}
+          onPronto={() => { setAnotando(false); carregar(); }}
+          onCancelar={() => setAnotando(false)}
+        />
+      </Modal>
     </div>
   );
 }

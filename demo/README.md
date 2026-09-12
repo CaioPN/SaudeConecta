@@ -1,5 +1,10 @@
 # Demonstração em HTML
 
+> **APOSENTADA — 10/09/2026.** Esta demonstração não é mais usada e não
+> acompanha mais o app: não rode o `gerar.mjs` nem o `testar.mjs`, e não
+> atualize nada nesta pasta. O conteúdo abaixo descreve como ela funcionava,
+> e o `index.html` ficou congelado no estado daquele dia.
+
 `index.html` é o Saúde Conecta inteiro em **um arquivo só**: todas as telas do
 app do paciente e o portal do médico, sem Node, sem Java e sem MySQL. Serve
 para mostrar o projeto a quem não vai clonar o repositório — basta abrir o

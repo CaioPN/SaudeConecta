@@ -7,6 +7,13 @@
   --white: #ffffff;
   --text-dark: #111827;
   --text-gray: #6b7280;
+  /* Cinza mais claro, usado em legenda e texto de apoio. Era literal em cinco
+     regras; virou variável para o alto contraste poder escurecê-lo de uma vez. */
+  --text-gray-claro: #9ca3af;
+  /* Multiplicador do tamanho do texto (acessibilidade). Todo `font-size` do
+     arquivo é `calc(Npx * var(--escala-fonte))`, então trocar esta variável
+     redimensiona o app inteiro. Ver o bloco "Acessibilidade" no fim. */
+  --escala-fonte: 1;
   --border-radius: 12px;
   /* Situação de resultados/eventos clínicos */
   --status-ok: #16a34a;
@@ -127,11 +134,11 @@ body {
 }
 
 /* Typography */
-.header-title { font-size: 24px; font-weight: 700; color: var(--text-dark); margin-bottom: 4px; }
-.header-subtitle { font-size: 14px; color: var(--text-gray); }
-.section-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; color: var(--text-dark); }
-.text-sm { font-size: 14px; }
-.text-xs { font-size: 12px; }
+.header-title { font-size: calc(24px * var(--escala-fonte)); font-weight: 700; color: var(--text-dark); margin-bottom: 4px; }
+.header-subtitle { font-size: calc(14px * var(--escala-fonte)); color: var(--text-gray); }
+.section-title { font-size: calc(18px * var(--escala-fonte)); font-weight: 700; margin-bottom: 16px; color: var(--text-dark); }
+.text-sm { font-size: calc(14px * var(--escala-fonte)); }
+.text-xs { font-size: calc(12px * var(--escala-fonte)); }
 .font-bold { font-weight: 700; }
 .text-muted { color: var(--text-gray); }
 .text-primary { color: var(--primary-blue); }
@@ -206,7 +213,7 @@ body {
 
 .input-label {
   display: block;
-  font-size: 14px;
+  font-size: calc(14px * var(--escala-fonte));
   font-weight: 500;
   margin-bottom: 6px;
 }
@@ -217,7 +224,7 @@ body {
   background-color: var(--bg-gray);
   border: 1px solid transparent;
   border-radius: var(--border-radius);
-  font-size: 16px;
+  font-size: calc(16px * var(--escala-fonte));
   outline: none;
 }
 
@@ -277,8 +284,8 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  color: #9ca3af;
-  font-size: 10px;
+  color: var(--text-gray-claro);
+  font-size: calc(10px * var(--escala-fonte));
   font-weight: 500;
   background: none;
   border: none;
@@ -378,7 +385,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #9ca3af;
+  color: var(--text-gray-claro);
   border: 4px solid var(--white);
   margin-bottom: 12px;
 }
@@ -428,12 +435,12 @@ body {
   justify-content: center;
 }
 .info-label {
-  font-size: 12px;
+  font-size: calc(12px * var(--escala-fonte));
   color: var(--text-gray);
   margin-bottom: 2px;
 }
 .info-value {
-  font-size: 14px;
+  font-size: calc(14px * var(--escala-fonte));
   font-weight: 600;
   color: var(--text-dark);
   word-break: break-word;
@@ -457,7 +464,7 @@ body {
   justify-content: center;
   gap: 8px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: calc(14px * var(--escala-fonte));
   font-weight: 600;
   color: var(--text-gray);
   background: none;
@@ -488,7 +495,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 16px;
+  font-size: calc(16px * var(--escala-fonte));
   font-weight: 700;
   color: var(--text-dark);
   margin-bottom: 6px;
@@ -498,13 +505,13 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: calc(12px * var(--escala-fonte));
   color: var(--text-gray);
   line-height: 1.6;
 }
 
 .exam-laudo-label {
-  font-size: 12px;
+  font-size: calc(12px * var(--escala-fonte));
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -516,7 +523,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: calc(11px * var(--escala-fonte));
   color: var(--text-gray);
   margin: 8px 0 12px;
 }
@@ -531,9 +538,9 @@ body {
   margin-bottom: 8px;
 }
 
-.result-nome { font-size: 14px; font-weight: 600; color: var(--text-dark); }
-.result-valor { font-size: 15px; font-weight: 700; color: var(--text-dark); }
-.result-unidade { font-size: 12px; font-weight: 400; color: var(--text-gray); }
+.result-nome { font-size: calc(14px * var(--escala-fonte)); font-weight: 600; color: var(--text-dark); }
+.result-valor { font-size: calc(15px * var(--escala-fonte)); font-weight: 700; color: var(--text-dark); }
+.result-unidade { font-size: calc(12px * var(--escala-fonte)); font-weight: 400; color: var(--text-gray); }
 
 .result-regua {
   position: relative;
@@ -579,7 +586,7 @@ body {
   gap: 8px;
 }
 
-.result-referencia { font-size: 12px; color: var(--text-gray); }
+.result-referencia { font-size: calc(12px * var(--escala-fonte)); color: var(--text-gray); }
 
 /* Selo de situação (exames, consultas) */
 .status-badge {
@@ -587,7 +594,7 @@ body {
   align-items: center;
   padding: 3px 10px;
   border-radius: 9999px;
-  font-size: 11px;
+  font-size: calc(11px * var(--escala-fonte));
   font-weight: 700;
   white-space: nowrap;
 }
@@ -598,6 +605,9 @@ body {
 .status-badge.pendente { background-color: var(--status-warn-bg); color: var(--status-warn); }
 .status-badge.alterado { background-color: var(--status-bad-bg); color: var(--status-bad); }
 .status-badge.agendada { background-color: #dbeafe; color: var(--primary-blue); }
+/* Cancelada é cinza, e não vermelha: desmarcar uma consulta é um fato comum,
+   não um alerta. O vermelho fica reservado para resultado alterado. */
+.status-badge.cancelada { background-color: #f3f4f6; color: var(--text-gray); }
 
 /* Par rótulo + valor (componente InfoField) */
 .info-field {
@@ -611,14 +621,14 @@ body {
 .info-field-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 
 .info-field-label {
-  font-size: 11px;
+  font-size: calc(11px * var(--escala-fonte));
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-gray);
 }
 
-.info-field-value { font-size: 14px; font-weight: 600; color: var(--text-dark); line-height: 1.5; }
+.info-field-value { font-size: calc(14px * var(--escala-fonte)); font-weight: 600; color: var(--text-dark); line-height: 1.5; }
 
 .detail-card-header {
   display: flex;
@@ -660,18 +670,18 @@ body {
   color: var(--primary-blue);
 }
 
-.consulta-item-dia { font-size: 18px; font-weight: 700; line-height: 1; }
-.consulta-item-mes { font-size: 11px; font-weight: 600; text-transform: uppercase; }
+.consulta-item-dia { font-size: calc(18px * var(--escala-fonte)); font-weight: 700; line-height: 1; }
+.consulta-item-mes { font-size: calc(11px * var(--escala-fonte)); font-weight: 600; text-transform: uppercase; }
 
 .consulta-item-body { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 .consulta-item-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.consulta-item-espec { font-size: 13px; color: var(--primary-blue); font-weight: 600; }
+.consulta-item-espec { font-size: calc(13px * var(--escala-fonte)); color: var(--primary-blue); font-weight: 600; }
 
 .consulta-item-meta {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
+  font-size: calc(11px * var(--escala-fonte));
   color: var(--text-gray);
 }
 
@@ -689,7 +699,7 @@ body {
 }
 
 .codigo-label {
-  font-size: 11px;
+  font-size: calc(11px * var(--escala-fonte));
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -697,7 +707,7 @@ body {
 }
 
 .codigo-valor {
-  font-size: 34px;
+  font-size: calc(34px * var(--escala-fonte));
   font-weight: 700;
   letter-spacing: 0.12em;
   color: var(--text-dark);
@@ -714,7 +724,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: calc(13px * var(--escala-fonte));
   font-weight: 600;
   color: var(--text-gray);
   font-variant-numeric: tabular-nums;
@@ -724,7 +734,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: calc(13px * var(--escala-fonte));
   font-weight: 600;
   color: var(--primary-blue);
   background: none;
@@ -733,7 +743,7 @@ body {
 }
 
 .codigo-aviso {
-  font-size: 11px;
+  font-size: calc(11px * var(--escala-fonte));
   color: var(--text-gray);
   text-align: center;
   line-height: 1.5;
@@ -772,14 +782,14 @@ body {
   color: var(--primary-blue);
 }
 
-.escopo-titulo { font-size: 13px; font-weight: 700; color: var(--text-dark); }
-.escopo-desc { font-size: 11px; color: var(--text-gray); line-height: 1.4; }
+.escopo-titulo { font-size: calc(13px * var(--escala-fonte)); font-weight: 700; color: var(--text-dark); }
+.escopo-desc { font-size: calc(11px * var(--escala-fonte)); color: var(--text-gray); line-height: 1.4; }
 
 .acesso-nota {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  font-size: 12px;
+  font-size: calc(12px * var(--escala-fonte));
   color: var(--text-gray);
   line-height: 1.5;
   margin-top: 12px;
@@ -800,7 +810,7 @@ body {
   justify-content: center;
   gap: 6px;
   padding: 8px;
-  font-size: 13px;
+  font-size: calc(13px * var(--escala-fonte));
   font-weight: 600;
   color: var(--status-bad);
   background-color: var(--status-bad-bg);
@@ -831,7 +841,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: calc(13px * var(--escala-fonte));
   font-weight: 600;
   color: var(--primary-blue);
   font-variant-numeric: tabular-nums;
@@ -841,7 +851,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: calc(13px * var(--escala-fonte));
   font-weight: 600;
   color: var(--text-gray);
   background: none;
@@ -873,7 +883,7 @@ body {
 }
 
 .form-erro {
-  font-size: 13px;
+  font-size: calc(13px * var(--escala-fonte));
   color: var(--status-bad);
   margin-bottom: 12px;
 }
@@ -882,7 +892,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: calc(13px * var(--escala-fonte));
   font-weight: 600;
   color: var(--status-ok);
   margin-bottom: 12px;
@@ -895,7 +905,7 @@ body {
   border-radius: var(--border-radius);
   padding: 20px;
   text-align: center;
-  font-size: 14px;
+  font-size: calc(14px * var(--escala-fonte));
   color: var(--text-gray);
 }
 
@@ -953,7 +963,7 @@ body {
   border-radius: var(--border-radius);
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
   margin-top: 12px;
-  font-size: 14px;
+  font-size: calc(14px * var(--escala-fonte));
   line-height: 1.5;
   color: var(--text-dark);
   cursor: pointer;
@@ -1018,7 +1028,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   width: 100%;
   padding: 12px;
   color: #f1f5f9;
-  font-size: 15px;
+  font-size: calc(15px * var(--escala-fonte));
   font-weight: 500;
   background: transparent;
   border: none;
@@ -1056,13 +1066,13 @@ button.record-card:hover { border-color: var(--primary-blue); }
   margin-bottom: 24px;
 }
 .login-greeting h2 {
-  font-size: 22px;
+  font-size: calc(22px * var(--escala-fonte));
   font-weight: 600;
   color: var(--text-dark);
   margin-bottom: 4px;
 }
 .login-greeting p {
-  font-size: 14px;
+  font-size: calc(14px * var(--escala-fonte));
   color: var(--text-gray);
 }
 .label-row {
@@ -1078,7 +1088,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   background: none;
   border: none;
   color: var(--primary-blue);
-  font-size: 13px;
+  font-size: calc(13px * var(--escala-fonte));
   font-weight: 500;
   cursor: pointer;
 }
@@ -1095,7 +1105,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   transform: translateY(-50%);
   background: none;
   border: none;
-  color: #9ca3af;
+  color: var(--text-gray-claro);
   cursor: pointer;
   display: flex;
   padding: 4px;
@@ -1105,7 +1115,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
 }
 .login-footer {
   margin-top: 32px;
-  font-size: 14px;
+  font-size: calc(14px * var(--escala-fonte));
   color: var(--text-gray);
   text-align: center;
 }
@@ -1114,7 +1124,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   border: none;
   color: var(--primary-blue);
   font-weight: 600;
-  font-size: 14px;
+  font-size: calc(14px * var(--escala-fonte));
   cursor: pointer;
 }
 .login-footer-link:hover {
@@ -1196,10 +1206,10 @@ button.record-card:hover { border-color: var(--primary-blue); }
 }
 
 .chat-bot-status { display: flex; flex-direction: column; }
-.chat-bot-name { color: white; font-weight: 600; font-size: 14px; }
+.chat-bot-name { color: white; font-weight: 600; font-size: calc(14px * var(--escala-fonte)); }
 .chat-status-indicator { display: flex; align-items: center; gap: 6px; }
 .status-dot { width: 8px; height: 8px; background-color: #4ade80; border-radius: 50%; }
-.status-text { color: #dbeafe; font-size: 12px; font-weight: 500; }
+.status-text { color: #dbeafe; font-size: calc(12px * var(--escala-fonte)); font-weight: 500; }
 
 .chat-close-btn {
   background: none;
@@ -1229,7 +1239,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   max-width: 80%;
   padding: 10px 14px;
   border-radius: 16px;
-  font-size: 14px;
+  font-size: calc(14px * var(--escala-fonte));
   line-height: 1.5;
 }
 .chat-bubble.user { background-color: var(--primary-blue); color: white; border-top-right-radius: 4px; }
@@ -1250,7 +1260,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   border-radius: 20px;
   border: none;
   background-color: #f1f5f9;
-  font-size: 14px;
+  font-size: calc(14px * var(--escala-fonte));
   outline: none;
 }
 .chat-input:focus { box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2); }
@@ -1263,13 +1273,13 @@ button.record-card:hover { border-color: var(--primary-blue); }
   margin: 0;
   padding: 0 12px 10px;
   background-color: white;
-  color: #6b7280;
-  font-size: 11px;
+  color: var(--text-gray);
+  font-size: calc(11px * var(--escala-fonte));
   line-height: 1.35;
   text-align: center;
 }
 
-.typing-indicator span { display: inline-block; width: 6px; height: 6px; background-color: #9ca3af; border-radius: 50%; margin: 0 2px; animation: blink 1.4s infinite both; }
+.typing-indicator span { display: inline-block; width: 6px; height: 6px; background-color: var(--text-gray-claro); border-radius: 50%; margin: 0 2px; animation: blink 1.4s infinite both; }
 .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
 .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
 
@@ -1287,7 +1297,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   border: 1px solid var(--primary-blue);
   background-color: white;
   color: var(--primary-blue);
-  font-size: 13px;
+  font-size: calc(13px * var(--escala-fonte));
   cursor: pointer;
   transition: background-color 0.15s, color 0.15s;
 }
@@ -1302,7 +1312,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   border: none;
   background-color: var(--primary-blue);
   color: white;
-  font-size: 13px;
+  font-size: calc(13px * var(--escala-fonte));
   font-weight: 600;
   cursor: pointer;
   transition: background-color 0.15s;
@@ -1315,7 +1325,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  font-size: 14px;
+  font-size: calc(14px * var(--escala-fonte));
   color: var(--text-dark);
   cursor: pointer;
 }
@@ -1333,7 +1343,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   padding: 0;
   color: var(--primary-blue);
   font-weight: 600;
-  font-size: 14px;
+  font-size: calc(14px * var(--escala-fonte));
   cursor: pointer;
   text-decoration: underline;
 }
@@ -1368,7 +1378,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   border-bottom: 1px solid #e5e7eb;
   flex-shrink: 0;
 }
-.modal-title { font-size: 16px; font-weight: 700; color: var(--text-dark); }
+.modal-title { font-size: calc(16px * var(--escala-fonte)); font-weight: 700; color: var(--text-dark); }
 .modal-close-btn {
   background: none;
   border: none;
@@ -1408,8 +1418,8 @@ button.record-card:hover { border-color: var(--primary-blue); }
 .aviso-item.baixa .aviso-icone { background-color: #eff6ff; color: var(--primary-blue); }
 
 .aviso-texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.aviso-titulo { font-size: 14px; font-weight: 600; color: var(--text-dark); line-height: 1.4; }
-.aviso-detalhe { font-size: 12px; color: var(--text-gray); line-height: 1.4; }
+.aviso-titulo { font-size: calc(14px * var(--escala-fonte)); font-weight: 600; color: var(--text-dark); line-height: 1.4; }
+.aviso-detalhe { font-size: calc(12px * var(--escala-fonte)); color: var(--text-gray); line-height: 1.4; }
 
 /* Carteira de Vacinação */
 
@@ -1434,7 +1444,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   border: 1px solid #e5e7eb;
   background-color: var(--white);
   color: var(--text-gray);
-  font-size: 13px;
+  font-size: calc(13px * var(--escala-fonte));
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
@@ -1524,9 +1534,9 @@ button.record-card:hover { border-color: var(--primary-blue); }
   align-items: baseline;
   gap: 8px;
 }
-.vacina-nome { font-weight: 700; font-size: 15px; color: var(--text-dark); }
+.vacina-nome { font-weight: 700; font-size: calc(15px * var(--escala-fonte)); color: var(--text-dark); }
 .vacina-periodo {
-  font-size: 12px;
+  font-size: calc(12px * var(--escala-fonte));
   font-weight: 600;
   color: var(--text-gray);
   background-color: var(--bg-gray);
@@ -1535,9 +1545,9 @@ button.record-card:hover { border-color: var(--primary-blue); }
   white-space: nowrap;
   flex-shrink: 0;
 }
-.vacina-dose { font-size: 13px; color: var(--text-gray); }
-.vacina-protege { font-size: 12px; color: var(--text-gray); font-style: italic; }
-.vacina-data { font-size: 12px; font-weight: 600; margin-top: 2px; }
+.vacina-dose { font-size: calc(13px * var(--escala-fonte)); color: var(--text-gray); }
+.vacina-protege { font-size: calc(12px * var(--escala-fonte)); color: var(--text-gray); font-style: italic; }
+.vacina-data { font-size: calc(12px * var(--escala-fonte)); font-weight: 600; margin-top: 2px; }
 .vacina-item.aplicada .vacina-data { color: #16a34a; }
 .vacina-item.prevista .vacina-data { color: #d97706; }
 .vacina-item.atrasada .vacina-data { color: #dc2626; }
@@ -1548,7 +1558,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   align-self: flex-start;
   margin-top: 6px;
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: calc(12px * var(--escala-fonte));
   font-weight: 600;
   border-radius: 8px;
   border: 1px solid #d1d5db;
@@ -1570,7 +1580,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   color: var(--primary-blue);
   margin-bottom: 8px;
 }
-.faq-categoria-titulo { font-size: 15px; font-weight: 700; color: var(--text-dark); }
+.faq-categoria-titulo { font-size: calc(15px * var(--escala-fonte)); font-weight: 700; color: var(--text-dark); }
 
 .faq-item { border-bottom: 1px solid #f3f4f6; }
 .faq-item:last-child { border-bottom: none; }
@@ -1585,7 +1595,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   background: none;
   border: none;
   text-align: left;
-  font-size: 14px;
+  font-size: calc(14px * var(--escala-fonte));
   font-weight: 600;
   color: var(--text-dark);
   line-height: 1.4;
@@ -1601,7 +1611,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
 .faq-item.aberta .faq-seta { transform: rotate(180deg); color: var(--primary-blue); }
 
 .faq-resposta {
-  font-size: 14px;
+  font-size: calc(14px * var(--escala-fonte));
   color: var(--text-gray);
   line-height: 1.6;
   padding: 0 0 14px;
@@ -1629,7 +1639,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   border: 1px solid #e5e7eb;
   background-color: var(--white);
   color: var(--text-gray);
-  font-size: 13px;
+  font-size: calc(13px * var(--escala-fonte));
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
@@ -1725,18 +1735,18 @@ button.record-card:hover { border-color: var(--primary-blue); }
 
 .unidade-distancia {
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: calc(12px * var(--escala-fonte));
   font-weight: 700;
   color: var(--primary-blue);
 }
 
-.unidade-tipo { font-size: 12px; font-weight: 600; color: var(--text-gray); }
+.unidade-tipo { font-size: calc(12px * var(--escala-fonte)); font-weight: 600; color: var(--text-gray); }
 
 .unidade-meta {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
+  font-size: calc(11px * var(--escala-fonte));
   color: var(--text-gray);
   line-height: 1.4;
 }
@@ -1755,7 +1765,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   border: 1px solid #e5e7eb;
   background-color: var(--white);
   color: var(--text-dark);
-  font-size: 12px;
+  font-size: calc(12px * var(--escala-fonte));
   font-weight: 600;
   text-decoration: none;
 }
@@ -1763,7 +1773,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
 
 /* Crédito da fonte dos dados — o CNES é público, mas exige citação. */
 .rede-fonte {
-  font-size: 11px;
+  font-size: calc(11px * var(--escala-fonte));
   color: var(--text-gray);
   line-height: 1.5;
   margin-top: 16px;
@@ -1794,7 +1804,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   border: 1px solid #e5e7eb;
   background-color: var(--white);
   color: var(--text-gray);
-  font-size: 12px;
+  font-size: calc(12px * var(--escala-fonte));
   font-weight: 600;
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s;
@@ -1817,7 +1827,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  font-size: 11px;
+  font-size: calc(11px * var(--escala-fonte));
   color: var(--text-gray);
   line-height: 1.5;
   margin: -12px 0 20px;
@@ -1835,7 +1845,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   border-radius: 12px;
   border: 1px solid var(--borda-azul, #e5e7eb);
   background-color: var(--white);
-  font-size: 13px;
+  font-size: calc(13px * var(--escala-fonte));
   cursor: pointer;
 }
 .acesso-opcao-contatos input { margin-top: 2px; }
@@ -1854,7 +1864,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
 .unidade-servicos {
   margin: 6px 0 2px;
   padding-left: 18px;
-  font-size: 12px;
+  font-size: calc(12px * var(--escala-fonte));
   color: var(--text-gray);
   line-height: 1.6;
 }
@@ -1865,7 +1875,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
    aparece quando é exceção. */
 .aviso-pessoa {
   display: inline-block;
-  font-size: 10px;
+  font-size: calc(10px * var(--escala-fonte));
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -1883,7 +1893,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   margin-bottom: 16px;
 }
 .trilha-pessoa {
-  font-size: 10px;
+  font-size: calc(10px * var(--escala-fonte));
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -1899,7 +1909,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   align-items: center;
   gap: 4px;
   margin-top: 4px;
-  font-size: 12px;
+  font-size: calc(12px * var(--escala-fonte));
   font-weight: 600;
   color: var(--primary-blue);
 }
@@ -1917,7 +1927,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   padding: 0;
   border: none;
   background: none;
-  color: #9ca3af;
+  color: var(--text-gray-claro);
   cursor: pointer;
   vertical-align: middle;
   line-height: 0;
@@ -1927,15 +1937,15 @@ button.record-card:hover { border-color: var(--primary-blue); }
 
 .explicacao-texto {
   margin: 0;
-  font-size: 14px;
+  font-size: calc(14px * var(--escala-fonte));
   line-height: 1.55;
   color: #374151;
 }
 
 .explicacao-estado {
   margin: 0;
-  font-size: 14px;
-  color: #6b7280;
+  font-size: calc(14px * var(--escala-fonte));
+  color: var(--text-gray);
 }
 .explicacao-estado.erro { color: #b91c1c; }
 
@@ -1945,9 +1955,9 @@ button.record-card:hover { border-color: var(--primary-blue); }
   margin: 14px 0 0;
   padding-top: 10px;
   border-top: 1px solid #e5e7eb;
-  font-size: 11px;
+  font-size: calc(11px * var(--escala-fonte));
   line-height: 1.4;
-  color: #6b7280;
+  color: var(--text-gray);
 }
 
 /* ============================================================
@@ -2073,7 +2083,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
 /* Rótulo de grupo dentro do menu "Mais" (ex.: "Privacidade"). */
 .more-menu-grupo {
   padding: 4px 12px;
-  font-size: 11px;
+  font-size: calc(11px * var(--escala-fonte));
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -2124,7 +2134,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   border-radius: 999px;
   background-color: var(--primary-blue);
   color: var(--white);
-  font-size: 11px;
+  font-size: calc(11px * var(--escala-fonte));
   font-weight: 700;
   text-align: center;
   line-height: 20px;
@@ -2135,7 +2145,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   background: none;
   padding: 0;
   cursor: pointer;
-  font-size: 12px;
+  font-size: calc(12px * var(--escala-fonte));
   font-weight: 700;
   color: var(--primary-blue);
 }
@@ -2166,3 +2176,170 @@ button.record-card:hover { border-color: var(--primary-blue); }
 /* Seletor de pessoa fora da tela de Vacinas (Exames, Consultas, Prontuário):
    lá ele mora no cabeçalho fixo e já tem espaçamento; aqui rola com a página. */
 .screen-container > .vacina-pessoa-selector { margin-bottom: 16px; }
+
+/* ------------------------------------------------------------
+   Marca d'água do logotipo
+   O logotipo grande, centralizado e quase invisível ao fundo do
+   quadro, como no wireframe. Mora no .app-container, que é o
+   quadro de altura fixa: assim ela fica PARADA enquanto a lista
+   rola por dentro — se estivesse no conteúdo, subiria junto.
+
+   O filtro tira a cor original (o logotipo tem verde) e deixa
+   tudo num azul só, para a marca não competir com os ícones
+   coloridos das telas. A opacidade é baixa de propósito: ela
+   precisa desaparecer atrás de um texto, não fazer companhia.
+
+   pointer-events: none porque é decoração — sem isso ela
+   engoliria o clique de quem toca num espaço vazio da tela.
+   ------------------------------------------------------------ */
+.app-container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url('./assets/logo.png');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 78% auto;
+  /* grayscale primeiro para o verde do logotipo não virar outro tom que o
+     hue-rotate levaria para o lado errado; o resto pinta tudo de azul. */
+  filter: grayscale(1) sepia(1) hue-rotate(178deg) saturate(2.2) brightness(0.95);
+  opacity: 0.06;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* A tela de LOGIN fica de fora: ela já mostra o logotipo inteiro, em tamanho
+   grande e no centro — a marca d'água atrás dele seria o mesmo desenho duas
+   vezes. A partir do Dashboard, o logotipo não aparece mais em lugar nenhum, e
+   é aí que a marca tem o que fazer. */
+.app-container:has(.login-wrapper)::before {
+  display: none;
+}
+
+/* O conteúdo precisa ficar ACIMA da marca: o ::before é posicionado, e sem
+   isto ele pintaria por cima do .app-content, que não é. A barra de navegação
+   já tem z-index próprio. */
+.app-content {
+  position: relative;
+  z-index: 1;
+}
+
+/* ------------------------------------------------------------
+   Consulta anotada pelo paciente
+   O app não agenda: o paciente marca com a unidade e anota aqui.
+   A etiqueta separa isso do atendimento que o profissional
+   registrou pelo código de acesso — as duas coisas aparecem na
+   mesma lista e valem coisas diferentes.
+   ------------------------------------------------------------ */
+.consulta-item-origem {
+  align-self: flex-start;
+  font-size: calc(11px * var(--escala-fonte));
+  font-weight: 600;
+  color: var(--primary-blue);
+  background-color: #eff6ff;
+  border: 1px solid var(--borda-azul);
+  border-radius: 999px;
+  padding: 1px 8px;
+  margin-bottom: 2px;
+}
+
+/* Data e hora lado a lado: são campos curtos, e um por linha deixava o
+   formulário mais alto que a janela do modal. */
+.form-linha-dupla {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.form-botoes {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+.form-botoes .btn-primary,
+.form-botoes .btn-secondary { margin: 0; flex: 1; }
+
+/* ============================================================
+   Acessibilidade — texto maior e texto mais escuro
+   Duas queixas diferentes, dois controles separados: quem não
+   enxerga o tamanho quer aumentar; quem não distingue o cinza
+   claro do fundo quer escurecer. Juntar os dois num "modo idoso"
+   obrigaria a aceitar o que não estava incomodando.
+
+   Tudo sai de variáveis: cada `font-size` do arquivo é
+   `calc(Npx * var(--escala-fonte))`, e o texto de apoio usa
+   var(--text-gray) / var(--text-gray-claro). Por isso o ajuste
+   cabe nestas poucas regras em vez de uma folha alternativa.
+
+   O atributo fica no <body> (e não no .app-container) porque o
+   modal é desenhado por portal direto no body — fora do quadro,
+   ele ficaria de fora do ajuste.
+   ============================================================ */
+body[data-fonte="grande"] { --escala-fonte: 1.15; }
+body[data-fonte="maior"]  { --escala-fonte: 1.3; }
+
+/* Ícone do lucide recebe o tamanho em atributo, em pixel fixo: ele não
+   acompanha o texto. Um empurrãozinho no tamanho mínimo dos botões evita que o
+   rótulo maior encoste na borda. */
+body[data-fonte="maior"] .btn-primary,
+body[data-fonte="maior"] .btn-secondary,
+body[data-fonte="grande"] .btn-primary,
+body[data-fonte="grande"] .btn-secondary {
+  min-height: 52px;
+  height: auto;
+  padding-block: 12px;
+}
+
+/* Alto contraste: o cinza-500 do texto de apoio sobre fundo claro fica em
+   torno de 4,5:1 — no limite do mínimo da WCAG, e abaixo dele quando o texto é
+   pequeno. Aqui ele desce para cinza-700, e o texto principal vira preto. */
+body[data-contraste="alto"] {
+  --text-dark: #000000;
+  --text-gray: #374151;
+  --text-gray-claro: #4b5563;
+}
+
+/* O azul do link e do rótulo também escurece: o #2563eb sobre branco passa,
+   mas sobre o azul-claro dos cartões e das pílulas não. */
+body[data-contraste="alto"] .text-primary,
+body[data-contraste="alto"] .consulta-item-espec,
+body[data-contraste="alto"] a {
+  color: #1e40af;
+}
+
+/* Escolha do tamanho, na tela de Perfil. */
+.acessibilidade-opcoes {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.acessibilidade-opcao {
+  flex: 1;
+  padding: 10px 4px;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--borda-azul);
+  background-color: var(--white);
+  color: var(--text-gray);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.acessibilidade-opcao.active {
+  border-color: var(--primary-blue);
+  background-color: #eff6ff;
+  color: var(--primary-blue);
+}
+
+/* Cada botão mostra o próprio tamanho: "Grande" escrito em corpo grande diz
+   mais do que a palavra sozinha. */
+.acessibilidade-opcao.tamanho-padrao { font-size: calc(13px * var(--escala-fonte)); }
+.acessibilidade-opcao.tamanho-grande { font-size: calc(15px * var(--escala-fonte)); }
+.acessibilidade-opcao.tamanho-maior  { font-size: calc(17px * var(--escala-fonte)); }
+
+.acessibilidade-linha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}

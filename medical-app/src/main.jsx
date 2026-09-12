@@ -4,6 +4,7 @@ import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 import { PessoasProvider } from './context/PessoasContext.jsx'
 import { PrivacidadeProvider } from './context/PrivacidadeContext.jsx'
+import { AcessibilidadeProvider } from './context/AcessibilidadeContext.jsx'
 
 // O Vite por padrão cria uma div com id "app" ou "root".
 // Verifique no seu index.html qual é o ID correto.
@@ -11,6 +12,9 @@ const rootElement = document.getElementById('root') || document.getElementById('
 
 ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
+    {/* Fora de tudo: o tamanho do texto vale inclusive no login, antes de
+        existir paciente logado. */}
+    <AcessibilidadeProvider>
     <PrivacidadeProvider>
       {/* PessoasProvider fica DENTRO do AuthProvider: ele precisa do paciente
           logado para montar a lista "titular + dependentes". */}
@@ -20,5 +24,6 @@ ReactDOM.createRoot(rootElement).render(
         </PessoasProvider>
       </AuthProvider>
     </PrivacidadeProvider>
+    </AcessibilidadeProvider>
   </React.StrictMode>,
 )

@@ -29,6 +29,12 @@ const ACOES = {
   removeu_condicao: { texto: 'Removeu uma condição do prontuário', icone: ICONES.prontuario, cor: 'revogado' },
   registrou_medicacao: { texto: 'Registrou uma medicação', icone: Pill, cor: 'consulta' },
   removeu_medicacao: { texto: 'Removeu uma medicação do prontuário', icone: Pill, cor: 'revogado' },
+  leu_vacinas: { texto: 'Consultou a carteira de vacinação', icone: ICONES.vacinas, cor: 'consulta' },
+  // Sem "Você" no texto: a dose passou a ser registrada pelo profissional, mas
+  // as linhas antigas, de quando o paciente marcava, continuam na trilha. A
+  // linha de baixo já diz quem foi.
+  registrou_vacina: { texto: 'Registrou uma dose de vacina', icone: ICONES.vacinas, cor: 'consulta' },
+  removeu_vacina: { texto: 'Desfez o registro de uma dose', icone: ICONES.vacinas, cor: 'revogado' },
   revogado: { texto: 'Você revogou o acesso', icone: Ban, cor: 'revogado' },
 
   // Lado do paciente (auditoria)
@@ -39,6 +45,11 @@ const ACOES = {
   consultou_prontuario: { texto: 'Você abriu o prontuário', icone: ICONES.prontuario, cor: 'consulta' },
   consultou_exames: { texto: 'Você abriu os exames', icone: ICONES.exames, cor: 'exame' },
   consultou_consultas: { texto: 'Você abriu as consultas', icone: ICONES.consultas, cor: 'consulta' },
+  cadastrou_consulta: { texto: 'Você anotou uma consulta', icone: ICONES.consultas, cor: 'consulta' },
+  atualizou_consulta: { texto: 'Você corrigiu uma consulta anotada', icone: ICONES.consultas, cor: 'consulta' },
+  excluiu_consulta: { texto: 'Você apagou uma consulta anotada', icone: ICONES.consultas, cor: 'revogado' },
+  concluiu_consulta: { texto: 'Você marcou uma consulta como realizada', icone: ICONES.consultas, cor: 'consulta' },
+  cancelou_consulta: { texto: 'Você marcou uma consulta como cancelada', icone: ICONES.consultas, cor: 'revogado' },
   exportou_exames: { texto: 'Você baixou o PDF de exames', icone: Download, cor: 'exame' },
   cadastrou_dependente: { texto: 'Você cadastrou um dependente', icone: ICONES.dependentes, cor: 'consulta' },
   excluiu_dependente: { texto: 'Você excluiu um dependente', icone: ICONES.dependentes, cor: 'revogado' },
@@ -46,8 +57,6 @@ const ACOES = {
   excluiu_contato: { texto: 'Você excluiu um contato de emergência', icone: HeartHandshake, cor: 'revogado' },
   gerou_codigo: { texto: 'Você gerou um código de acesso', icone: ICONES.acessoMedico, cor: 'consulta' },
   consultou_vacinas: { texto: 'Você abriu a carteira de vacinação', icone: ICONES.vacinas, cor: 'consulta' },
-  registrou_vacina: { texto: 'Você registrou uma dose de vacina', icone: ICONES.vacinas, cor: 'consulta' },
-  removeu_vacina: { texto: 'Você desfez o registro de uma dose', icone: ICONES.vacinas, cor: 'revogado' },
   atualizou_perfil: { texto: 'Você alterou dados do cadastro', icone: User, cor: 'consulta' },
   solicitou_senha: { texto: 'Você pediu a recuperação da senha', icone: ShieldCheck, cor: 'consulta' },
   redefiniu_senha: { texto: 'Você trocou a senha', icone: ShieldCheck, cor: 'revogado' },

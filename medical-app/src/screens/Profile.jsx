@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import {
   User, ChevronLeft, Mail, Phone, IdCard, Calendar, Droplet, Venus, MapPin,
-  HeartHandshake, Trash2, Plus, Pencil,
+  HeartHandshake, Trash2, Plus, Pencil, Contrast, Check,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { usePrivacidade } from '../context/PrivacidadeContext';
+import { useAcessibilidade, TAMANHOS } from '../context/AcessibilidadeContext';
 import BotaoPrivacidade from '../components/BotaoPrivacidade';
 import { mascarar } from '../utils/privacidade';
 import { listarFamiliares, cadastrarFamiliar, removerFamiliar } from '../services/familiares';
@@ -308,6 +309,67 @@ function EditarContato({ paciente, aoSalvar, aoFechar }) {
   );
 }
 
+/**
+ * Acessibilidade: tamanho do texto e contraste.
+ *
+ * São dois controles, e não um "modo idoso": quem não enxerga o texto pequeno
+ * quer aumentar; quem não distingue o cinza claro do fundo quer escurecer. Um
+ * botão só obrigaria a aceitar o que não estava incomodando.
+ *
+ * O ajuste vale para o app inteiro e fica gravado no aparelho — ao contrário do
+ * olhinho, que volta ao normal a cada abertura de propósito.
+ */
+function Acessibilidade() {
+  const { fonte, contraste, definirFonte, alternarContraste } = useAcessibilidade();
+
+  return (
+    <>
+      <h3 className="section-title">Acessibilidade</h3>
+      <div className="card">
+        <p className="text-sm text-muted mb-4">Tamanho do texto</p>
+        {/* Cada botão é escrito no próprio tamanho: ver o resultado antes de
+            escolher vale mais do que a palavra. */}
+        <div className="acessibilidade-opcoes">
+          {TAMANHOS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              className={`acessibilidade-opcao tamanho-${t.id} ${fonte === t.id ? 'active' : ''}`}
+              onClick={() => definirFonte(t.id)}
+              aria-pressed={fonte === t.id}
+            >
+              {t.rotulo}
+            </button>
+          ))}
+        </div>
+
+        <div className="acessibilidade-linha">
+          <div>
+            <p className="font-bold text-sm">Texto mais escuro</p>
+            <p className="text-xs text-muted">
+              Escurece as legendas e os textos de apoio, que aparecem em cinza claro.
+            </p>
+          </div>
+          <button
+            type="button"
+            className={`btn-secondary ${contraste ? 'active' : ''}`}
+            style={{ margin: 0, width: 'auto', flexShrink: 0 }}
+            onClick={alternarContraste}
+            aria-pressed={contraste}
+          >
+            {contraste ? <Check size={16} /> : <Contrast size={16} />}
+            {contraste ? 'Ativado' : 'Ativar'}
+          </button>
+        </div>
+
+        <p className="text-xs text-muted" style={{ marginTop: '12px' }}>
+          O ajuste vale para todas as telas e fica guardado neste aparelho.
+        </p>
+      </div>
+    </>
+  );
+}
+
 export default function Profile() {
   const navigate = useNavigate();
   const { paciente, atualizarPaciente } = useAuth();
@@ -374,6 +436,7 @@ export default function Profile() {
       </div>
 
       <ContatosEmergencia />
+      <Acessibilidade />
       </div>
     </div>
   );

@@ -64,6 +64,7 @@ const ICONES_NOTIFICACAO = {
   exame: FlaskConical,
   prontuario: FileText,
   acesso: Bell,
+  vacina: Syringe,
 };
 
 /**

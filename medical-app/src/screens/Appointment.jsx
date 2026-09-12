@@ -1,15 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Calendar, MapPin, Info, ChevronLeft, User, Clock, FileText, Droplet, Navigation,
+  Pencil, Trash2, CalendarPlus, CheckCircle2, XCircle,
 } from 'lucide-react';
 import { buscarDetalhesUnidade } from '../services/redeSaude';
 import { useNavigate, useParams } from 'react-router-dom';
 import InfoField from '../components/InfoField';
 import StatusBadge from '../components/StatusBadge';
 import BotaoPrivacidade from '../components/BotaoPrivacidade';
+import Modal from '../components/Modal';
+import FormularioConsulta from '../components/FormularioConsulta';
 import { usePrivacidade } from '../context/PrivacidadeContext';
 import { mascararTexto } from '../utils/privacidade';
-import { buscarConsulta } from '../services/consultas';
+import { buscarConsulta, excluirConsulta, definirSituacao } from '../services/consultas';
 import { formatarData } from '../utils/exames';
 
 export default function Appointment() {
@@ -18,27 +21,24 @@ export default function Appointment() {
   const { oculto } = usePrivacidade();
   const [consulta, setConsulta] = useState(null);
   const [carregando, setCarregando] = useState(true);
+  const [editando, setEditando] = useState(false);
+  const [anotandoRetorno, setAnotandoRetorno] = useState(false);
+  const [erroAcao, setErroAcao] = useState(null);
+  const [salvando, setSalvando] = useState(false);
   // Unidade da rede onde a consulta acontece, quando há vínculo. Vem de uma
   // segunda chamada porque a consulta guarda só o código do CNES — o endereço
   // e a coordenada moram no espelho da Rede de Saúde.
   const [unidade, setUnidade] = useState(null);
 
-  useEffect(() => {
-    let ativo = true;
-    buscarConsulta(id)
-      .then((c) => {
-        if (ativo) setConsulta(c);
-      })
-      .catch(() => {
-        if (ativo) setConsulta(null);
-      })
-      .finally(() => {
-        if (ativo) setCarregando(false);
-      });
-    return () => {
-      ativo = false;
-    };
+  const recarregar = useCallback(() => {
+    setCarregando(true);
+    return buscarConsulta(id)
+      .then(setConsulta)
+      .catch(() => setConsulta(null))
+      .finally(() => setCarregando(false));
   }, [id]);
+
+  useEffect(() => { recarregar(); }, [recarregar]);
 
   useEffect(() => {
     if (!consulta?.unidadeCnes) {
@@ -68,6 +68,26 @@ export default function Appointment() {
   }
 
   const realizada = consulta.status === 'realizada';
+  const anotada = consulta.origem === 'paciente';
+  const agendada = consulta.status === 'agendada';
+
+  // Só a situação muda; o resto da consulta continua como está.
+  const marcar = (status) => {
+    setSalvando(true);
+    definirSituacao(consulta.id, status)
+      .then(recarregar)
+      .catch((err) => setErroAcao(err.response?.data?.erro || 'Não foi possível mudar a situação.'))
+      .finally(() => setSalvando(false));
+  };
+
+  const apagar = () => {
+    // Apagar o que ele mesmo anotou não pede confirmação em janela: a
+    // consulta volta a ser digitada em quatro campos, e a trilha de auditoria
+    // guarda que a exclusão aconteceu.
+    excluirConsulta(consulta.id)
+      .then(() => navigate('/appointment'))
+      .catch(() => setErroAcao('Não foi possível apagar esta anotação.'));
+  };
 
   return (
     <div className="screen-container tela-rolagem">
@@ -146,16 +166,85 @@ export default function Appointment() {
         </>
       )}
 
+      {erroAcao && <p className="form-erro">{erroAcao}</p>}
+
+      {/* A situação de quem esteve lá. Nada no app sabe o que aconteceu no
+          dia: sem estes botões a consulta ficava "agendada" para sempre, mesmo
+          depois de acontecer ou de ser desmarcada com a unidade. Aparecem nas
+          duas origens — desmarcar é coisa que o paciente faz na vida real —,
+          mas não escrevem resumo nem conduta, que são do profissional. */}
+      {agendada && (
+        <>
+          <h3 className="section-title">Você foi a esta consulta?</h3>
+          <div className="card mb-6">
+            <div className="form-botoes" style={{ marginTop: 0 }}>
+              <button
+                className="btn-primary"
+                onClick={() => marcar('realizada')}
+                disabled={salvando}
+              >
+                <CheckCircle2 size={18} /> Sim, fui
+              </button>
+              <button
+                className="btn-secondary"
+                onClick={() => marcar('cancelada')}
+                disabled={salvando}
+              >
+                <XCircle size={18} /> Foi cancelada
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
       <div className="flex-col gap-4">
         {realizada && (
           <button onClick={() => navigate('/exams')} className="btn-secondary">
             <Droplet size={18} /> Ver exames
           </button>
         )}
-        {/* TODO: ligar ao endpoint de reagendamento quando ele existir no ApiServer. */}
-        {!realizada && <button className="btn-primary">Remarcar</button>}
+
+        {/* O que o paciente anotou, ele corrige e apaga. O atendimento
+            registrado pelo profissional é prontuário: nem a tela nem a rota
+            deixam mexer — o botão daqui é o de anotar o retorno. */}
+        {anotada ? (
+          <>
+            <button className="btn-primary" onClick={() => setEditando(true)}>
+              <Pencil size={18} /> Corrigir data ou local
+            </button>
+            <button className="btn-secondary" onClick={apagar}>
+              <Trash2 size={18} /> Apagar anotação
+            </button>
+          </>
+        ) : (
+          // Marcar retorno: abre o formulário com profissional, especialidade e
+          // local já preenchidos. Retorno é quase sempre com quem atendeu, no
+          // mesmo lugar — só a data muda.
+          <button className="btn-secondary" onClick={() => setAnotandoRetorno(true)}>
+            <CalendarPlus size={18} /> Anotar retorno com este profissional
+          </button>
+        )}
       </div>
       </div>
+
+      <Modal open={editando} title="Corrigir consulta" onClose={() => setEditando(false)}>
+        <FormularioConsulta
+          consulta={consulta}
+          onPronto={() => { setEditando(false); recarregar(); }}
+          onCancelar={() => setEditando(false)}
+        />
+      </Modal>
+
+      <Modal open={anotandoRetorno} title="Anotar retorno" onClose={() => setAnotandoRetorno(false)}>
+        <FormularioConsulta
+          // Sem o id: é uma consulta nova com os campos herdados, não a edição
+          // do atendimento que já aconteceu.
+          consulta={{ ...consulta, id: null, data: '', hora: '' }}
+          dependenteId={consulta.dependenteId}
+          onPronto={() => { setAnotandoRetorno(false); navigate('/appointment'); }}
+          onCancelar={() => setAnotandoRetorno(false)}
+        />
+      </Modal>
     </div>
   );
 }

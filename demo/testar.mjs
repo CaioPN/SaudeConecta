@@ -91,6 +91,16 @@ const cenarios = [
       };
     },
   },
+  {
+    // A carteira agora é escrita pelo profissional: esta aba do portal é o
+    // único lugar do app onde uma dose é marcada, e sem cenário próprio ela
+    // nunca seria desenhada aqui.
+    nome: 'médico na aba de vacinas',
+    antes: () => {
+      contexto.estado.oculto = false;
+      contexto.estado.abaMedico = 'vacinas';
+    },
+  },
 ];
 
 let falhas = 0;

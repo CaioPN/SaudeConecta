@@ -10,7 +10,18 @@ const BASE_CONHECIMENTO = [
         chaves: ['agendar', 'agendamento', 'consulta', 'marcar', 'médico', 'medico'],
         resposta:
             'Suas consultas ficam em "Início" → "Consultas" (ou em "Minha Saúde"), separadas entre as próximas e as anteriores. ' +
-            'Toque em uma delas para ver o local, o profissional, o resumo e a conduta.',
+            'Toque em uma delas para ver o local, o profissional, o resumo e a conduta. O app não marca consulta com a ' +
+            'unidade: quando você marcar por telefone ou no balcão, use "Anotar consulta marcada" para guardar a data — ' +
+            'o app avisa quando ela se aproximar.',
+    },
+    {
+        chaves: ['letra pequena', 'fonte', 'aumentar a letra', 'aumentar a fonte', 'texto pequeno',
+                 'nao consigo ler', 'não consigo ler', 'enxergar', 'acessibilidade', 'contraste',
+                 'letra maior', 'texto maior'],
+        resposta:
+            'Em "Mais" → "Meu perfil", no fim da tela, existe a seção "Acessibilidade". Lá você escolhe o ' +
+            'tamanho do texto (Padrão, Grande ou Maior) e pode ligar o "Texto mais escuro", que escurece as ' +
+            'legendas em cinza claro. O ajuste vale para todas as telas e fica guardado no aparelho.',
     },
     {
         chaves: ['exame', 'exames', 'resultado', 'sangue', 'hemograma', 'imagem', 'laudo'],
@@ -90,8 +101,9 @@ const BASE_CONHECIMENTO = [
         resposta:
             'A Carteira de Vacinação fica em "Minha Saúde" → "Carteira de Vacinação". Ela é montada pelo calendário ' +
             'do PNI a partir da data de nascimento, e o seletor do topo alterna entre você e cada dependente. ' +
-            'Cada dose fica em um de três estados: registrada, prevista ou em atraso. Quem confirma a dose é ' +
-            'você, no botão "Marcar como aplicada" — o app não é ligado ao sistema do posto. Dose vencida sem ' +
+            'Cada dose fica em um de três estados: registrada, prevista ou em atraso. Na sua tela a carteira é ' +
+            'só de leitura: quem registra a dose é o profissional de saúde, com o código de acesso que você ' +
+            'gera em "Mais" → "Acesso do médico" — o app não é ligado ao sistema do posto. Dose vencida sem ' +
             'registro vira aviso na tela inicial.',
     },
     {
@@ -155,7 +167,7 @@ const BASE_CONHECIMENTO = [
 ];
 
 // Sugestões rápidas exibidas como botões na primeira interação.
-const SUGESTOES = ['Como agendar consulta?', 'Ver meus exames', 'Adicionar dependente'];
+const SUGESTOES = ['Anotar uma consulta', 'Ver meus exames', 'Adicionar dependente'];
 
 // Tira acentos e caixa para o casamento não depender de "vacinação" vs "vacinacao".
 function normalizar(texto) {

@@ -7,7 +7,7 @@ import BotaoPrivacidade from '../components/BotaoPrivacidade';
 import SeletorPessoa from '../components/SeletorPessoa';
 import BotaoExplicacao from '../components/BotaoExplicacao';
 import { mascarar } from '../utils/privacidade';
-import { buscarCarteira, registrarDose, removerDose } from '../services/vacinas';
+import { buscarCarteira } from '../services/vacinas';
 
 // Calcula a idade (anos completos) a partir de uma data ISO (YYYY-MM-DD).
 function calcularIdade(dataIso) {
@@ -34,7 +34,7 @@ const ICONE = {
   prevista: <Clock size={16} />,
 };
 
-function VacinaItem({ v, oculto, onMarcar, onDesmarcar, salvando }) {
+function VacinaItem({ v, oculto }) {
   // O olhinho esconde as DATAS, não a lista de vacinas: os nomes e os períodos
   // saem do calendário do PNI, que é público e igual para todo mundo da mesma
   // idade. A data em que a pessoa tomou (ou deveria ter tomado) é que é dela.
@@ -64,29 +64,6 @@ function VacinaItem({ v, oculto, onMarcar, onDesmarcar, salvando }) {
         <span className={`vacina-data ${oculto ? 'valor-oculto' : ''}`}>
           {oculto ? mascarar(quando) : quando}
         </span>
-
-        {/* Quem confirma a dose é a pessoa, não o calendário. Antes a tela
-            deduzia da idade que a dose já tinha sido tomada, e uma criança
-            que não foi ao posto aparecia em dia. */}
-        {v.status === 'aplicada' ? (
-          <button
-            type="button"
-            className="vacina-acao"
-            onClick={() => onDesmarcar(v)}
-            disabled={salvando}
-          >
-            Desfazer{v.origem === 'medico' ? ' (registrado por profissional)' : ''}
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="vacina-acao destaque"
-            onClick={() => onMarcar(v)}
-            disabled={salvando}
-          >
-            Marcar como aplicada
-          </button>
-        )}
       </div>
     </div>
   );
@@ -100,7 +77,6 @@ export default function Vacinas() {
   const [doses, setDoses] = useState([]);
   const [resumo, setResumo] = useState({ total: 0, aplicadas: 0, atrasadas: 0 });
   const [carregando, setCarregando] = useState(true);
-  const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState(null);
 
   const carregar = useCallback(() => {
@@ -116,22 +92,6 @@ export default function Vacinas() {
   }, [dependenteId]);
 
   useEffect(() => { carregar(); }, [carregar]);
-
-  const marcar = (dose) => {
-    setSalvando(true);
-    registrarDose(dose.id, { dependenteId })
-      .then(carregar)
-      .catch(() => setErro('Não foi possível registrar a dose. Tente de novo.'))
-      .finally(() => setSalvando(false));
-  };
-
-  const desmarcar = (dose) => {
-    setSalvando(true);
-    removerDose(dose.id, dependenteId)
-      .then(carregar)
-      .catch(() => setErro('Não foi possível desfazer o registro.'))
-      .finally(() => setSalvando(false));
-  };
 
   const idade = calcularIdade(pessoa.data_nascimento);
   const rotuloIdade = idade != null ? `${idade} ${idade === 1 ? 'ano' : 'anos'}` : 'Titular da conta';
@@ -180,6 +140,14 @@ export default function Vacinas() {
           </div>
         </div>
 
+        {/* A carteira aqui é só de leitura: quem confirma a dose é o
+            profissional, pelo código de acesso. Sem essa linha o paciente
+            procuraria um botão que não existe. */}
+        <p className="text-xs text-muted">
+          O registro das doses é feito pelo profissional de saúde, com o código
+          de acesso que você gera em Mais › Acesso do médico.
+        </p>
+
         {erro && <p className="text-sm text-red">{erro}</p>}
       </div>
 
@@ -191,8 +159,7 @@ export default function Vacinas() {
           <>
             <h3 className="section-title">Em atraso</h3>
             {atrasadas.map((v) => (
-              <VacinaItem key={v.id} v={v} oculto={oculto} salvando={salvando}
-                onMarcar={marcar} onDesmarcar={desmarcar} />
+              <VacinaItem key={v.id} v={v} oculto={oculto} />
             ))}
           </>
         )}
@@ -203,8 +170,7 @@ export default function Vacinas() {
               Próximas doses
             </h3>
             {previstas.map((v) => (
-              <VacinaItem key={v.id} v={v} oculto={oculto} salvando={salvando}
-                onMarcar={marcar} onDesmarcar={desmarcar} />
+              <VacinaItem key={v.id} v={v} oculto={oculto} />
             ))}
           </>
         )}
@@ -215,8 +181,7 @@ export default function Vacinas() {
               Doses registradas
             </h3>
             {aplicadas.map((v) => (
-              <VacinaItem key={v.id} v={v} oculto={oculto} salvando={salvando}
-                onMarcar={marcar} onDesmarcar={desmarcar} />
+              <VacinaItem key={v.id} v={v} oculto={oculto} />
             ))}
           </>
         )}

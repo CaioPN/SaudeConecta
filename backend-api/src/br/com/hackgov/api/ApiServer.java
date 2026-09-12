@@ -89,8 +89,8 @@ import br.com.hackgov.util.SenhaUtil;
  *   GET    /api/rede-saude/unidades/{cnes}  o que aquela unidade oferece
  *   POST   /api/rede-saude/referencia       escolhe a UBS de referência
  *   GET    /api/vacinas           carteira de vacinação; aceita ?dependenteId=
- *   POST   /api/vacinas           marca uma dose como aplicada
- *   DELETE /api/vacinas/{doseId}  desmarca uma dose
+ *                                 (só leitura: quem registra dose é o médico,
+ *                                  por /api/medico/vacinas)
  *   POST   /api/exames/exportacao registra na auditoria o download do PDF
  *   GET    /api/auditoria         trilha de auditoria (médico + próprio paciente)
  *   GET    /api/familiares        contatos de emergência
@@ -134,6 +134,13 @@ public class ApiServer {
 
     /** Quantas notificações a tela recebe de uma vez. */
     private static final int LIMITE_NOTIFICACOES = 30;
+
+    /**
+     * Quantos profissionais/locais anteriores o formulário de consulta recebe
+     * para autocompletar. Doze cobre com folga quem o paciente vê de novo —
+     * mais que isso vira uma lista que ninguém lê.
+     */
+    private static final int LIMITE_SUGESTOES = 12;
 
     /**
      * Com quantos dias de antecedência a consulta agendada vira lembrete.
@@ -915,8 +922,14 @@ public class ApiServer {
     // ===================== CARTEIRA DE VACINAÇÃO =====================
 
     /**
-     * /api/vacinas — carteira da pessoa selecionada (GET), marca uma dose como
-     * aplicada (POST) ou desmarca (DELETE /{doseId}).
+     * /api/vacinas — carteira da pessoa selecionada. Só leitura.
+     *
+     * Registrar e desmarcar dose saiu daqui de propósito: a carteira é um
+     * documento de saúde, e quem confirma que a dose foi aplicada é o
+     * profissional, pelo acesso temporário (POST/DELETE /api/medico/vacinas).
+     * Enquanto o próprio paciente marcava, a carteira misturava o que foi
+     * aplicado com o que ele achava que tinha sido — e o médico que abrisse o
+     * prontuário não tinha como separar as duas coisas.
      *
      * Aceita ?dependenteId= como as outras rotas clínicas. A data de
      * nascimento sai do banco, nunca do cliente: é ela que define o calendário
@@ -933,10 +946,6 @@ public class ApiServer {
         try {
             if ("GET".equals(metodo) && "/api/vacinas".equals(path)) {
                 listarVacinas(ex, userId);
-            } else if ("POST".equals(metodo) && "/api/vacinas".equals(path)) {
-                registrarVacina(ex, userId);
-            } else if ("DELETE".equals(metodo) && path.startsWith("/api/vacinas/")) {
-                removerVacina(ex, userId, path.substring("/api/vacinas/".length()));
             } else {
                 enviarErro(ex, 405, "Método não permitido.");
             }
@@ -956,8 +965,25 @@ public class ApiServer {
             return;
         }
 
+        Map<String, Object> resp = carteiraJson(userId, dependenteId, nascimento);
+
+        // A carteira diz o que a pessoa tomou e o que deixou de tomar: é dado
+        // de saúde como os exames, e entra na trilha pelo mesmo motivo.
+        auditarLeitura(ex, userId, "consultou_vacinas", "vacinas",
+                alvoDaLeitura(userId, dependenteId), dependenteId);
+        enviarJson(ex, 200, resp);
+    }
+
+    /**
+     * Monta a carteira de uma pessoa (calendário do PNI + o que foi aplicado).
+     *
+     * Fica separado do handler porque tem dois leitores: a tela do paciente,
+     * que só mostra, e o portal do médico, que mostra para poder registrar.
+     */
+    private static Map<String, Object> carteiraJson(int idPaciente, Integer idDependente,
+                                                    String nascimento) throws SQLException {
         String publico = CarteiraVacinal.publicoPara(nascimento);
-        List<DoseVacina> doses = vacinaDAO.listarCarteira(userId, dependenteId, publico);
+        List<DoseVacina> doses = vacinaDAO.listarCarteira(idPaciente, idDependente, publico);
         CarteiraVacinal.calcular(doses, nascimento);
 
         int aplicadas = 0;
@@ -978,84 +1004,7 @@ public class ApiServer {
         resp.put("publico", publico);
         resp.put("doses", arr);
         resp.put("resumo", resumo);
-
-        // A carteira diz o que a pessoa tomou e o que deixou de tomar: é dado
-        // de saúde como os exames, e entra na trilha pelo mesmo motivo.
-        auditarLeitura(ex, userId, "consultou_vacinas", "vacinas",
-                alvoDaLeitura(userId, dependenteId), dependenteId);
-        enviarJson(ex, 200, resp);
-    }
-
-    private static void registrarVacina(HttpExchange ex, int userId) throws IOException, SQLException {
-        Map<String, Object> body = lerCorpo(ex);
-        int idDose = inteiro(body.get("doseId"));
-        if (idDose <= 0) {
-            enviarErro(ex, 400, "Informe a dose.");
-            return;
-        }
-
-        Integer dependenteId = body.get("dependenteId") instanceof Number
-                ? ((Number) body.get("dependenteId")).intValue()
-                : null;
-        if (dependenteId != null && dependenteDAO.nomeDoPaciente(dependenteId, userId) == null) {
-            enviarErro(ex, 404, "Dependente não encontrado.");
-            return;
-        }
-
-        // Sem data no corpo, vale hoje: o caso comum é marcar a dose ao voltar
-        // do posto. Data futura é recusada — carteira não registra intenção.
-        String data = campo(body, "data");
-        if (data == null) data = LocalDate.now().toString();
-        try {
-            if (LocalDate.parse(data).isAfter(LocalDate.now())) {
-                enviarErro(ex, 400, "A data de aplicação não pode estar no futuro.");
-                return;
-            }
-        } catch (java.time.format.DateTimeParseException e) {
-            enviarErro(ex, 400, "Data de aplicação inválida.");
-            return;
-        }
-
-        String descricao = vacinaDAO.descricaoDaDose(idDose);
-        if (descricao == null) {
-            enviarErro(ex, 404, "Dose não encontrada no calendário.");
-            return;
-        }
-
-        vacinaDAO.registrar(userId, dependenteId, idDose, data, VacinaDAO.ORIGEM_PACIENTE);
-        auditar(ex, userId, "registrou_vacina", "vacinas", descricao, dependenteId);
-
-        Map<String, Object> resp = new LinkedHashMap<>();
-        resp.put("sucesso", Boolean.TRUE);
-        resp.put("data", data);
-        enviarJson(ex, 201, resp);
-    }
-
-    private static void removerVacina(HttpExchange ex, int userId, String idTexto)
-            throws IOException, SQLException {
-        int idDose;
-        try {
-            idDose = Integer.parseInt(idTexto.trim());
-        } catch (NumberFormatException e) {
-            enviarErro(ex, 400, "Dose inválida.");
-            return;
-        }
-
-        Integer dependenteId = idDependente(ex);
-        String descricao = vacinaDAO.descricaoDaDose(idDose);
-
-        if (!vacinaDAO.remover(userId, dependenteId, idDose)) {
-            enviarErro(ex, 404, "Esta dose não estava registrada.");
-            return;
-        }
-
-        // Desmarcar é apagar um registro de saúde: entra na trilha como as
-        // outras exclusões.
-        auditar(ex, userId, "removeu_vacina", "vacinas", descricao, dependenteId);
-
-        Map<String, Object> resp = new LinkedHashMap<>();
-        resp.put("sucesso", Boolean.TRUE);
-        enviarJson(ex, 200, resp);
+        return resp;
     }
 
     /**
@@ -1075,12 +1024,47 @@ public class ApiServer {
     }
 
     private static void consultas(HttpExchange ex) throws IOException {
-        if (!"GET".equals(ex.getRequestMethod())) { enviarErro(ex, 405, "Método não permitido."); return; }
         Integer userId = autenticar(ex);
         if (userId == null) return;
 
+        String metodo = ex.getRequestMethod();
         String path = ex.getRequestURI().getPath();
         try {
+            // O paciente anota a própria consulta: o app não agenda nada, mas é
+            // ele quem sabe o que marcou no balcão da unidade ou por telefone.
+            if ("POST".equals(metodo) && "/api/consultas".equals(path)) {
+                criarConsulta(ex, userId);
+                return;
+            }
+            // .../situacao vem antes do PUT geral: o resto do caminho não é um
+            // número e cairia no parse do id.
+            if ("PUT".equals(metodo) && path.startsWith("/api/consultas/")
+                    && path.endsWith("/situacao")) {
+                String resto = path.substring("/api/consultas/".length());
+                atualizarSituacao(ex, userId, resto.substring(0, resto.length() - "/situacao".length()));
+                return;
+            }
+            if ("PUT".equals(metodo) && path.startsWith("/api/consultas/")) {
+                atualizarConsulta(ex, userId, path.substring("/api/consultas/".length()));
+                return;
+            }
+            if ("DELETE".equals(metodo) && path.startsWith("/api/consultas/")) {
+                excluirConsulta(ex, userId, path.substring("/api/consultas/".length()));
+                return;
+            }
+            if (!"GET".equals(metodo)) {
+                enviarErro(ex, 405, "Método não permitido.");
+                return;
+            }
+
+            // Profissionais e locais que já apareceram na conta, para o
+            // formulário preencher sozinho. Vem antes do /{id} porque
+            // "sugestoes" não é número e cairia no parse do detalhe.
+            if ("/api/consultas/sugestoes".equals(path)) {
+                sugestoesDeConsulta(ex, userId);
+                return;
+            }
+
             if ("/api/consultas".equals(path)) {
                 Integer dependenteId = idDependente(ex);
                 List<Object> arr = new ArrayList<>();
@@ -1130,6 +1114,246 @@ public class ApiServer {
         } catch (SQLException e) {
             System.out.println("[ERRO consultas] " + e.getMessage());
             enviarErro(ex, 500, "Erro ao buscar consultas.");
+        }
+    }
+
+    /**
+     * POST /api/consultas — o paciente anota uma consulta que ele marcou.
+     *
+     * O app não agenda: quem marca é a unidade, por telefone ou no balcão. O
+     * que ele grava aqui é o lembrete disso, e por isso nasce sempre como
+     * `agendada` e com origem `paciente` — resumo e conduta continuam sendo do
+     * profissional, que é quem esteve no atendimento.
+     */
+    private static void criarConsulta(HttpExchange ex, int userId) throws IOException, SQLException {
+        Map<String, Object> body = lerCorpo(ex);
+
+        String profissional = campo(body, "profissional");
+        String data = campo(body, "data");
+        String hora = campo(body, "hora");
+        String local = campo(body, "local");
+        if (profissional == null || data == null || hora == null || local == null) {
+            enviarErro(ex, 400, "Informe o profissional, a data, a hora e o local.");
+            return;
+        }
+        if (!dataValida(data) || !horaValida(hora)) {
+            enviarErro(ex, 400, "Data ou hora inválida.");
+            return;
+        }
+
+        Integer dependenteId = body.get("dependenteId") instanceof Number
+                ? ((Number) body.get("dependenteId")).intValue()
+                : null;
+        if (dependenteId != null && dependenteDAO.nomeDoPaciente(dependenteId, userId) == null) {
+            enviarErro(ex, 404, "Dependente não encontrado.");
+            return;
+        }
+
+        Consulta c = new Consulta();
+        c.setIdPaciente(userId);
+        if (dependenteId != null) c.setIdDependente(dependenteId);
+        c.setMedico(profissionalDigitado(profissional, campo(body, "especialidade")));
+        c.setOrigem(ConsultaDAO.ORIGEM_PACIENTE);
+        c.setStatus("agendada");
+        c.setData(data);
+        c.setHora(hora);
+        c.setLocal(local);
+        c.setMotivo(campo(body, "motivo") == null ? "Consulta" : campo(body, "motivo"));
+        c.setUnidadeCnes(cnesValido(body.get("unidadeCnes")));
+
+        // acesso_id nulo: esta consulta não veio de acesso temporário nenhum.
+        int id = consultaDAO.inserir(c, null);
+        auditar(ex, userId, "cadastrou_consulta", "consultas", c.getMotivo(), dependenteId);
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("id", id);
+        resp.put("sucesso", Boolean.TRUE);
+        enviarJson(ex, 201, resp);
+    }
+
+    /** PUT /api/consultas/{id} — corrige uma consulta anotada pelo paciente. */
+    private static void atualizarConsulta(HttpExchange ex, int userId, String idTexto)
+            throws IOException, SQLException {
+        int id;
+        try {
+            id = Integer.parseInt(idTexto.trim());
+        } catch (NumberFormatException e) {
+            enviarErro(ex, 400, "Id de consulta inválido.");
+            return;
+        }
+
+        Map<String, Object> body = lerCorpo(ex);
+        String profissional = campo(body, "profissional");
+        String data = campo(body, "data");
+        String hora = campo(body, "hora");
+        String local = campo(body, "local");
+        if (profissional == null || data == null || hora == null || local == null) {
+            enviarErro(ex, 400, "Informe o profissional, a data, a hora e o local.");
+            return;
+        }
+        if (!dataValida(data) || !horaValida(hora)) {
+            enviarErro(ex, 400, "Data ou hora inválida.");
+            return;
+        }
+
+        Consulta c = new Consulta();
+        c.setIdConsulta(id);
+        c.setIdPaciente(userId);
+        c.setMedico(profissionalDigitado(profissional, campo(body, "especialidade")));
+        c.setData(data);
+        c.setHora(hora);
+        c.setLocal(local);
+        c.setMotivo(campo(body, "motivo") == null ? "Consulta" : campo(body, "motivo"));
+        c.setUnidadeCnes(cnesValido(body.get("unidadeCnes")));
+
+        // O DAO exige origem = 'paciente': o 404 abaixo cobre tanto "não existe"
+        // quanto "é um atendimento do profissional", e de propósito não
+        // distingue os dois.
+        if (!consultaDAO.atualizarDoPaciente(c)) {
+            enviarErro(ex, 404, "Consulta não encontrada ou registrada por um profissional.");
+            return;
+        }
+        auditar(ex, userId, "atualizou_consulta", "consultas", c.getMotivo(), null);
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("sucesso", Boolean.TRUE);
+        enviarJson(ex, 200, resp);
+    }
+
+    /**
+     * PUT /api/consultas/{id}/situacao — o paciente diz se foi à consulta.
+     *
+     * Existe porque nada no app sabe o que aconteceu no dia: a consulta
+     * agendada ficava "agendada" para sempre, mesmo depois de acontecer ou de
+     * ser desmarcada com a unidade. Só quem esteve lá pode dizer.
+     *
+     * Vale para as duas origens (anotada pelo paciente ou agendada pelo
+     * profissional), porque desmarcar uma consulta é coisa que o paciente faz
+     * na vida real. O que ele NÃO escreve é o registro clínico: resumo e
+     * conduta não são tocados aqui, e o status só sai de `agendada`.
+     */
+    private static void atualizarSituacao(HttpExchange ex, int userId, String idTexto)
+            throws IOException, SQLException {
+        int id;
+        try {
+            id = Integer.parseInt(idTexto.trim());
+        } catch (NumberFormatException e) {
+            enviarErro(ex, 400, "Id de consulta inválido.");
+            return;
+        }
+
+        // A lista de status aceitos fica aqui, e não no corpo da requisição:
+        // ninguém escreve situação inventada na própria consulta.
+        String status = campo(lerCorpo(ex), "status");
+        if (!"realizada".equals(status) && !"cancelada".equals(status)) {
+            enviarErro(ex, 400, "Situação inválida: use realizada ou cancelada.");
+            return;
+        }
+
+        Consulta c = consultaDAO.buscarDoPaciente(id, userId);
+        if (c == null) {
+            enviarErro(ex, 404, "Consulta não encontrada.");
+            return;
+        }
+        if (!consultaDAO.atualizarStatus(id, userId, status)) {
+            enviarErro(ex, 409, "Esta consulta já foi concluída ou cancelada.");
+            return;
+        }
+
+        Integer dono = c.getIdDependente() > 0 ? c.getIdDependente() : null;
+        auditar(ex, userId,
+                "realizada".equals(status) ? "concluiu_consulta" : "cancelou_consulta",
+                "consultas", c.getMotivo(), dono);
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("sucesso", Boolean.TRUE);
+        resp.put("status", status);
+        enviarJson(ex, 200, resp);
+    }
+
+    /** DELETE /api/consultas/{id} — apaga uma consulta anotada pelo paciente. */
+    private static void excluirConsulta(HttpExchange ex, int userId, String idTexto)
+            throws IOException, SQLException {
+        int id;
+        try {
+            id = Integer.parseInt(idTexto.trim());
+        } catch (NumberFormatException e) {
+            enviarErro(ex, 400, "Id de consulta inválido.");
+            return;
+        }
+
+        Consulta c = consultaDAO.buscarDoPaciente(id, userId);
+        String motivo = c == null ? null : c.getMotivo();
+
+        if (!consultaDAO.excluirDoPaciente(id, userId)) {
+            enviarErro(ex, 404, "Consulta não encontrada ou registrada por um profissional.");
+            return;
+        }
+        auditar(ex, userId, "excluiu_consulta", "consultas", motivo, null);
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("sucesso", Boolean.TRUE);
+        enviarJson(ex, 200, resp);
+    }
+
+    /**
+     * GET /api/consultas/sugestoes — o que o formulário usa para preencher
+     * sozinho: profissionais, especialidades e locais que já apareceram na
+     * conta. Não é leitura de dado clínico (não sai motivo, resumo nem
+     * conduta), então não entra na trilha.
+     */
+    private static void sugestoesDeConsulta(HttpExchange ex, int userId)
+            throws IOException, SQLException {
+        List<Object> arr = new ArrayList<>();
+        for (String[] s : consultaDAO.sugestoes(userId, LIMITE_SUGESTOES)) {
+            if (s[0] == null) continue;
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("profissional", s[0]);
+            m.put("especialidade", s[1]);
+            m.put("local", s[2]);
+            m.put("unidade_cnes", s[3] == null ? null : Integer.valueOf(s[3]));
+            arr.add(m);
+        }
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("sugestoes", arr);
+        enviarJson(ex, 200, resp);
+    }
+
+    /**
+     * O profissional que o paciente digitou: nome e especialidade, sem id e sem
+     * CRM. É assim que o ConsultaDAO sabe que a consulta vai com texto livre em
+     * vez de uma linha da tabela `medicos`.
+     */
+    private static Medico profissionalDigitado(String nome, String especialidade) {
+        Medico m = new Medico();
+        m.setNome(nome);
+        m.setEspecialidade(especialidade == null ? "Não informada" : especialidade);
+        return m;
+    }
+
+    /** Código do CNES vindo do corpo, conferido contra o espelho da rede. */
+    private static Integer cnesValido(Object valor) throws SQLException {
+        if (!(valor instanceof Number)) return null;
+        int codigo = ((Number) valor).intValue();
+        return unidadeSaudeDAO.buscarPorCnes(codigo) == null ? null : codigo;
+    }
+
+    private static boolean dataValida(String data) {
+        try {
+            LocalDate.parse(data);
+            return true;
+        } catch (java.time.format.DateTimeParseException e) {
+            return false;
+        }
+    }
+
+    /** Aceita "HH:mm" e "HH:mm:ss" — é o que o <input type="time"> manda. */
+    private static boolean horaValida(String hora) {
+        try {
+            LocalTime.parse(hora.length() == 5 ? hora + ":00" : hora);
+            return true;
+        } catch (java.time.format.DateTimeParseException e) {
+            return false;
         }
     }
 
@@ -1970,6 +2194,12 @@ public class ApiServer {
                 registrarItemProntuario(ex);
             } else if ("DELETE".equals(metodo) && path.startsWith("/api/medico/prontuario/")) {
                 removerItemProntuario(ex, path.substring("/api/medico/prontuario/".length()));
+            } else if ("GET".equals(metodo) && "/api/medico/vacinas".equals(path)) {
+                carteiraDoMedico(ex);
+            } else if ("POST".equals(metodo) && "/api/medico/vacinas".equals(path)) {
+                registrarVacina(ex);
+            } else if ("DELETE".equals(metodo) && path.startsWith("/api/medico/vacinas/")) {
+                removerVacina(ex, path.substring("/api/medico/vacinas/".length()));
             } else {
                 enviarErro(ex, 404, "Rota não encontrada.");
             }
@@ -2174,6 +2404,7 @@ public class ApiServer {
         c.setLocal(local);
         c.setMotivo(motivo);
         c.setStatus("realizada");
+        c.setOrigem(ConsultaDAO.ORIGEM_MEDICO);
         c.setResumo(campo(body, "resumo"));
         c.setConduta(campo(body, "conduta"));
 
@@ -2414,6 +2645,117 @@ public class ApiServer {
         enviarJson(ex, 200, resp);
     }
 
+    /**
+     * GET /api/medico/vacinas — a carteira da pessoa a quem o código pertence.
+     *
+     * Vem junto com o resto do prontuário em espírito, mas numa rota própria:
+     * são 26 doses, e quem tem acesso só de leitura raramente abre a carteira.
+     * O paciente e o dependente saem do acesso, nunca da requisição.
+     */
+    private static void carteiraDoMedico(HttpExchange ex) throws IOException, SQLException {
+        AcessoTemporario acesso = autenticarMedico(ex);
+        if (acesso == null) return;
+
+        String nascimento = nascimentoDe(acesso.getIdPaciente(), acesso.getIdDependente());
+        if (nascimento == null && acesso.getIdDependente() != null) {
+            // O dependente foi excluído depois que o código foi gerado.
+            enviarErro(ex, 404, "Dependente não encontrado.");
+            return;
+        }
+        Map<String, Object> resp = carteiraJson(acesso.getIdPaciente(),
+                acesso.getIdDependente(), nascimento);
+
+        acessoDAO.registrarLog(acesso.getIdAcesso(), "leu_vacinas",
+                "Carteira de vacinação de " + deQuem(acesso));
+        enviarJson(ex, 200, resp);
+    }
+
+    /**
+     * POST /api/medico/vacinas — marca uma dose como aplicada.
+     *
+     * Era uma rota do paciente e virou do médico: a carteira vale como
+     * documento quando quem confirma a dose é quem aplicou (ou viu) a vacina.
+     * O paciente continua vendo tudo, mas não escreve nela.
+     */
+    private static void registrarVacina(HttpExchange ex) throws IOException, SQLException {
+        AcessoTemporario acesso = autenticarMedico(ex);
+        if (acesso == null) return;
+        if (!exigirEscrita(ex, acesso)) return;
+
+        Map<String, Object> body = lerCorpo(ex);
+        int idDose = inteiro(body.get("doseId"));
+        if (idDose <= 0) {
+            enviarErro(ex, 400, "Informe a dose.");
+            return;
+        }
+
+        // Sem data no corpo, vale hoje: o caso comum é marcar a dose logo
+        // depois de aplicá-la. Data futura é recusada — carteira não registra
+        // intenção.
+        String data = campo(body, "data");
+        if (data == null) data = LocalDate.now().toString();
+        try {
+            if (LocalDate.parse(data).isAfter(LocalDate.now())) {
+                enviarErro(ex, 400, "A data de aplicação não pode estar no futuro.");
+                return;
+            }
+        } catch (java.time.format.DateTimeParseException e) {
+            enviarErro(ex, 400, "Data de aplicação inválida.");
+            return;
+        }
+
+        String descricao = vacinaDAO.descricaoDaDose(idDose);
+        if (descricao == null) {
+            enviarErro(ex, 404, "Dose não encontrada no calendário.");
+            return;
+        }
+
+        vacinaDAO.registrar(acesso.getIdPaciente(), acesso.getIdDependente(), idDose,
+                data, VacinaDAO.ORIGEM_MEDICO);
+        acessoDAO.registrarLog(acesso.getIdAcesso(), "registrou_vacina", descricao);
+        notificacaoDAO.inserirSemFalhar(acesso.getIdPaciente(), NotificacaoDAO.TIPO_VACINA,
+                nomeDoMedico(acesso) + " registrou uma dose na carteira de vacinação de "
+                        + deQuem(acesso) + ".");
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("sucesso", Boolean.TRUE);
+        resp.put("data", data);
+        enviarJson(ex, 201, resp);
+    }
+
+    /** DELETE /api/medico/vacinas/{doseId} — desfaz uma dose marcada por engano. */
+    private static void removerVacina(HttpExchange ex, String idTexto)
+            throws IOException, SQLException {
+        AcessoTemporario acesso = autenticarMedico(ex);
+        if (acesso == null) return;
+        if (!exigirEscrita(ex, acesso)) return;
+
+        int idDose;
+        try {
+            idDose = Integer.parseInt(idTexto.trim());
+        } catch (NumberFormatException e) {
+            enviarErro(ex, 400, "Dose inválida.");
+            return;
+        }
+
+        String descricao = vacinaDAO.descricaoDaDose(idDose);
+        if (!vacinaDAO.remover(acesso.getIdPaciente(), acesso.getIdDependente(), idDose)) {
+            enviarErro(ex, 404, "Esta dose não estava registrada.");
+            return;
+        }
+
+        // Desmarcar é apagar um registro de saúde: entra na trilha do acesso
+        // como as outras exclusões, e o paciente vê as duas ações separadas.
+        acessoDAO.registrarLog(acesso.getIdAcesso(), "removeu_vacina", descricao);
+        notificacaoDAO.inserirSemFalhar(acesso.getIdPaciente(), NotificacaoDAO.TIPO_VACINA,
+                nomeDoMedico(acesso) + " removeu uma dose da carteira de vacinação de "
+                        + deQuem(acesso) + ".");
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("sucesso", Boolean.TRUE);
+        enviarJson(ex, 200, resp);
+    }
+
     /** Nome do médico do acesso, com um rótulo genérico se ele não veio. */
     /**
      * De quem é o prontuário aberto por este acesso, do ponto de vista do
@@ -2591,6 +2933,9 @@ public class ApiServer {
         m.put("local", c.getLocal());
         m.put("motivo", c.getMotivo());
         m.put("status", c.getStatus());
+        // Quem anotou: "medico" ou "paciente". A tela usa isso para a etiqueta e
+        // para saber o que pode editar.
+        m.put("origem", c.getOrigem());
         m.put("resumo", c.getResumo());
         m.put("conduta", c.getConduta());
         // Código da unidade da rede, quando a consulta foi marcada em uma. É

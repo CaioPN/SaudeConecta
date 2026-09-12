@@ -68,7 +68,20 @@ CREATE TABLE IF NOT EXISTS consultas (
   id               INT AUTO_INCREMENT PRIMARY KEY,
   paciente_id      INT           NOT NULL,
   dependente_id    INT           NULL,
-  medico_id        INT           NOT NULL,
+  -- NULL quando quem anotou a consulta foi o PACIENTE: ele sabe o nome do
+  -- profissional, mas não o CRM, e a tabela medicos é indexada por CRM (é ele
+  -- que identifica a pessoa no portal). Inventar um CRM para poder gravar
+  -- criaria uma identidade falsa que um dia colidiria com a verdadeira.
+  medico_id        INT           NULL,
+  -- Nome e especialidade digitados pelo paciente, usados quando medico_id é
+  -- NULL. Texto livre de propósito: é o que está no papelzinho da unidade.
+  profissional     VARCHAR(120)  NULL,
+  especialidade    VARCHAR(80)   NULL,
+  -- 'medico' (registrada pelo profissional, com acesso temporário) ou
+  -- 'paciente' (anotada pelo titular). Muda o que a tela deixa editar e a
+  -- etiqueta que ela mostra: anotar uma consulta não é o mesmo que registrar
+  -- um atendimento.
+  origem           VARCHAR(20)   NOT NULL DEFAULT 'medico',
   data             DATE          NOT NULL,
   hora             TIME          NOT NULL,
   local            VARCHAR(160)  NOT NULL,
@@ -347,7 +360,7 @@ CREATE TABLE IF NOT EXISTS familiares (
 CREATE TABLE IF NOT EXISTS notificacoes (
   id               INT AUTO_INCREMENT PRIMARY KEY,
   paciente_id      INT           NOT NULL,
-  tipo             VARCHAR(30)   NOT NULL,  -- 'consulta' | 'exame' | 'prontuario' | 'acesso' | 'lembrete'
+  tipo             VARCHAR(30)   NOT NULL,  -- 'consulta' | 'exame' | 'prontuario' | 'acesso' | 'lembrete' | 'vacina'
   -- Identidade do fato, para a notificação automática não repetir. Um lembrete
   -- da consulta 42 tem chave 'consulta_proxima:42': o gerador roda a cada
   -- Dashboard aberto, mas a linha nasce uma vez só. NULL = notificação de
@@ -464,8 +477,16 @@ CALL sc_adicionar_coluna('auditoria', 'dependente_id', 'INT NULL');
 CALL sc_adicionar_coluna('notificacoes', 'chave', 'VARCHAR(80) NULL');
 CALL sc_adicionar_coluna('unidades_saude', 'servicos', 'VARCHAR(500) NULL');
 CALL sc_adicionar_coluna('unidades_saude', 'servicos_em', 'DATETIME NULL');
+CALL sc_adicionar_coluna('consultas', 'profissional', 'VARCHAR(120) NULL');
+CALL sc_adicionar_coluna('consultas', 'especialidade', 'VARCHAR(80) NULL');
+CALL sc_adicionar_coluna('consultas', 'origem', "VARCHAR(20) NOT NULL DEFAULT 'medico'");
 
 DROP PROCEDURE IF EXISTS sc_adicionar_coluna;
+
+-- A consulta anotada pelo paciente não tem CRM, e portanto não tem linha em
+-- `medicos`. MODIFY é idempotente: rodar de novo num banco já migrado não
+-- muda nada, e por isso ele não precisa do procedimento acima.
+ALTER TABLE consultas MODIFY medico_id INT NULL;
 
 -- O mesmo para o índice que garante a deduplicação das notificações
 -- automáticas: sem ele, a coluna `chave` recém-criada não impediria a

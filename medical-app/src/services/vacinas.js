@@ -46,18 +46,6 @@ export async function buscarCarteira(dependenteId) {
   };
 }
 
-/**
- * POST /api/vacinas — marca uma dose como aplicada.
- *
- * Sem `data`, o backend usa hoje: o caso comum é marcar ao voltar do posto.
- */
-export async function registrarDose(doseId, { dependenteId, data } = {}) {
-  await api.post('/vacinas', { doseId, dependenteId, data });
-}
-
-/** DELETE /api/vacinas/{doseId} — desmarca uma dose registrada por engano. */
-export async function removerDose(doseId, dependenteId) {
-  await api.delete(`/vacinas/${doseId}`, {
-    params: dependenteId ? { dependenteId } : undefined,
-  });
-}
+// Não há aqui como registrar nem desmarcar dose de propósito: a carteira é
+// escrita pelo profissional, pelo acesso temporário (services/medico.js). Do
+// lado do paciente ela é só leitura.

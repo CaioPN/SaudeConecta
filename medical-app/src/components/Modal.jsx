@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 // Janelinha (modal) exibida sobre a página atual, sem abrir nova aba/janela.
@@ -16,7 +17,12 @@ export default function Modal({ open, title, onClose, children }) {
 
   if (!open) return null;
 
-  return (
+  // Vai para o <body>, e não para dentro da tela que o abriu: o .app-content
+  // tem z-index próprio (por causa da marca d'água do logotipo), e isso prende
+  // tudo o que está dentro dele num nível abaixo do botão do chatbot — a
+  // janela abria por baixo do botão. Como o overlay é position: fixed, sair do
+  // lugar na árvore não muda nada no desenho.
+  return createPortal(
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
@@ -27,6 +33,7 @@ export default function Modal({ open, title, onClose, children }) {
         </div>
         <div className="modal-body">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

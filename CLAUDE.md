@@ -47,7 +47,9 @@ backend-api/          API Java (pacote br.com.hackgov)
                         (regras da carteira), CnesApi, Localizacao
 database/             scripts SQL (schema com migração no fim, seeds)
   gerar-calendario.mjs  reescreve o calendário do PNI no seed a partir do JS
-demo/                 versão HTML de demonstração (arquivo único, sem build)
+docs/                 documentação do trabalho
+  evolucao-do-projeto.md  registro detalhado da evolução (para a entrega)
+demo/                 versão HTML de demonstração — APOSENTADA, não atualizar
   app.template.html   marcação das telas, escrita à mão
   gerar.mjs           recorta os originais e monta o index.html
   gerar-icones.mjs    extrai os SVG do lucide para icones.js
@@ -58,6 +60,7 @@ medical-app/          front-end React + Vite
     assets/           imagens, ícones
     components/       componentes reutilizáveis
       BottomNav.jsx     navegação inferior (mobile)
+      FormularioConsulta.jsx  o paciente anota a consulta que marcou
       MedicalChatbot.jsx
       Modal.jsx
       VLibras.jsx       acessibilidade em Libras
@@ -69,6 +72,7 @@ medical-app/          front-end React + Vite
     context/
       AuthContext.jsx   estado de autenticação global
       PrivacidadeContext.jsx  estado do "olhinho" (global, não persistido)
+      AcessibilidadeContext.jsx  tamanho do texto e contraste (gravado)
       PessoasContext.jsx  de quem são os dados na tela (idem, não persistido)
     data/             vacinas.js — calendário do PNI. Hoje serve à DEMO e ao
                       seed; o app lê o calendário do banco (calendario_vacinal)
@@ -115,7 +119,8 @@ sem lógica de banco).
 - Banco MySQL criado com as tabelas dos pacientes
 - `ApiServer`, `Conexao` (JDBC) e os DAOs de Paciente e Dependente
 - Consultas: lista (`Appointments.jsx`, rota `/appointment`) e detalhe
-  (`Appointment.jsx`, rota `/appointment/:id`)
+  (`Appointment.jsx`, rota `/appointment/:id`), com o paciente anotando as
+  que ele marcou na unidade (ver o bloco mais abaixo)
 - Prontuário (`MedicalRecord.jsx`) com linha do tempo unindo consultas e exames
 - Exames (`Exams.jsx`) agrupados por coleta, com faixa de referência e situação
   calculadas em `utils/exames.js`
@@ -249,10 +254,10 @@ sem lógica de banco).
       "O QUE O APP NÃO FAZ". Ao mudar um fluxo, esse bloco entra na mesma
       revisão do FAQ e da base de regras.
 - **Dúvidas frequentes** (`Faq.jsx`, rota `/faq`, texto em
-  `content/FaqContent.js`): sanfona com 51 perguntas em oito categorias — o item
+  `content/FaqContent.js`): sanfona com 60 perguntas em oito categorias — o item
   "Dúvidas frequentes" do menu "Mais" apontava para uma rota que não existia.
-  As respostas descrevem o que o app faz **hoje** (dizem, por exemplo, que a
-  tela de consultas só lista, não agenda, e explicam a conferência de três
+  As respostas descrevem o que o app faz **hoje** (dizem, por exemplo, que
+  anotar uma consulta não a marca na unidade, e explicam a conferência de três
   dados da recuperação de senha); ao mudar um fluxo, revise o texto
   correspondente. A base local do
   chatbot é a outra ponta da mesma informação — mantenha as duas de acordo.
@@ -349,6 +354,26 @@ sem lógica de banco).
   - Ao criar tela com lista, use estas classes — não repita o `overflow-y`. A
     carteira de vacinação tinha as suas próprias (`.vacinas-topo`,
     `.vacinas-lista`) e foi migrada para cá.
+- **Marca d'água do logotipo** (`.app-container::before`, bloco "Marca d'água
+  do logotipo" no fim do `app.css`): o logotipo grande, centralizado e quase
+  invisível ao fundo do quadro, como no wireframe (`public/layout.jpeg`).
+  - Mora no `.app-container`, que é o quadro de **altura fixa**: assim ela fica
+    parada enquanto a lista rola por dentro. No conteúdo, subiria junto.
+  - `opacity: 0.06` e um filtro que tira a cor original
+    (`grayscale → sepia → hue-rotate(178deg)`), porque o logotipo tem verde e a
+    marca não pode competir com os ícones coloridos das telas.
+    `pointer-events: none`: é decoração, e sem isso engoliria o toque em
+    qualquer espaço vazio.
+  - **O Login fica de fora** (`.app-container:has(.login-wrapper)::before`):
+    aquela tela já mostra o logotipo inteiro, grande e no centro, e a marca
+    atrás dele seria o mesmo desenho duas vezes.
+  - **Efeito colateral que custou um bug**: para o conteúdo ficar acima da
+    marca, o `.app-content` ganhou `position: relative; z-index: 1` — e isso
+    criou um contexto de empilhamento que prendia o modal abaixo do botão do
+    chatbot (`z-index: 100`, filho do `.app-container`). A correção foi
+    desenhar o `Modal` por **portal no `<body>`**. Ao mexer em `z-index` aqui,
+    lembre que o quadro tem três camadas: marca (0), conteúdo (1) e
+    chatbot/barra (100/50).
 - **Acabamento em azul** (bloco "Detalhes em azul" no fim do `app.css`):
   bordas azul-claras nos cartões, filete à esquerda dos títulos de seção, fundo
   levemente azulado, ícones cinza que viraram azuis, borda superior na barra de
@@ -496,13 +521,27 @@ sem lógica de banco).
   trilha de auditoria do paciente como as outras ações.
 - **Carteira de vacinação de verdade** (tabelas `calendario_vacinal` e
   `vacinas_aplicadas`, `VacinaDAO`, `util/CarteiraVacinal`, rotas
-  `GET/POST /api/vacinas` e `DELETE /api/vacinas/{doseId}`,
-  `services/vacinas.js`): a tela **adivinhava**. Toda dose com data prevista no
-  passado aparecia como tomada, então a criança que não foi ao posto ficava
-  "em dia" — o oposto de um alerta útil.
+  rota `GET /api/vacinas`, `services/vacinas.js`): a tela **adivinhava**. Toda
+  dose com data prevista no passado aparecia como tomada, então a criança que
+  não foi ao posto ficava "em dia" — o oposto de um alerta útil.
   - Agora são **três estados**: `aplicada` (alguém registrou), `atrasada` (a
-    data recomendada passou e ninguém registrou) e `prevista`. Quem confirma a
-    dose é o paciente, pelo botão da tela, ou o médico com escopo de escrita.
+    data recomendada passou e ninguém registrou) e `prevista`.
+  - **Quem escreve na carteira é o profissional, não o paciente.** Do lado do
+    titular ela é só leitura: não há "Marcar como aplicada" nem "Desfazer" —
+    nem tela, nem rota. Enquanto o próprio paciente marcava, a carteira
+    misturava o que foi aplicado com o que ele achava que tinha sido, e o
+    médico que abrisse o prontuário não tinha como separar as duas coisas. O
+    registro passou para o portal do médico (aba **Vacinas**,
+    `GET/POST /api/medico/vacinas` e `DELETE /api/medico/vacinas/{doseId}`,
+    em `services/medico.js`), sempre exigindo o escopo de escrita do código.
+    A tela do paciente diz em uma linha onde a dose é registrada, senão ele
+    procuraria um botão que não existe.
+  - Marcar e desmarcar caem na **trilha do acesso** (`acessos_log`:
+    `leu_vacinas`, `registrou_vacina`, `removeu_vacina`) e geram
+    **notificação** (`NotificacaoDAO.TIPO_VACINA`), como o resto do que o
+    médico registra. As linhas antigas de `registrou_vacina` na `auditoria`,
+    de quando o paciente marcava, continuam na trilha — por isso o rótulo da
+    tela perdeu o "Você".
   - O **calendário do PNI foi para o banco**. Ele tem dois leitores — a tela e
     o `AvisoDAO`, que conta as doses atrasadas — e duas cópias, uma em JS e
     outra em Java, sairiam do ar uma da outra no primeiro ajuste do Ministério.
@@ -603,14 +642,107 @@ sem lógica de banco).
     espelho quem ninguém abre há 180 dias. A marca não pôde ficar em
     `unidades_saude` porque aquela tabela tem `ON UPDATE CURRENT_TIMESTAMP`, e
     um UPDATE por visita faria o cache do CNES parecer sempre novo.
+- **Acessibilidade: texto maior e texto mais escuro**
+  (`context/AcessibilidadeContext.jsx`, seção "Acessibilidade" no fim do
+  `Profile.jsx`, bloco "Acessibilidade" no fim do `app.css`): o app é para
+  quem acompanha a própria saúde, e boa parte desse público não enxerga bem o
+  corpo 12 cinza-claro que o projeto usava em legenda.
+  - São **dois controles separados**, e não um "modo idoso": quem não enxerga
+    o tamanho quer aumentar; quem não distingue o cinza do fundo quer
+    escurecer. Juntar os dois obrigaria a aceitar o que não estava
+    incomodando.
+  - Quem faz o trabalho é o **CSS**, por variável: todo `font-size` do
+    `app.css` virou `calc(Npx * var(--escala-fonte))` (89 regras, de uma vez),
+    e `body[data-fonte="grande"|"maior"]` troca o multiplicador (1,15 e 1,3).
+    O alto contraste redefine `--text-dark`, `--text-gray` e
+    `--text-gray-claro` — os cinzas literais que havia em cinco regras viraram
+    variável para isso funcionar. **Regra nova com `font-size` em px puro não
+    acompanha o ajuste**: use o `calc`.
+  - O atributo fica no **`<body>`**, não no `.app-container`: o modal é
+    desenhado por portal direto no body e ficaria de fora.
+  - Esta preferência **é gravada** (`localStorage`, `sc_acessibilidade`) — ao
+    contrário do olhinho e do seletor de pessoa, que somem ao recarregar de
+    propósito. Quem aumentou a fonte porque não enxerga não enxerga melhor no
+    dia seguinte. Não é dado de saúde nem identifica ninguém; a leitura aceita
+    só valores conhecidos, para um localStorage adulterado não deixar o app
+    com um atributo que o CSS não entende.
+  - O provedor fica **fora de todos os outros** no `main.jsx`: o ajuste vale
+    inclusive no login, antes de existir paciente.
+  - Fora do alcance: os ícones do lucide (recebem o tamanho em atributo, em
+    px) e os seis `style={{ fontSize }}` inline que sobraram em mensagens de
+    erro do Cadastro, do Login e dos Dependentes.
+- **O paciente anota a própria consulta** (`consultas.origem`,
+  `consultas.profissional`, `consultas.especialidade`,
+  `POST/PUT/DELETE /api/consultas`, `GET /api/consultas/sugestoes`,
+  `components/FormularioConsulta.jsx`): a tela só mostrava o que o profissional
+  tinha registrado **depois** do atendimento, então a consulta marcada para a
+  semana que vem não existia no app até acontecer.
+  - O app **não agenda**: quem marca é a unidade, por telefone ou no balcão.
+    O que se grava aqui é o lembrete disso — a consulta nasce `agendada`, com
+    `origem = 'paciente'`, e a lista mostra a etiqueta "anotado por você" ao
+    lado do que veio do profissional. O formulário repete isso em uma linha,
+    senão "anotar" viraria "marquei pelo app".
+  - **Resumo e conduta continuam sendo do profissional.** O paciente cria,
+    corrige e apaga só o que ele mesmo anotou: o `origem = 'paciente'` está no
+    WHERE do UPDATE e do DELETE (`ConsultaDAO`), então mandar o id de um
+    atendimento antigo devolve 404 em vez de reescrever prontuário.
+  - `medico_id` passou a aceitar **NULL**. O paciente sabe o nome do
+    profissional, não o CRM — e `medicos.crm` é NOT NULL UNIQUE porque é o CRM
+    que identifica a pessoa no portal. Inventar um CRM para poder gravar
+    criaria uma identidade falsa que um dia colidiria com a verdadeira; o nome
+    digitado vai em `profissional`/`especialidade` e o `COALESCE` do
+    `SELECT_BASE` entrega as duas origens à tela com os mesmos campos.
+    **Todo JOIN com `medicos` a partir de `consultas` virou LEFT JOIN** — no
+    `ConsultaDAO` (lista e lembretes) e no `AvisoDAO`. Com o JOIN de antes,
+    justamente a consulta que o paciente anotou sumiria da lista, do aviso e
+    do lembrete.
+  - **O que a tela automatiza**, já que digitar tudo é o que faz ninguém usar:
+    - `GET /api/consultas/sugestoes` devolve os profissionais, especialidades e
+      locais que já apareceram na conta (agrupados, do mais recente ao mais
+      antigo). Escolher o nome na lista preenche especialidade e local, e
+      recupera o `unidade_cnes` — consulta quase sempre é retorno com quem já
+      atendeu, no mesmo lugar. Sai das próprias consultas, e não de uma tabela
+      de "meus médicos", que seria mais uma tela para manter.
+    - No detalhe de um atendimento do profissional, **"Anotar retorno"** abre o
+      mesmo formulário com profissional, especialidade e local herdados e a
+      data em branco. (Era o botão "Remarcar", que não fazia nada e tinha um
+      TODO pendurado.)
+    - **"Próximas" passou a olhar a data, não só o status**: a consulta
+      agendada continua `agendada` enquanto ninguém disser o contrário. Sem
+      isso, a consulta do mês passado encalhava no topo.
+    - **"Você foi a esta consulta?"** (`PUT /api/consultas/{id}/situacao`): dois
+      botões no detalhe de toda consulta agendada — "Sim, fui" e "Foi
+      cancelada". Nada no app sabe o que aconteceu no dia; só quem esteve lá
+      pode dizer. Vale para as **duas origens** (desmarcar uma consulta é coisa
+      que o paciente faz na vida real), mas muda **só o status**: resumo e
+      conduta continuam sendo escritos por quem atendeu. A lista de situações
+      aceitas fica no `ApiServer`, não no corpo da requisição, e o `WHERE` do
+      DAO exige `status = 'agendada'` — uma consulta já concluída não volta
+      atrás por aqui (409). Auditado como `concluiu_consulta` e
+      `cancelou_consulta`; `cancelada` é um selo novo, em cinza, porque
+      desmarcar é fato comum e não alerta.
+    - Lembrete e aviso saem de graça: `gerarLembretes` e o `AvisoDAO` já olham
+      `status = 'agendada'` por data, e agora enxergam também estas.
+  - Auditado como `cadastrou_consulta`, `atualizou_consulta` e
+    `excluiu_consulta` — o `detalhe` guarda o motivo, nunca o profissional.
+  - O `Modal` passou a ser desenhado via **portal no `<body>`**: a marca d'água
+    do logotipo deu `z-index` ao `.app-content`, e isso prendia qualquer janela
+    aberta de dentro de uma tela abaixo do botão do chatbot.
 - **Trilha de auditoria por pessoa** (`auditoria.dependente_id`): a linha
   continua pertencendo ao titular — é ele quem responde pela conta e quem vê a
   trilha —, mas agora diz de quem era o dado. A tela ganhou um segundo filtro,
   por pessoa, montado a partir dos próprios registros (um dependente já
   excluído continua na trilha, e sumir com ele esconderia o que foi feito).
-  Ações novas: `consultou_vacinas`, `registrou_vacina`, `removeu_vacina`,
-  `atualizou_perfil` e `definiu_referencia`.
-- **Versão HTML de demonstração** (`demo/`, gerada por `node demo/gerar.mjs`):
+  Ações novas: `consultou_vacinas`, `atualizou_perfil` e `definiu_referencia`
+  (`registrou_vacina` e `removeu_vacina` nasceram aqui e migraram para a
+  trilha do acesso quando a carteira passou a ser escrita pelo médico).
+- **Versão HTML de demonstração** (`demo/`) — **APOSENTADA (10/09/2026).** Não
+  será mais usada: **não regenere, não teste e não atualize nada dentro de
+  `demo/`**. Ao mexer no `app.css`, no FAQ, na base de regras do chatbot ou em
+  qualquer outro arquivo que o `gerar.mjs` recortava, **não** rode o
+  `gerar.mjs` nem o `testar.mjs` — a pasta fica congelada como está, e o que
+  ela mostra hoje já não corresponde ao app. O que segue descreve como ela
+  funcionava, para quem precisar entender o que está lá:
   o app inteiro — as telas do paciente e o portal do médico — num **arquivo
   só**, sem Node, sem Java e sem MySQL, para mostrar o projeto a quem não vai
   clonar o repositório. As rotas usam `#`, então funciona até aberto do disco.
@@ -625,12 +757,13 @@ sem lógica de banco).
     "Tudo / Profissionais / Você" e por pessoa, o seletor de pessoa em Exames,
     Consultas, Prontuário e Vacinas, o card "Novidades" do Dashboard (com
     lembrete de consulta), os contatos de emergência do Perfil, a recuperação
-    de senha, a carteira com os três estados e o botão de registrar dose, a
+    de senha, a carteira com os três estados (só leitura) e a aba Vacinas do
+    portal do médico, que é onde a dose é registrada, a
     edição de contato e endereço, o código de acesso por pessoa com os contatos
     opcionais, e a Rede de Saúde com "O que tem lá", "Definir como minha" e a
     unidade de cidade vizinha.
   - `node demo/testar.mjs` é o teste de fumaça: monta um DOM de mentira e
-    chama cada tela em três cenários. A demo não tem build nem lint, então uma
+    chama cada tela em quatro cenários. A demo não tem build nem lint, então uma
     função renomeada num lugar e esquecida em outro só apareceria na hora de
     mostrar o projeto. Rode depois do `gerar.mjs`.
   - Tudo o que ela mostra é fictício e mora só na memória da página; o que
@@ -647,11 +780,16 @@ sem lógica de banco).
   Sem serviço de e-mail é o mais forte que dá para fazer aqui, mas continua
   sendo mais fraco que um link na caixa de entrada: quem souber e-mail, CPF e
   data de nascimento da pessoa passa.
-- O registro de vacina é **declaratório**: quem confirma a dose é o paciente ou
-  o médico com acesso de escrita. Não há ligação com o sistema do posto (o
-  OpenDataSUS publica doses agregadas, não o histórico de uma pessoa), então
-  uma carteira em branco pode significar "ninguém marcou" e não "ninguém
-  tomou".
+- O registro de vacina é **declaratório**: quem confirma a dose é o médico com
+  acesso de escrita. Não há ligação com o sistema do posto (o OpenDataSUS
+  publica doses agregadas, não o histórico de uma pessoa), então uma carteira
+  em branco pode significar "ninguém marcou" e não "ninguém tomou". E como o
+  paciente não escreve mais nela, a carteira de quem só usa o app sozinho fica
+  vazia até a primeira consulta com código de acesso.
+- O médico **só enxerga a carteira com escopo de escrita**: a aba Vacinas do
+  portal nasce dentro do bloco de registro, então quem entrou com um código de
+  somente leitura não vê as doses (a rota `GET /api/medico/vacinas` aceita os
+  dois escopos; o que falta é a tela).
 - O calendário do PNI existe em dois lugares: a tabela `calendario_vacinal`
   (usada pelo app) e `data/vacinas.js` (usado pela demonstração, que não tem
   backend). O gerador (`database/gerar-calendario.mjs`) mantém o seed em dia a
@@ -680,9 +818,10 @@ sem lógica de banco).
   Mandar o histórico é fácil, mas aí a pergunta antiga volta a sair do app a
   cada mensagem, e o nível gratuito pode usá-la para treinar.
 - A Rede de Saúde **não agenda nada**: a tela mostra a unidade, o telefone e a
-  rota, e o agendamento é feito com a unidade. A consulta já pode apontar para
-  uma unidade (`consultas.unidade_cnes`), mas quem preenche isso é o médico
-  pelo portal — o paciente não marca nada por aqui.
+  rota, e o agendamento é feito com a unidade. O paciente pode ANOTAR a
+  consulta depois de marcá-la (ver o bloco da agenda mais abaixo), mas o app
+  não fala com o sistema de marcação de ninguém — nem teria como, não existe
+  API pública de agendamento do SUS.
 - O que o app mostra da unidade é a **estrutura** dela (24 h, internação,
   centro cirúrgico), não as especialidades atendidas: esta API do CNES não
   publica especialidade por estabelecimento.
@@ -711,6 +850,19 @@ sem lógica de banco).
 - Os **contatos de emergência** não avisam ninguém: eles são mostrados ao
   médico quando o paciente autoriza, mas não existe envio de mensagem — isso
   exigiria um serviço de SMS ou e-mail, que o projeto não tem.
+- Saber se a consulta aconteceu **depende do paciente responder**: os botões
+  "Sim, fui" e "Foi cancelada" existem, mas quem não responde fica com a
+  consulta marcada como agendada para sempre. A lista contorna pela data, e
+  não há como o app conferir a presença sozinho.
+- O paciente **não escolhe a unidade da rede** ao anotar a consulta: ele digita
+  o local em texto livre, e o vínculo com o CNES (que dá o "Como chegar" pela
+  coordenada oficial) só é herdado quando ele escolhe um local que já apareceu
+  em outra consulta. Ligar o campo à busca da Rede de Saúde é o passo seguinte.
+- O ajuste de **tamanho do texto não alcança os ícones** (o lucide recebe o
+  tamanho em atributo, em px) nem os seis `style={{ fontSize }}` inline que
+  sobraram em mensagens de erro do Cadastro, do Login e dos Dependentes.
+  Também não existe modo de alto contraste de verdade (fundo escuro): o que há
+  é o escurecimento do texto cinza.
 - O acesso do médico continua **só de leitura e registro clínico**: ele não
   edita o cadastro do paciente nem marca vacina de quem não é o dono do
   código.
@@ -836,17 +988,9 @@ o paciente já esteja cadastrado e **não toca nos dependentes**:
 mysql -u root -p --default-character-set=utf8mb4 < database/seed-caio.sql
 ```
 
-Demonstração (`demo/`), depois de mexer em qualquer arquivo que ela recorta:
-
-```bash
-node demo/gerar-icones.mjs   # só quando um ícone novo é usado na demo
-node demo/gerar.mjs          # regenera demo/index.html
-node demo/testar.mjs         # teste de fumaça: 18 telas x 3 cenários
-```
-
-O `testar.mjs` monta um DOM de mentira e chama cada tela. A demo é escrita à
-mão e não tem build nem lint, então uma função renomeada num lugar e esquecida
-em outro só apareceria na hora de mostrar o projeto para alguém.
+A demonstração (`demo/`) está **aposentada**: não rode mais o `gerar.mjs` nem o
+`testar.mjs`, e não mexa em nada dentro da pasta. Ela ficou congelada no estado
+do dia 10/09/2026 e não acompanha mais o app.
 
 ## Como conferir uma mudança de verdade
 
@@ -860,7 +1004,6 @@ Compilar não é testar. O caminho que pega o que o compilador não pega:
    Foi assim que apareceram os dois erros mais sérios da última leva: o
    `CodigoAcesso` herdando o hash salgado (que quebraria o acesso do médico
    inteiro) e o titular adulto aparecendo com o calendário infantil em atraso.
-4. `node demo/testar.mjs` para a versão de demonstração.
 
 Cuidado ao testar por `curl` no Git Bash: acento em argumento chega corrompido
 ao banco. Para validar texto com acento, use o navegador. E os dados que o

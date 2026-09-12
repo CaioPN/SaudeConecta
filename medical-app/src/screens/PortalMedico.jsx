@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Stethoscope, ShieldCheck, Clock, LogOut, AlertCircle, Heart, Pill,
-  Droplet, Plus, Trash2, Check, FileText, PhoneCall, Image as ImageIcon,
+  Droplet, Plus, Trash2, Check, FileText, PhoneCall, Image as ImageIcon, Syringe,
 } from 'lucide-react';
 import {
   entrarComCodigo, buscarPacienteDoAcesso, registrarConsulta, registrarExame,
-  registrarItemProntuario, removerItemProntuario,
+  registrarItemProntuario, removerItemProntuario, buscarCarteira, registrarDose,
+  removerDose,
 } from '../services/medico';
 
 const ITEM_VAZIO = { nome: '', valor: '', unidade: '', refMin: '', refMax: '' };
@@ -21,6 +22,13 @@ const ITEM_VAZIO = { nome: '', valor: '', unidade: '', refMin: '', refMax: '' };
 function hojeIso() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// "2026-04-12" -> "12/04/2026". Sem new Date() de propósito: a data vem do
+// banco sem fuso, e o construtor a interpretaria como UTC, o que muda o dia.
+function dataIsoBr(iso) {
+  if (!iso || iso.length < 10) return iso || '';
+  return `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 }
 
 /** Minutos e segundos restantes até `iso`; null quando já passou. */
@@ -467,6 +475,99 @@ function FormularioProntuario({ token, dados, onMudou }) {
   );
 }
 
+/**
+ * Carteira de vacinação — a parte que saiu do app do paciente.
+ *
+ * Marcar dose era coisa do próprio paciente, e a carteira acabava misturando o
+ * que foi aplicado com o que ele achava que tinha sido. Agora quem confirma é
+ * quem aplicou (ou viu) a vacina, como no resto do prontuário: incluir e
+ * remover, sem editar, para as duas ações ficarem separadas na trilha.
+ */
+function FormularioVacinas({ token }) {
+  const [doses, setDoses] = useState([]);
+  const [data, setData] = useState(hojeIso);
+  const [carregando, setCarregando] = useState(true);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState(null);
+
+  const carregar = useCallback(() => {
+    setCarregando(true);
+    return buscarCarteira(token)
+      .then((resp) => { setDoses(resp.doses || []); setErro(null); })
+      .catch((err) => setErro(err.response?.data?.erro || 'Não foi possível carregar a carteira.'))
+      .finally(() => setCarregando(false));
+  }, [token]);
+
+  useEffect(() => { carregar(); }, [carregar]);
+
+  const aplicar = (dose, marcar) => {
+    setSalvando(true);
+    const acao = marcar ? registrarDose(token, dose.id, data) : removerDose(token, dose.id);
+    acao
+      .then(carregar)
+      .catch((err) => setErro(err.response?.data?.erro
+        || (marcar ? 'Não foi possível registrar a dose.' : 'Não foi possível desfazer o registro.')))
+      .finally(() => setSalvando(false));
+  };
+
+  return (
+    <>
+      <form className="card" onSubmit={(e) => e.preventDefault()}>
+        {/* Data da APLICAÇÃO, não do registro: quem chega com a caderneta de
+            papel lança doses antigas, e sem este campo todas entrariam como
+            hoje. O max impede data no futuro. */}
+        <div className="input-group">
+          <label className="input-label">Data da aplicação</label>
+          <input
+            className="input-field"
+            type="date"
+            value={data}
+            max={hojeIso()}
+            onChange={(e) => setData(e.target.value)}
+          />
+        </div>
+        <p className="text-xs text-muted">
+          Vale para as doses marcadas a seguir. O paciente vê a carteira no app,
+          mas só o profissional registra as doses.
+        </p>
+        {erro && <p className="form-erro">{erro}</p>}
+      </form>
+
+      <div className="card">
+        <h3 className="section-title">Calendário do paciente</h3>
+        {carregando && <p className="text-sm text-muted">Carregando a carteira…</p>}
+        {!carregando && doses.length === 0 && (
+          <p className="text-sm text-muted">Nenhuma dose no calendário para esta idade.</p>
+        )}
+        {doses.map((d) => (
+          <div key={d.id} className={`vacina-item ${d.status}`}>
+            <div className="vacina-info">
+              <div className="vacina-top">
+                <span className="vacina-nome">{d.vacina}</span>
+                <span className="vacina-periodo">{d.periodo}</span>
+              </div>
+              <span className="vacina-dose">{d.dose}</span>
+              <span className="vacina-data">
+                {d.status === 'aplicada'
+                  ? `Aplicada em ${dataIsoBr(d.aplicada_em)}`
+                  : d.status === 'atrasada' ? 'Em atraso' : 'Prevista'}
+              </span>
+              <button
+                type="button"
+                className={`vacina-acao ${d.status === 'aplicada' ? '' : 'destaque'}`}
+                onClick={() => aplicar(d, d.status !== 'aplicada')}
+                disabled={salvando}
+              >
+                {d.status === 'aplicada' ? 'Desfazer' : 'Marcar como aplicada'}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
 export default function PortalMedico() {
   // A sessão do médico vive só em memória: recarregar a página exige um novo
   // código, que é o comportamento esperado de um acesso temporário.
@@ -613,6 +714,9 @@ export default function PortalMedico() {
                 <button className={`tab-btn ${aba === 'prontuario' ? 'active' : ''}`} onClick={() => setAba('prontuario')}>
                   <FileText size={18} /><span>Prontuário</span>
                 </button>
+                <button className={`tab-btn ${aba === 'vacinas' ? 'active' : ''}`} onClick={() => setAba('vacinas')}>
+                  <Syringe size={18} /><span>Vacinas</span>
+                </button>
               </div>
               {aba === 'consulta' && <FormularioConsulta token={sessao.token} />}
               {aba === 'exame' && <FormularioExame token={sessao.token} />}
@@ -626,6 +730,7 @@ export default function PortalMedico() {
                   onMudou={() => carregarPaciente(sessao.token)}
                 />
               )}
+              {aba === 'vacinas' && <FormularioVacinas token={sessao.token} />}
             </>
           ) : (
             <p className="acesso-nota">

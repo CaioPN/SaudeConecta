@@ -13,6 +13,8 @@ public class Consulta {
     private String local;
     private String motivo;
     private String status;
+    /** "medico" (registrada pelo profissional) ou "paciente" (anotada pelo titular). */
+    private String origem;
     private String resumo;
     private String conduta;
     /**
@@ -88,6 +90,14 @@ public class Consulta {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public String getOrigem() {
+        return origem;
+    }
+
+    public void setOrigem(String origem) {
+        this.origem = origem;
     }
 
     /** Resumo do atendimento — preenchido apenas em consultas realizadas. */

@@ -57,3 +57,29 @@ export async function removerItemProntuario(token, tipo, id) {
   const { data } = await apiMedico.delete(`/medico/prontuario/${tipo}/${id}`, auth(token));
   return data;
 }
+
+/**
+ * GET /api/medico/vacinas — a carteira de quem o código abriu.
+ *
+ * Escrever na carteira é do profissional: o paciente vê as doses no app dele,
+ * mas não marca nada. Por isso o registro e o desfazer moram aqui, e não em
+ * services/vacinas.js.
+ */
+export async function buscarCarteira(token) {
+  const { data } = await apiMedico.get('/medico/vacinas', auth(token));
+  return data;
+}
+
+/** POST /api/medico/vacinas — marca uma dose como aplicada (hoje, sem `data`). */
+export async function registrarDose(token, doseId, dataAplicacao) {
+  const { data } = await apiMedico.post(
+    '/medico/vacinas', { doseId, data: dataAplicacao }, auth(token),
+  );
+  return data;
+}
+
+/** DELETE /api/medico/vacinas/{doseId} — desfaz uma dose marcada por engano. */
+export async function removerDose(token, doseId) {
+  const { data } = await apiMedico.delete(`/medico/vacinas/${doseId}`, auth(token));
+  return data;
+}
