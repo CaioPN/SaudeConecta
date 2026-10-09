@@ -87,7 +87,7 @@ export default function Dependentes() {
     }
 
     const erroMsg = (campo) => errors[campo] && (
-        <p style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{errors[campo].message}</p>
+        <p className="campo-erro">{errors[campo].message}</p>
     );
 
     return (
@@ -152,7 +152,7 @@ export default function Dependentes() {
                         </div>
                     </div>
 
-                    {erro && <p style={{ color: '#ef4444', fontSize: '14px', marginBottom: '16px' }}>{erro}</p>}
+                    {erro && <p className="form-erro">{erro}</p>}
 
                     <button type="submit" className="btn-primary" disabled={isSubmitting}>
                         {isSubmitting ? 'Salvando...' : 'Adicionar Dependente'}

@@ -44,6 +44,7 @@ import br.com.hackgov.modelos.Consulta;
 import br.com.hackgov.modelos.Dependente;
 import br.com.hackgov.modelos.DoseVacina;
 import br.com.hackgov.modelos.Exame;
+import br.com.hackgov.modelos.Explicacao;
 import br.com.hackgov.modelos.Familiar;
 import br.com.hackgov.modelos.HistoricoMedico;
 import br.com.hackgov.modelos.ItemExame;
@@ -56,6 +57,7 @@ import br.com.hackgov.modelos.UnidadeSaude;
 import br.com.hackgov.util.ChatIA;
 import br.com.hackgov.util.CarteiraVacinal;
 import br.com.hackgov.util.CodigoAcesso;
+import br.com.hackgov.util.IaReserva;
 import br.com.hackgov.util.Json;
 import br.com.hackgov.util.Localizacao;
 import br.com.hackgov.util.Jwt;
@@ -100,6 +102,8 @@ import br.com.hackgov.util.SenhaUtil;
  *   POST   /api/notificacoes/lidas          marca todas como lidas
  *   POST   /api/notificacoes/{id}/lida      marca uma como lida
  *   POST   /api/chat              pergunta livre do chatbot (IA)
+ *   POST   /api/explicacoes       glossário: o que é um exame ou uma vacina
+ *   POST   /api/explicacoes/reportar        relata erro num verbete do glossário
  *
  * Em todas elas o paciente vem do JWT, nunca da requisição — assim um usuário
  * não consegue ler os dados de outro passando um id na URL.
@@ -206,6 +210,10 @@ public class ApiServer {
         faxina.setDaemon(true);
         faxina.start();
 
+        // O Google aposenta modelos sem avisar; esta conferência põe no log o
+        // nome do substituto em vez de deixar o bot caindo no fallback calado.
+        ChatIA.iniciarVerificacaoPeriodica();
+
         server.setExecutor(null); // executor padrão
         server.start();
 
@@ -226,6 +234,14 @@ public class ApiServer {
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("api", "SaudeConecta");
         resp.put("status", "online");
+
+        // Primeiro lugar a olhar quando o chatbot só responde o texto fixo:
+        // "modelo_recusado" quer dizer trocar gemini.modelo no config.properties.
+        Map<String, Object> ia = new LinkedHashMap<>();
+        ia.put("gemini", ChatIA.situacaoGemini());
+        ia.put("modelo", ChatIA.modeloGeminiAtual());
+        ia.put("reserva", IaReserva.disponivel());
+        resp.put("ia", ia);
         enviarJson(ex, 200, resp);
     }
 
@@ -1475,6 +1491,16 @@ public class ApiServer {
         Integer userId = autenticar(ex);
         if (userId == null) return;
 
+        String path = ex.getRequestURI().getPath();
+        if ("/api/explicacoes/reportar".equals(path)) {
+            reportarExplicacao(ex, userId);
+            return;
+        }
+        if (!"/api/explicacoes".equals(path) && !"/api/explicacoes/".equals(path)) {
+            enviarErro(ex, 404, "Rota não encontrada.");
+            return;
+        }
+
         try {
             Map<String, Object> body = lerCorpo(ex);
             String tipo = campo(body, "tipo");
@@ -1497,11 +1523,20 @@ public class ApiServer {
             }
 
             // 1) o que já está no banco serve todo mundo, na hora e sem cota.
-            String texto = explicacaoDAO.buscar(tipo, termo);
-            if (texto != null) {
+            Explicacao gravada = explicacaoDAO.buscar(tipo, termo);
+            if (gravada != null) {
+                // Suspensa por relatos de erro: não mostra e, sobretudo, não
+                // pede outra ao modelo — o texto novo iria ao ar sem ninguém
+                // conferir, que é justamente o que o relato quis impedir.
+                if (Explicacao.STATUS_SUSPENSA.equals(gravada.getStatus())) {
+                    enviarErro(ex, 409, "Esta explicação foi retirada para revisão "
+                            + "depois de relatos de erro. Pergunte ao profissional de saúde.");
+                    return;
+                }
                 Map<String, Object> resp = new LinkedHashMap<>();
-                resp.put("texto", texto);
+                resp.put("texto", gravada.getTexto());
                 resp.put("origem", "banco");
+                resp.put("revisado", gravada.getRevisadoEm() != null);
                 enviarJson(ex, 200, resp);
                 return;
             }
@@ -1534,6 +1569,7 @@ public class ApiServer {
             Map<String, Object> resp = new LinkedHashMap<>();
             resp.put("texto", escrito);
             resp.put("origem", "ia");
+            resp.put("revisado", false);
             enviarJson(ex, 200, resp);
 
         } catch (IllegalArgumentException e) {
@@ -1541,6 +1577,61 @@ public class ApiServer {
         } catch (SQLException e) {
             System.out.println("[ERRO explicacoes] " + e.getMessage());
             enviarErro(ex, 500, "Erro ao buscar a explicação.");
+        }
+    }
+
+    /**
+     * POST /api/explicacoes/reportar — "este texto tem algum problema".
+     *
+     * O glossário é escrito por um modelo e mostrado a todos, sem aprovação
+     * prévia; este é o caminho de volta. Com {@link ExplicacaoDAO#RELATOS_PARA_SUSPENDER}
+     * pessoas diferentes relatando, o verbete sai do ar até alguém revisá-lo no
+     * banco (database/revisar-glossario.sql).
+     *
+     * <p>O motivo é uma lista fechada, nunca texto livre: o paciente escreveria
+     * o próprio resultado ali. E a mesma trava da explicação vale aqui — só se
+     * relata termo que a pessoa pode ver, senão a rota serviria para descobrir
+     * quais termos existem no glossário.
+     */
+    private static void reportarExplicacao(HttpExchange ex, int userId) throws IOException {
+        try {
+            Map<String, Object> body = lerCorpo(ex);
+            String tipo = campo(body, "tipo");
+            String termo = campo(body, "termo");
+            String motivo = campo(body, "motivo");
+
+            if ((!"exame".equals(tipo) && !"vacina".equals(tipo))
+                    || termo == null || termo.isBlank() || termo.length() > LIMITE_TERMO) {
+                enviarErro(ex, 400, "Item inválido.");
+                return;
+            }
+            if (!ExplicacaoDAO.motivoValido(motivo)) {
+                enviarErro(ex, 400, "Motivo inválido.");
+                return;
+            }
+            if (!explicacaoDAO.termoConhecido(tipo, termo, userId)) {
+                enviarErro(ex, 404, "Não temos explicação para este item.");
+                return;
+            }
+            Explicacao gravada = explicacaoDAO.buscar(tipo, termo);
+            if (gravada == null) {
+                enviarErro(ex, 404, "Não temos explicação para este item.");
+                return;
+            }
+
+            boolean suspensa = explicacaoDAO.reportar(gravada.getId(), userId, motivo);
+
+            Map<String, Object> resp = new LinkedHashMap<>();
+            resp.put("registrado", true);
+            resp.put("suspensa", suspensa
+                    || Explicacao.STATUS_SUSPENSA.equals(gravada.getStatus()));
+            enviarJson(ex, 200, resp);
+
+        } catch (IllegalArgumentException e) {
+            enviarErro(ex, 400, "Corpo da requisição inválido (JSON).");
+        } catch (SQLException e) {
+            System.out.println("[ERRO reportar explicacao] " + e.getMessage());
+            enviarErro(ex, 500, "Não foi possível registrar o relato.");
         }
     }
 

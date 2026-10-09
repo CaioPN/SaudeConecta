@@ -482,8 +482,13 @@ function FormularioProntuario({ token, dados, onMudou }) {
  * que foi aplicado com o que ele achava que tinha sido. Agora quem confirma é
  * quem aplicou (ou viu) a vacina, como no resto do prontuário: incluir e
  * remover, sem editar, para as duas ações ficarem separadas na trilha.
+ *
+ * Com `podeRegistrar` falso (código de somente leitura) a carteira aparece sem
+ * a data e sem os botões. Antes ela só existia dentro das abas de registro, e
+ * quem entrava para consultar não via as doses — embora a rota de leitura
+ * aceitasse os dois escopos.
  */
-function FormularioVacinas({ token }) {
+function FormularioVacinas({ token, podeRegistrar = true }) {
   const [doses, setDoses] = useState([]);
   const [data, setData] = useState(hojeIso);
   const [carregando, setCarregando] = useState(true);
@@ -512,29 +517,32 @@ function FormularioVacinas({ token }) {
 
   return (
     <>
-      <form className="card" onSubmit={(e) => e.preventDefault()}>
-        {/* Data da APLICAÇÃO, não do registro: quem chega com a caderneta de
-            papel lança doses antigas, e sem este campo todas entrariam como
-            hoje. O max impede data no futuro. */}
-        <div className="input-group">
-          <label className="input-label">Data da aplicação</label>
-          <input
-            className="input-field"
-            type="date"
-            value={data}
-            max={hojeIso()}
-            onChange={(e) => setData(e.target.value)}
-          />
-        </div>
-        <p className="text-xs text-muted">
-          Vale para as doses marcadas a seguir. O paciente vê a carteira no app,
-          mas só o profissional registra as doses.
-        </p>
-        {erro && <p className="form-erro">{erro}</p>}
-      </form>
+      {podeRegistrar && (
+        <form className="card" onSubmit={(e) => e.preventDefault()}>
+          {/* Data da APLICAÇÃO, não do registro: quem chega com a caderneta de
+              papel lança doses antigas, e sem este campo todas entrariam como
+              hoje. O max impede data no futuro. */}
+          <div className="input-group">
+            <label className="input-label">Data da aplicação</label>
+            <input
+              className="input-field"
+              type="date"
+              value={data}
+              max={hojeIso()}
+              onChange={(e) => setData(e.target.value)}
+            />
+          </div>
+          <p className="text-xs text-muted">
+            Vale para as doses marcadas a seguir. O paciente vê a carteira no app,
+            mas só o profissional registra as doses.
+          </p>
+          {erro && <p className="form-erro">{erro}</p>}
+        </form>
+      )}
 
       <div className="card">
         <h3 className="section-title">Calendário do paciente</h3>
+        {!podeRegistrar && erro && <p className="form-erro">{erro}</p>}
         {carregando && <p className="text-sm text-muted">Carregando a carteira…</p>}
         {!carregando && doses.length === 0 && (
           <p className="text-sm text-muted">Nenhuma dose no calendário para esta idade.</p>
@@ -552,14 +560,16 @@ function FormularioVacinas({ token }) {
                   ? `Aplicada em ${dataIsoBr(d.aplicada_em)}`
                   : d.status === 'atrasada' ? 'Em atraso' : 'Prevista'}
               </span>
-              <button
-                type="button"
-                className={`vacina-acao ${d.status === 'aplicada' ? '' : 'destaque'}`}
-                onClick={() => aplicar(d, d.status !== 'aplicada')}
-                disabled={salvando}
-              >
-                {d.status === 'aplicada' ? 'Desfazer' : 'Marcar como aplicada'}
-              </button>
+              {podeRegistrar && (
+                <button
+                  type="button"
+                  className={`vacina-acao ${d.status === 'aplicada' ? '' : 'destaque'}`}
+                  onClick={() => aplicar(d, d.status !== 'aplicada')}
+                  disabled={salvando}
+                >
+                  {d.status === 'aplicada' ? 'Desfazer' : 'Marcar como aplicada'}
+                </button>
+              )}
             </div>
           </div>
         ))}
@@ -576,6 +586,7 @@ export default function PortalMedico() {
   const [aba, setAba] = useState('consulta');
   const [agora, setAgora] = useState(new Date());
   const [expirado, setExpirado] = useState(false);
+  const [verVacinas, setVerVacinas] = useState(false);
 
   useEffect(() => {
     const id = setInterval(() => setAgora(new Date()), 1000);
@@ -598,6 +609,7 @@ export default function PortalMedico() {
     setSessao(null);
     setDados(null);
     setExpirado(false);
+    setVerVacinas(false);
   };
 
   const restante = sessao ? tempoRestante(sessao.expira_em, agora) : null;
@@ -733,10 +745,22 @@ export default function PortalMedico() {
               {aba === 'vacinas' && <FormularioVacinas token={sessao.token} />}
             </>
           ) : (
-            <p className="acesso-nota">
-              <ShieldCheck size={14} /> Este acesso é somente leitura — o paciente
-              não autorizou o registro de novos dados.
-            </p>
+            <>
+              <p className="acesso-nota">
+                <ShieldCheck size={14} /> Este acesso é somente leitura — o paciente
+                não autorizou o registro de novos dados.
+              </p>
+              {/* A carteira abre por botão, e não sozinha: cada leitura entra
+                  na trilha do paciente ("leu_vacinas"), e ela só deve dizer
+                  que o médico viu as vacinas quando ele de fato as abriu. */}
+              {verVacinas ? (
+                <FormularioVacinas token={sessao.token} podeRegistrar={false} />
+              ) : (
+                <button type="button" className="btn-secondary" onClick={() => setVerVacinas(true)}>
+                  <Syringe size={16} /> Ver carteira de vacinação
+                </button>
+              )}
+            </>
           )}
         </>
       )}

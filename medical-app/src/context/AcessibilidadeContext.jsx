@@ -10,7 +10,8 @@ import { createContext, useContext, useEffect, useState } from 'react';
  * o localStorage serve — é preferência de exibição, como o tema de um site.
  *
  * O estado vira atributo no <body> (data-fonte / data-contraste) e quem faz o
- * trabalho é o CSS: todo `font-size` do app.css é calc(Npx * var(--escala-fonte)).
+ * trabalho é o CSS: todo `font-size` do app.css é calc(Npx * var(--escala-fonte)),
+ * e fundo, borda e texto saem de variáveis que o contraste redefine.
  */
 const AcessibilidadeContext = createContext(null);
 
@@ -22,7 +23,16 @@ export const TAMANHOS = [
   { id: 'maior', rotulo: 'Maior' },
 ];
 
-const PADRAO = { fonte: 'padrao', contraste: false };
+// Três opções, e não um liga/desliga: "texto mais escuro" ajuda quem não
+// distingue o cinza do branco; "fundo escuro" ajuda quem é ofuscado pelo fundo
+// claro. São queixas diferentes, e uma não resolve a outra.
+export const CONTRASTES = [
+  { id: 'normal', rotulo: 'Padrão' },
+  { id: 'alto', rotulo: 'Texto escuro' },
+  { id: 'escuro', rotulo: 'Fundo escuro' },
+];
+
+const PADRAO = { fonte: 'padrao', contraste: 'normal' };
 
 // Lê o que estiver gravado, aceitando só valores conhecidos: um localStorage
 // adulterado (ou de uma versão antiga) não pode deixar o app com um atributo
@@ -31,9 +41,11 @@ function lerGravado() {
   try {
     const bruto = JSON.parse(localStorage.getItem(CHAVE));
     if (!bruto) return PADRAO;
+    // Até a versão anterior o contraste era um booleano (true = texto escuro).
+    const contraste = bruto.contraste === true ? 'alto' : bruto.contraste;
     return {
       fonte: TAMANHOS.some((t) => t.id === bruto.fonte) ? bruto.fonte : PADRAO.fonte,
-      contraste: Boolean(bruto.contraste),
+      contraste: CONTRASTES.some((c) => c.id === contraste) ? contraste : PADRAO.contraste,
     };
   } catch {
     return PADRAO;
@@ -52,10 +64,10 @@ export function AcessibilidadeProvider({ children }) {
     } else {
       body.dataset.fonte = ajustes.fonte;
     }
-    if (ajustes.contraste) {
-      body.dataset.contraste = 'alto';
-    } else {
+    if (ajustes.contraste === 'normal') {
       delete body.dataset.contraste;
+    } else {
+      body.dataset.contraste = ajustes.contraste;
     }
 
     try {
@@ -66,11 +78,11 @@ export function AcessibilidadeProvider({ children }) {
   }, [ajustes]);
 
   const definirFonte = (fonte) => setAjustes((a) => ({ ...a, fonte }));
-  const alternarContraste = () => setAjustes((a) => ({ ...a, contraste: !a.contraste }));
+  const definirContraste = (contraste) => setAjustes((a) => ({ ...a, contraste }));
 
   return (
     <AcessibilidadeContext.Provider
-      value={{ ...ajustes, definirFonte, alternarContraste }}
+      value={{ ...ajustes, definirFonte, definirContraste }}
     >
       {children}
     </AcessibilidadeContext.Provider>

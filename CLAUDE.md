@@ -39,7 +39,7 @@ backend-api/          API Java (pacote br.com.hackgov)
                         Consulta, Prontuario, HistoricoMedico, Medicacao,
                         Alergia, Notificacao, Exame, ItemExame,
                         AcessoTemporario, AcessoLog, RegistroAuditoria, Aviso,
-                        UnidadeSaude, DoseVacina
+                        UnidadeSaude, DoseVacina, Explicacao
     principal/Principal menu de console antigo (não serve o front)
     util/               Json (parser próprio), Jwt, SenhaUtil,
                         CodigoAcesso, ChatIA (Gemini), IaReserva (2ª IA),
@@ -47,6 +47,8 @@ backend-api/          API Java (pacote br.com.hackgov)
                         (regras da carteira), CnesApi, Localizacao
 database/             scripts SQL (schema com migração no fim, seeds)
   gerar-calendario.mjs  reescreve o calendário do PNI no seed a partir do JS
+                        (--conferir só compara; roda no prebuild do front)
+  revisar-glossario.sql consultas de revisão dos verbetes relatados (manual)
 docs/                 documentação do trabalho
   evolucao-do-projeto.md  registro detalhado da evolução (para a entrega)
 demo/                 versão HTML de demonstração — APOSENTADA, não atualizar
@@ -226,8 +228,32 @@ sem lógica de banco).
     fosse sobre quem está olhando. Quando o modelo não conhece o termo, a
     instrução manda responder `DESCONHECIDO`, e a rota recusa gravar — senão o
     erro ficaria no banco para sempre.
-  - A tela sempre rotula o texto como escrito por IA e lembra que quem
-    interpreta é o profissional.
+  - A tela sempre rotula o texto como escrito por IA, diz se ele já foi
+    **conferido por uma pessoa** (`explicacoes_ia.revisado_em`) e lembra que
+    quem interpreta é o profissional.
+  - **"Este texto tem algum problema?"** (`POST /api/explicacoes/reportar`,
+    tabela `explicacoes_reportes`, modelo `Explicacao`): o caminho de volta de
+    um texto que vai ao ar sem aprovação.
+    - O motivo é **lista fechada** (`errado`, `confuso`, `resultado`), nunca
+      texto livre: o paciente escreveria o próprio resultado ali.
+    - Com **2 pessoas diferentes** (`RELATOS_PARA_SUSPENDER`, chave única por
+      paciente) o verbete vira `status = 'suspensa'` e a rota responde 409.
+      Suspenso **não** é reescrito pelo modelo — senão relatar só trocaria o
+      texto por outro que ninguém conferiu.
+    - Texto já revisado não cai por relato automático; os relatos dele ficam
+      para a próxima revisão.
+    - A revisão é no banco, com as consultas de `database/revisar-glossario.sql`
+      (aprovar, corrigir à mão ou descartar). Aprovar ou apagar leva os relatos
+      junto, para o vínculo "esta pessoa olhou o exame X" não ficar guardado.
+    - A rota confere o termo com a mesma trava da explicação: sem ela, serviria
+      para descobrir quais termos existem no glossário.
+  - **A IA avisa quando o modelo morre** (`ChatIA.iniciarVerificacaoPeriodica`):
+    na subida da API e a cada 24 h, uma chamada com pergunta fixa. Como a
+    pergunta é nossa, ali — e só ali — o corpo do erro é logado, e é ele que
+    diz o substituto ("use models/gemini-3.8-flash"). O 404 em uso também
+    passa a dizer "modelo aposentado" no log, uma vez só. A situação aparece em
+    `GET /` (`ia.gemini`: `ok`, `modelo_recusado`, `indisponivel`,
+    `sem_chave`). Custa uma requisição da cota por dia.
   - **A chamada real foi exercitada de ponta a ponta** (chave gerada, API no ar,
     rota chamada com JWT). O que isso ensinou, e que o teste de mesa não pegava:
     - **Modelo aposentado é 404.** O `gemini-2.0-flash` que estava no exemplo
@@ -254,7 +280,7 @@ sem lógica de banco).
       "O QUE O APP NÃO FAZ". Ao mudar um fluxo, esse bloco entra na mesma
       revisão do FAQ e da base de regras.
 - **Dúvidas frequentes** (`Faq.jsx`, rota `/faq`, texto em
-  `content/FaqContent.js`): sanfona com 60 perguntas em oito categorias — o item
+  `content/FaqContent.js`): sanfona com 62 perguntas em oito categorias — o item
   "Dúvidas frequentes" do menu "Mais" apontava para uma rota que não existia.
   As respostas descrevem o que o app faz **hoje** (dizem, por exemplo, que
   anotar uma consulta não a marca na unidade, e explicam a conferência de três
@@ -536,6 +562,10 @@ sem lógica de banco).
     em `services/medico.js`), sempre exigindo o escopo de escrita do código.
     A tela do paciente diz em uma linha onde a dose é registrada, senão ele
     procuraria um botão que não existe.
+  - Com código de **somente leitura** o médico também vê a carteira (botão
+    "Ver carteira de vacinação", sem data nem botões). Ela abre por botão, e
+    não sozinha, porque cada leitura entra na trilha do paciente como
+    `leu_vacinas` — e a trilha só deve dizer isso quando ele de fato olhou.
   - Marcar e desmarcar caem na **trilha do acesso** (`acessos_log`:
     `leu_vacinas`, `registrou_vacina`, `removeu_vacina`) e geram
     **notificação** (`NotificacaoDAO.TIPO_VACINA`), como o resto do que o
@@ -549,7 +579,10 @@ sem lógica de banco).
     `node database/gerar-calendario.mjs --gravar`, que reescreve o bloco entre
     os marcadores `<calendario-vacinal>` do `seed.sql`. A lista JS continua
     sendo a fonte porque a demonstração (sem backend) também precisa dela:
-    mexa no JS e rode o gerador, nunca o contrário.
+    mexa no JS e rode o gerador, nunca o contrário. **O `npm run build` confere
+    isso** (`prebuild` → `gerar-calendario.mjs --conferir`): um `vacinas.js`
+    alterado sem o seed regenerado derruba o build. A comparação ignora CRLF,
+    porque o `autocrlf` do Git no Windows não é diferença de calendário.
   - `vacinas_aplicadas` **não tem chave única**, e isso é limitação do MySQL:
     `dependente_id` é NULL no titular, NULLs não colidem em índice único, e a
     coluna gerada que resolveria isso é proibida junto com `ON DELETE CASCADE`.
@@ -642,7 +675,7 @@ sem lógica de banco).
     espelho quem ninguém abre há 180 dias. A marca não pôde ficar em
     `unidades_saude` porque aquela tabela tem `ON UPDATE CURRENT_TIMESTAMP`, e
     um UPDATE por visita faria o cache do CNES parecer sempre novo.
-- **Acessibilidade: texto maior e texto mais escuro**
+- **Acessibilidade: texto maior, texto mais escuro e fundo escuro**
   (`context/AcessibilidadeContext.jsx`, seção "Acessibilidade" no fim do
   `Profile.jsx`, bloco "Acessibilidade" no fim do `app.css`): o app é para
   quem acompanha a própria saúde, e boa parte desse público não enxerga bem o
@@ -668,9 +701,36 @@ sem lógica de banco).
     com um atributo que o CSS não entende.
   - O provedor fica **fora de todos os outros** no `main.jsx`: o ajuste vale
     inclusive no login, antes de existir paciente.
-  - Fora do alcance: os ícones do lucide (recebem o tamanho em atributo, em
-    px) e os seis `style={{ fontSize }}` inline que sobraram em mensagens de
-    erro do Cadastro, do Login e dos Dependentes.
+  - **O tamanho alcança tudo agora.** Três buracos foram fechados:
+    - **Botão e campo não herdam `font-size`** — o navegador lhes dá 13,33px
+      fixos. Todo botão sem regra própria ("Voltar", "Adicionar contato") ficava
+      de fora; uma regra de elemento logo depois do `body` dá a eles
+      `calc(13.333px * var(--escala-fonte))`, o mesmo tamanho de antes.
+    - **Os ícones do lucide** recebem o tamanho em atributo, em px. Em vez de
+      mexer nas ~200 chamadas, `svg.lucide { zoom: 1.15 | 1.3 }`: o `zoom`
+      escala o desenho **e** o espaço que ele ocupa; `transform: scale` faria o
+      ícone crescer por cima do texto vizinho.
+    - Os sete `style={{ fontSize }}` inline (erros do Cadastro, Login e
+      Dependentes, nome no Perfil) viraram classe (`.campo-erro`,
+      `.form-erro`, `.perfil-nome`).
+  - **Contraste são três opções** (`CONTRASTES`: Padrão, Texto escuro, Fundo
+    escuro), não mais um liga/desliga: escurecer o cinza ajuda quem não o
+    distingue do branco; o fundo escuro ajuda quem é ofuscado pelo branco
+    (fotofobia, catarata). O `localStorage` antigo (`contraste: true`) é lido
+    como "Texto escuro".
+  - **Como o fundo escuro funciona**: as cores literais de fundo e borda do
+    `app.css` (106 declarações) viraram variáveis do `:root` com **o mesmo
+    valor** — `--superficie`, `--azul-suave`, `--borda-cinza` etc. —, então o
+    modo claro ficou idêntico por construção, e `body[data-contraste="escuro"]`
+    só redefine as variáveis. A troca foi feita por script e só em
+    `background`/`border`; cor de texto literal ficou e ganhou a versão clara
+    no bloco do escuro.
+    - `--white` foi dividida em duas: `--superficie` (fundo de cartão) e
+      `--texto-sobre-cor` (texto em cima de azul). No escuro o azul clareia
+      para continuar legível como texto, e o texto **em cima** dele vira
+      escuro — branco sobre azul-claro não passaria no contraste mínimo.
+    - **Regra nova de fundo ou borda usa variável**, nunca `#hex` solto, senão
+      fica clara no modo escuro.
 - **O paciente anota a própria consulta** (`consultas.origem`,
   `consultas.profissional`, `consultas.especialidade`,
   `POST/PUT/DELETE /api/consultas`, `GET /api/consultas/sugestoes`,
@@ -703,6 +763,13 @@ sem lógica de banco).
       recupera o `unidade_cnes` — consulta quase sempre é retorno com quem já
       atendeu, no mesmo lugar. Sai das próprias consultas, e não de uma tabela
       de "meus médicos", que seria mais uma tela para manter.
+    - **O campo "Local" lista a rede de saúde** (`buscarRedeSaude` no
+      formulário): depois dos lugares já usados na conta, as unidades da
+      cidade do cadastro, da mais perto para a mais longe, com tipo e bairro.
+      Escolher uma delas grava o `unidade_cnes` (conferido no backend contra o
+      espelho) e o detalhe ganha o "Como chegar" pela coordenada oficial. Vai
+      **sem GPS** de propósito: anotar consulta não é motivo para pedir a
+      localização. Digitar outro nome continua valendo, só sem o vínculo.
     - No detalhe de um atendimento do profissional, **"Anotar retorno"** abre o
       mesmo formulário com profissional, especialidade e local herdados e a
       data em branco. (Era o botão "Remarcar", que não fazia nada e tinha um
@@ -773,7 +840,21 @@ sem lógica de banco).
     `formatarData` do `vacinas.js` (recebe `Date`) atropelava o do `exames.js`
     (recebe ISO) e derrubava três telas. O `gerar.mjs` renomeia esse, e o
     `demo/README.md` explica o resto.
-
+- **Consultas analíticas da entrega** (`database/analise.sql`,
+  `docs/parte4-analise-e-eficiencia-dos-dados.md` com o SQL e as medições,
+  `docs/parte4-explicacao-didatica.md` com a explicação sem código para a
+  entrega): sete consultas de leitura
+  sobre a base inteira — agrupamento, percentual, CTE, subconsulta
+  correlacionada, `RANK()`, `LAG()`, `SUM() OVER ()` e `HAVING` comparado a
+  subconsulta. **O app não as executa**: o SQL dos DAOs responde por UM
+  paciente, porque é o que uma tela precisa; estas olham o conjunto, que é o
+  que a análise da Parte 4 pede. Duas delas valem como ferramenta de
+  manutenção: a cobertura vacinal reproduz o bug do adulto com o calendário
+  infantil quando se tira a trava de idade, e o intervalo médio entre
+  atendimentos (123 dias, entre 69 e 196) é o que calibra o
+  `DIAS_CONSULTA_ALERTA` do `AvisoDAO`. O documento traz também a análise Big O
+  do que já existia no código (índice B+, Top-K geográfico, intercalação de
+  duas filas, fila FIFO da auditoria), com `EXPLAIN` medido.
 ## O que falta
 
 - A recuperação de senha prova a identidade conferindo três dados do cadastro.
@@ -786,33 +867,28 @@ sem lógica de banco).
   em branco pode significar "ninguém marcou" e não "ninguém tomou". E como o
   paciente não escreve mais nela, a carteira de quem só usa o app sozinho fica
   vazia até a primeira consulta com código de acesso.
-- O médico **só enxerga a carteira com escopo de escrita**: a aba Vacinas do
-  portal nasce dentro do bloco de registro, então quem entrou com um código de
-  somente leitura não vê as doses (a rota `GET /api/medico/vacinas` aceita os
-  dois escopos; o que falta é a tela).
 - O calendário do PNI existe em dois lugares: a tabela `calendario_vacinal`
-  (usada pelo app) e `data/vacinas.js` (usado pela demonstração, que não tem
-  backend). O gerador (`database/gerar-calendario.mjs`) mantém o seed em dia a
-  partir do JS, mas ninguém obriga a rodá-lo — não há verificação automática de
-  que o banco e o arquivo estão iguais.
+  (usada pelo app) e `data/vacinas.js`. O `npm run build` agora recusa um
+  `seed.sql` diferente do JS, mas o que ele confere é o **arquivo**, não o
+  banco: um seed regenerado e não aplicado no MySQL passa na conferência.
 - O chatbot **não conhece os dados do paciente** — ele explica o app e orienta,
   mas não responde "quando foi meu último exame?". Fazer isso exigiria mandar
   dado clínico para o modelo, o que o nível gratuito do Gemini não permite (usa
   os prompts para treinar); o caminho seria um modelo local (ex.: Ollama), aí
   nada sai da máquina. É o mesmo teto do glossário: o app explica **o que é** um
   exame, nunca **o que o seu deu**.
-- O glossário **não é revisado por ninguém**. O texto é escrito por um modelo,
-  gravado e mostrado a todos os pacientes dali em diante. A instrução proíbe
-  diagnóstico, número e faixa de referência, e a tela avisa que o texto é de
-  IA — mas não há aprovação humana antes de publicar, nem botão de "reportar
-  erro". Para uso real seria preciso os dois. Enquanto isso, apagar um verbete
-  ruim é `DELETE FROM explicacoes_ia WHERE termo = ...` (a coluna `modelo`
-  permite apagar em bloco o que veio de um modelo específico).
-- O chatbot **depende de um modelo que o Google aposenta sem avisar**. Hoje ele
-  responde, mas o `gemini-2.0-flash` do exemplo antigo já morreu, e o mesmo vai
-  acontecer com o atual. Quando o bot começar a cair sempre no fallback,
-  suspeite disso primeiro: troque `gemini.modelo` no `config.properties` (não
-  precisa recompilar). Não há verificação automática de que o modelo ainda vale.
+- O glossário **não tem aprovação prévia**: o texto vai ao ar assim que o
+  modelo o escreve. O que existe é o caminho de volta — o relato do paciente,
+  a suspensão automática com 2 pessoas e a revisão no banco
+  (`database/revisar-glossario.sql`). Não há tela de administração, porque o
+  projeto não tem perfil de administrador; quem revisa precisa do MySQL. E
+  ninguém é avisado de que há verbete suspenso esperando.
+- O chatbot **depende de um modelo que o Google aposenta sem avisar**. Hoje a
+  API percebe sozinha (conferência na subida e a cada 24 h, mais o 404 em
+  uso), escreve no log o substituto que o Google indica e mostra a situação em
+  `GET /` — mas **trocar continua sendo manual**: `gemini.modelo` no
+  `config.properties` e reiniciar a API. Trocar sozinha seria pôr no ar um
+  modelo que ninguém testou com a `INSTRUCAO` do app.
 - O bot **não guarda a conversa**: cada pergunta vai sozinha ao modelo, sem as
   anteriores. "E o meu filho?" depois de uma pergunta sobre vacina não funciona.
   Mandar o histórico é fácil, mas aí a pergunta antiga volta a sair do app a
@@ -854,15 +930,17 @@ sem lógica de banco).
   "Sim, fui" e "Foi cancelada" existem, mas quem não responde fica com a
   consulta marcada como agendada para sempre. A lista contorna pela data, e
   não há como o app conferir a presença sozinho.
-- O paciente **não escolhe a unidade da rede** ao anotar a consulta: ele digita
-  o local em texto livre, e o vínculo com o CNES (que dá o "Como chegar" pela
-  coordenada oficial) só é herdado quando ele escolhe um local que já apareceu
-  em outra consulta. Ligar o campo à busca da Rede de Saúde é o passo seguinte.
-- O ajuste de **tamanho do texto não alcança os ícones** (o lucide recebe o
-  tamanho em atributo, em px) nem os seis `style={{ fontSize }}` inline que
-  sobraram em mensagens de erro do Cadastro, do Login e dos Dependentes.
-  Também não existe modo de alto contraste de verdade (fundo escuro): o que há
-  é o escurecimento do texto cinza.
+- O campo "Local" da consulta anotada oferece só a rede **da cidade do
+  cadastro** (mais a vizinhança de 12 km já espelhada). Uma consulta em outra
+  cidade continua em texto livre, sem "Como chegar" pela coordenada oficial — o
+  formulário não tem o "Ver outra cidade" da Rede de Saúde.
+- O **fundo escuro** depende de toda cor de fundo e de borda sair das
+  variáveis do `:root`. Um `#hex` literal novo num `background` ou `border`
+  fica claro no modo escuro; o mesmo vale para cor em `style={{}}` inline. E
+  o logotipo do Login é uma imagem: não muda de cor.
+- O **`zoom`** que escala os ícones é padrão recente (Firefox só a partir da
+  126, de 2024). Num navegador antigo o texto cresce e o ícone não, que era o
+  comportamento de antes.
 - O acesso do médico continua **só de leitura e registro clínico**: ele não
   edita o cadastro do paciente nem marca vacina de quem não é o dono do
   código.
@@ -978,6 +1056,14 @@ regenere o bloco do seed:
 ```bash
 node database/gerar-calendario.mjs --gravar
 ```
+
+O `npm run build` confere isso sozinho; para conferir sem compilar, use
+`npm run conferir-calendario` dentro de `medical-app/`.
+
+Para revisar o glossário de IA (verbetes que pacientes relataram como
+errados), abra o MySQL e use as consultas de `database/revisar-glossario.sql`,
+uma de cada vez. Para saber se o modelo do Gemini ainda responde, abra
+`http://localhost:3001/` e olhe `ia.gemini`.
 
 Para a apresentação existe ainda o `database/seed-caio.sql`, com o histórico
 clínico de demonstração da conta `caioastoria@gmail.com` (consultas passadas e

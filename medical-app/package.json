@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "node ../database/gerar-calendario.mjs --conferir",
     "build": "vite build",
+    "conferir-calendario": "node ../database/gerar-calendario.mjs --conferir",
     "preview": "vite preview"
   },
   "devDependencies": {

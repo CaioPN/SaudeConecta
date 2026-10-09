@@ -72,8 +72,8 @@ public final class ChatIA {
           + "tipo sanguíneo, contatos de emergência, histórico de quem acessou os dados, a Rede de "
           + "Saúde (UBS, UPA e pronto-socorro perto do paciente, com telefone e rota) e um código "
           + "temporário que libera os dados para o médico no atendimento. Em \"Mais\" > \"Meu perfil\" "
-          + "há uma seção de Acessibilidade, com o tamanho do texto (Padrão, Grande, Maior) e a opção "
-          + "de texto mais escuro.\n\n"
+          + "há uma seção de Acessibilidade, com o tamanho do texto (Padrão, Grande, Maior) e o "
+          + "contraste (Padrão, Texto escuro ou Fundo escuro, que é o modo escuro do app).\n\n"
           + "O QUE O APP NÃO FAZ (nunca prometa isso): ele não agenda consulta nem marca exame com "
           + "a unidade de saúde — o agendamento é feito direto com ela, por telefone ou no balcão. "
           + "O paciente pode ANOTAR no app, em \"Consultas\", uma consulta que ele já marcou, e o "
@@ -126,7 +126,119 @@ public final class ChatIA {
      */
     private static final String MODELO_PADRAO = "gemini-3.5-flash-lite";
 
+    /**
+     * O que se sabe do modelo configurado do Gemini, para quem precisa saber
+     * por que o bot está caindo no fallback (a rota "/" da API mostra isto).
+     *
+     * <ul>
+     *   <li>{@code sem_chave} — não há chave; o Gemini nem é tentado;</li>
+     *   <li>{@code nao_verificado} — a API acabou de subir;</li>
+     *   <li>{@code ok} — a última chamada respondeu;</li>
+     *   <li>{@code modelo_recusado} — 404/400/403: modelo aposentado ou que não
+     *       aceita mais esta chave. Não passa sozinho: é trocar
+     *       {@code gemini.modelo} no config.properties;</li>
+     *   <li>{@code indisponivel} — 429, 5xx ou rede: passageiro.</li>
+     * </ul>
+     */
+    private static volatile String situacao = "nao_verificado";
+
+    /** Intervalo entre as conferências automáticas do modelo. */
+    private static final Duration INTERVALO_VERIFICACAO = Duration.ofHours(24);
+
     private ChatIA() { }
+
+    /** Situação do modelo do Gemini (ver o campo {@code situacao}). */
+    public static String situacaoGemini() {
+        return Config.ler(CHAVE_GEMINI) == null ? "sem_chave" : situacao;
+    }
+
+    /** Nome do modelo do Gemini em uso, ou null sem chave. */
+    public static String modeloGeminiAtual() {
+        return modeloGemini();
+    }
+
+    /**
+     * Confere se o modelo configurado ainda responde — uma vez quando a API
+     * sobe e depois a cada {@link #INTERVALO_VERIFICACAO}, numa thread daemon.
+     *
+     * Existe porque o Google aposenta modelos sem avisar, e o sintoma era só o
+     * bot passar a cair sempre no fallback, sem nada no log além de "HTTP 404".
+     * Aparecer no GET /models não basta (um modelo pode estar listado e recusar
+     * chaves novas), então a conferência é uma chamada de verdade, com uma
+     * pergunta fixa. Como a pergunta é nossa, aqui — e só aqui — dá para logar
+     * a mensagem de erro do Google, que é quem diz qual é o substituto.
+     *
+     * Custa uma requisição da cota por dia.
+     */
+    public static void iniciarVerificacaoPeriodica() {
+        if (Config.ler(CHAVE_GEMINI) == null) return;
+        Thread t = new Thread(() -> {
+            while (true) {
+                verificarModelo();
+                try {
+                    Thread.sleep(INTERVALO_VERIFICACAO.toMillis());
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        }, "verifica-modelo-ia");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    /** Uma conferência: chama o modelo com uma pergunta fixa e registra o resultado. */
+    static void verificarModelo() {
+        String chave = Config.ler(CHAVE_GEMINI);
+        if (chave == null) return;
+        String modelo = modeloGemini();
+        try {
+            HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create("https://generativelanguage.googleapis.com/v1beta/models/"
+                            + modelo + ":generateContent"))
+                    .timeout(TEMPO_LIMITE)
+                    .header("Content-Type", "application/json; charset=UTF-8")
+                    .header("x-goog-api-key", chave)
+                    .POST(HttpRequest.BodyPublishers.ofString(
+                            montarRequisicao("Responda apenas: ok", "ok"), StandardCharsets.UTF_8))
+                    .build();
+            HttpResponse<String> resp = CLIENTE.send(
+                    req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+
+            int codigo = resp.statusCode();
+            if (codigo == 200) {
+                situacao = "ok";
+            } else if (codigo == 400 || codigo == 403 || codigo == 404) {
+                situacao = "modelo_recusado";
+                System.out.println("[AVISO chat-ia] O modelo \"" + modelo + "\" foi recusado (HTTP "
+                        + codigo + "): " + mensagemDeErro(resp.body()));
+                System.out.println("[AVISO chat-ia] Troque gemini.modelo no config.properties "
+                        + "(não precisa recompilar). Até lá, o bot usa a reserva ou o fallback.");
+            } else {
+                situacao = "indisponivel";
+            }
+        } catch (IOException | InterruptedException e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            situacao = "indisponivel";
+        }
+    }
+
+    /** O campo error.message do corpo de erro do Google, ou um texto genérico. */
+    @SuppressWarnings("unchecked")
+    private static String mensagemDeErro(String corpo) {
+        try {
+            Object erro = Json.parseObjeto(corpo).get("error");
+            if (erro instanceof Map) {
+                Object msg = ((Map<String, Object>) erro).get("message");
+                if (msg != null) return msg.toString();
+            }
+        } catch (IllegalArgumentException e) {
+            // corpo fora do formato: cai no texto genérico abaixo
+        }
+        return "sem detalhes na resposta.";
+    }
 
     /**
      * Diz se há alguma IA configurada — o Gemini ou a reserva. Sem nenhuma das
@@ -244,11 +356,21 @@ public final class ChatIA {
                         req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             }
 
-            if (resp.statusCode() != 200) {
+            int codigo = resp.statusCode();
+            if (codigo != 200) {
                 // Não logamos o corpo: ele pode ecoar a pergunta do paciente.
-                System.out.println("[ERRO chat-ia] HTTP " + resp.statusCode());
+                if (codigo == 404 && !"modelo_recusado".equals(situacao)) {
+                    // Só na primeira vez, para o log não virar uma linha por pergunta.
+                    System.out.println("[AVISO chat-ia] HTTP 404: o modelo \"" + modeloGemini()
+                            + "\" provavelmente foi aposentado. Troque gemini.modelo no config.properties.");
+                } else if (codigo != 404) {
+                    System.out.println("[ERRO chat-ia] HTTP " + codigo);
+                }
+                situacao = codigo == 404 || codigo == 400 || codigo == 403
+                        ? "modelo_recusado" : "indisponivel";
                 return null;
             }
+            situacao = "ok";
             return extrairTexto(resp.body());
 
         } catch (IOException | InterruptedException e) {

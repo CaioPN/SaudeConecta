@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Check } from 'lucide-react';
 import { criarConsulta, atualizarConsulta, buscarSugestoes } from '../services/consultas';
+import { buscarRedeSaude } from '../services/redeSaude';
 
 /**
  * Formulário da consulta que o PACIENTE anota.
@@ -22,6 +23,9 @@ const ESPECIALIDADES = [
   'Oftalmologia', 'Ortopedia', 'Odontologia', 'Psiquiatria', 'Psicologia',
   'Nutrição', 'Fisioterapia', 'Endocrinologia', 'Neurologia', 'Urologia',
 ];
+
+// Como a Rede de Saúde escreve cada tipo de unidade (a API manda o código).
+const ROTULO_TIPO = { ubs: 'UBS', upa: 'UPA', pronto_socorro: 'Pronto-socorro' };
 
 function hojeIso() {
   const d = new Date();
@@ -63,6 +67,21 @@ export default function FormularioConsulta({ consulta, dependenteId, onPronto, o
     return () => { ativo = false; };
   }, []);
 
+  // As unidades da rede perto do paciente, para o campo "Local". Sem elas o
+  // vínculo com o CNES (que dá o "Como chegar" pela coordenada oficial) só
+  // existia quando o local já tinha aparecido numa consulta anterior. Vai sem
+  // GPS de propósito: anotar consulta não é motivo para pedir a localização,
+  // e a lista do CEP do cadastro é a mesma rede municipal.
+  const [rede, setRede] = useState([]);
+  useEffect(() => {
+    let ativo = true;
+    buscarRedeSaude()
+      .then(({ unidades }) => { if (ativo) setRede(unidades); })
+      // Sem a rede (sem CEP, CNES fora do ar) o campo volta a ser texto livre.
+      .catch(() => { if (ativo) setRede([]); });
+    return () => { ativo = false; };
+  }, []);
+
   const profissionais = useMemo(() => {
     const vistos = new Set();
     return sugestoes.filter((s) => {
@@ -72,10 +91,28 @@ export default function FormularioConsulta({ consulta, dependenteId, onPronto, o
     });
   }, [sugestoes]);
 
-  const locais = useMemo(
-    () => [...new Set(sugestoes.map((s) => s.local).filter(Boolean))],
-    [sugestoes],
-  );
+  // Primeiro os lugares onde o paciente já foi atendido, depois a rede, da
+  // unidade mais perto para a mais longe (é a ordem em que a API devolve).
+  const locais = useMemo(() => {
+    const vistos = new Set();
+    const lista = [];
+    sugestoes.forEach((s) => {
+      if (s.local && !vistos.has(s.local)) {
+        vistos.add(s.local);
+        lista.push({ valor: s.local, rotulo: '' });
+      }
+    });
+    rede.forEach((u) => {
+      if (u.nome && !vistos.has(u.nome)) {
+        vistos.add(u.nome);
+        lista.push({
+          valor: u.nome,
+          rotulo: [ROTULO_TIPO[u.tipo], u.bairro].filter(Boolean).join(' · '),
+        });
+      }
+    });
+    return lista;
+  }, [sugestoes, rede]);
 
   const especialidades = useMemo(() => {
     const usadas = sugestoes.map((s) => s.especialidade).filter(Boolean);
@@ -102,7 +139,8 @@ export default function FormularioConsulta({ consulta, dependenteId, onPronto, o
       // "Como chegar" do detalhe apontaria para o endereço errado.
       if (campo === 'local') {
         const achado = sugestoes.find((s) => s.local === valor && s.unidadeCnes);
-        setUnidadeCnes(achado ? achado.unidadeCnes : null);
+        const daRede = rede.find((u) => u.nome === valor);
+        setUnidadeCnes(achado ? achado.unidadeCnes : daRede ? daRede.codigo_cnes : null);
       }
       return novo;
     });
@@ -201,8 +239,14 @@ export default function FormularioConsulta({ consulta, dependenteId, onPronto, o
           required
         />
         <datalist id="consulta-locais">
-          {locais.map((l) => <option key={l} value={l} />)}
+          {locais.map((l) => <option key={l.valor} value={l.valor}>{l.rotulo}</option>)}
         </datalist>
+        {unidadeCnes && (
+          <p className="text-xs text-muted">
+            <Check size={12} /> Unidade da rede de saúde — o detalhe da consulta
+            vai mostrar o "Como chegar".
+          </p>
+        )}
       </div>
 
       <div className="input-group">

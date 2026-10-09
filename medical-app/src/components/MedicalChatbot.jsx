@@ -17,11 +17,13 @@ const BASE_CONHECIMENTO = [
     {
         chaves: ['letra pequena', 'fonte', 'aumentar a letra', 'aumentar a fonte', 'texto pequeno',
                  'nao consigo ler', 'não consigo ler', 'enxergar', 'acessibilidade', 'contraste',
-                 'letra maior', 'texto maior'],
+                 'letra maior', 'texto maior', 'modo escuro', 'tema escuro', 'fundo escuro',
+                 'tela escura', 'tela branca', 'brilho'],
         resposta:
             'Em "Mais" → "Meu perfil", no fim da tela, existe a seção "Acessibilidade". Lá você escolhe o ' +
-            'tamanho do texto (Padrão, Grande ou Maior) e pode ligar o "Texto mais escuro", que escurece as ' +
-            'legendas em cinza claro. O ajuste vale para todas as telas e fica guardado no aparelho.',
+            'tamanho do texto (Padrão, Grande ou Maior) e o contraste: "Texto escuro" escurece as legendas ' +
+            'em cinza claro, e "Fundo escuro" deixa o app com fundo escuro e texto claro, para quem se ' +
+            'incomoda com o branco da tela. O ajuste vale para todas as telas e fica guardado no aparelho.',
     },
     {
         chaves: ['exame', 'exames', 'resultado', 'sangue', 'hemograma', 'imagem', 'laudo'],
@@ -136,7 +138,8 @@ const BASE_CONHECIMENTO = [
             'Ao lado do nome de cada exame e de cada vacina existe um "?". Tocando nele abre uma ' +
             'explicação em linguagem simples do que aquilo é e por que o profissional costuma pedir ' +
             'ou aplicar. O texto é escrito por inteligência artificial e fala do item em geral: ele ' +
-            'não avalia o seu resultado. Só o nome do exame sai do aplicativo — nunca o seu valor.',
+            'não avalia o seu resultado. Só o nome do exame sai do aplicativo — nunca o seu valor. ' +
+            'Se a explicação parecer errada ou confusa, toque em "Este texto tem algum problema?" embaixo dela.',
     },
     {
         chaves: ['privacidade', 'dados', 'lgpd', 'termo', 'termos'],

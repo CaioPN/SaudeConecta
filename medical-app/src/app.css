@@ -22,6 +22,29 @@
   --status-warn-bg: #fef9c3;
   --status-bad: #dc2626;
   --status-bad-bg: #fee2e2;
+
+  /* Superfícies e bordas. Eram cores literais espalhadas pelo arquivo; viraram
+     variáveis, com o MESMO valor de antes, para o modo de fundo escuro poder
+     trocá-las de uma vez (ver "Acessibilidade" no fim). Regra nova: fundo e
+     borda saem daqui, nunca de um #hex solto — senão ficam claros no escuro. */
+  --superficie: #ffffff;          /* fundo de cartão, barra, modal, campo */
+  --texto-sobre-cor: #ffffff;     /* texto em cima de fundo azul/verde/vermelho */
+  --azul-suave: #eff6ff;
+  --azul-suave-2: #f8fbff;
+  --azul-claro: #dbeafe;
+  --azul-claro-forte: #bfdbfe;
+  --borda-cinza: #e5e7eb;
+  --borda-cinza-forte: #d1d5db;
+  --cinza-suave: #f3f4f6;
+  --cinza-ardosia: #f1f5f9;
+  --fundo-chat: #f8fafc;
+  --vermelho-claro: #fee2e2;
+  --vermelho-borda: #fecaca;
+  --vermelho-fundo: #fef2f2;
+  --verde-fundo: #f0fdf4;
+  --verde-borda: #bbf7d0;
+  --amarelo-fundo: #fffbeb;
+  --amarelo-borda: #fde68a;
 }
 
 * {
@@ -34,6 +57,14 @@
 body {
   background-color: var(--bg-gray);
   color: var(--text-dark);
+}
+
+/* Botão e campo NÃO herdam o tamanho de fonte: o navegador lhes dá 13,33px
+   fixos. Todo botão sem font-size próprio (Voltar, Adicionar contato...) ficava
+   de fora do ajuste de acessibilidade. Mesmo tamanho de antes, agora escalado;
+   como é seletor de elemento, qualquer classe com font-size continua valendo. */
+button, input, select, textarea {
+  font-size: calc(13.333px * var(--escala-fonte));
 }
 
 /* Layout */
@@ -64,7 +95,7 @@ body {
     margin-top: 40px;
     margin-bottom: 40px;
     border-radius: 24px;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--borda-cinza);
   }
 }
 
@@ -135,6 +166,7 @@ body {
 
 /* Typography */
 .header-title { font-size: calc(24px * var(--escala-fonte)); font-weight: 700; color: var(--text-dark); margin-bottom: 4px; }
+.header-title.perfil-nome { font-size: calc(20px * var(--escala-fonte)); }
 .header-subtitle { font-size: calc(14px * var(--escala-fonte)); color: var(--text-gray); }
 .section-title { font-size: calc(18px * var(--escala-fonte)); font-weight: 700; margin-bottom: 16px; color: var(--text-dark); }
 .text-sm { font-size: calc(14px * var(--escala-fonte)); }
@@ -145,7 +177,7 @@ body {
 
 /* Components */
 .card {
-  background-color: var(--white);
+  background-color: var(--superficie);
   border-radius: var(--border-radius);
   padding: 24px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
@@ -160,7 +192,7 @@ body {
 .btn-primary {
   width: 100%;
   background-color: var(--primary-blue);
-  color: var(--white);
+  color: var(--texto-sobre-cor);
   font-weight: 600;
   padding: 14px;
   border: none;
@@ -180,11 +212,11 @@ body {
   justify-content: center;
   gap: 8px;
   width: 100%;
-  background-color: var(--white);
+  background-color: var(--superficie);
   color: var(--text-dark);
   font-weight: 600;
   padding: 14px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--borda-cinza);
   border-radius: var(--border-radius);
   cursor: pointer;
   margin-top: 12px;
@@ -235,7 +267,7 @@ body {
 .icon-box {
   width: 48px;
   height: 48px;
-  background-color: #eff6ff;
+  background-color: var(--azul-suave);
   color: var(--primary-blue);
   border-radius: 50%;
   display: flex;
@@ -269,8 +301,8 @@ body {
   position: absolute;
   bottom: 0;
   width: 100%;
-  background-color: var(--white);
-  border-top: 1px solid #e5e7eb;
+  background-color: var(--superficie);
+  border-top: 1px solid var(--borda-cinza);
   display: flex;
   justify-content: space-around;
   padding: 12px 0;
@@ -317,7 +349,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--white);
+  color: var(--texto-sobre-cor);
   margin-bottom: 32px;
   box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
 }
@@ -332,7 +364,7 @@ body {
   cursor: pointer;
   margin-top: 16px;
   padding-top: 16px;
-  border-top: 1px solid #f3f4f6;
+  border-top: 1px solid var(--cinza-suave);
   width: 100%;
   justify-content: center;
 }
@@ -347,7 +379,7 @@ body {
 }
 
 .patient-summary:hover {
-  border-color: #dbeafe;
+  border-color: var(--azul-claro);
 }
 
 .quick-actions-grid {
@@ -357,7 +389,7 @@ body {
 }
 
 .action-btn {
-  background-color: var(--white);
+  background-color: var(--superficie);
   padding: 20px;
   border-radius: var(--border-radius);
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
@@ -386,12 +418,12 @@ body {
   align-items: center;
   justify-content: center;
   color: var(--text-gray-claro);
-  border: 4px solid var(--white);
+  border: 4px solid var(--superficie);
   margin-bottom: 12px;
 }
 
 .list-action-btn {
-  background-color: var(--white);
+  background-color: var(--superficie);
   padding: 20px;
   border-radius: var(--border-radius);
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
@@ -405,7 +437,7 @@ body {
 }
 
 .list-action-btn:hover {
-  border-color: #dbeafe;
+  border-color: var(--azul-claro);
 }
 
 /* Linhas de dados cadastrais (Meu Perfil) */
@@ -414,7 +446,7 @@ body {
   align-items: center;
   gap: 14px;
   padding: 12px 0;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--cinza-ardosia);
 }
 .info-row:last-child {
   border-bottom: none;
@@ -428,7 +460,7 @@ body {
   height: 38px;
   flex-shrink: 0;
   border-radius: 10px;
-  background-color: #eff6ff;
+  background-color: var(--azul-suave);
   color: var(--primary-blue);
   display: flex;
   align-items: center;
@@ -449,7 +481,7 @@ body {
 /* Exams */
 .tabs-wrapper {
   display: flex;
-  background-color: var(--white);
+  background-color: var(--superficie);
   border-radius: var(--border-radius);
   padding: 4px;
   margin-bottom: 32px;
@@ -473,7 +505,7 @@ body {
 }
 
 .tab-btn.active {
-  background-color: #eff6ff;
+  background-color: var(--azul-suave);
   color: var(--primary-blue);
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
@@ -488,7 +520,7 @@ body {
   gap: 12px;
   padding-bottom: 16px;
   margin-bottom: 16px;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--cinza-suave);
 }
 
 .exam-card-title {
@@ -570,7 +602,7 @@ body {
   height: 14px;
   margin-left: -7px;
   border-radius: 50%;
-  border: 2px solid var(--white);
+  border: 2px solid var(--superficie);
   box-shadow: 0 1px 3px rgba(0,0,0,0.2);
   transition: left 0.6s ease;
 }
@@ -604,10 +636,10 @@ body {
 .status-badge.limite,
 .status-badge.pendente { background-color: var(--status-warn-bg); color: var(--status-warn); }
 .status-badge.alterado { background-color: var(--status-bad-bg); color: var(--status-bad); }
-.status-badge.agendada { background-color: #dbeafe; color: var(--primary-blue); }
+.status-badge.agendada { background-color: var(--azul-claro); color: var(--primary-blue); }
 /* Cancelada é cinza, e não vermelha: desmarcar uma consulta é um fato comum,
    não um alerta. O vermelho fica reservado para resultado alterado. */
-.status-badge.cancelada { background-color: #f3f4f6; color: var(--text-gray); }
+.status-badge.cancelada { background-color: var(--cinza-suave); color: var(--text-gray); }
 
 /* Par rótulo + valor (componente InfoField) */
 .info-field {
@@ -636,7 +668,7 @@ body {
   gap: 16px;
   padding-bottom: 16px;
   margin-bottom: 8px;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--cinza-suave);
 }
 
 /* Lista de consultas */
@@ -646,8 +678,8 @@ body {
   gap: 14px;
   width: 100%;
   text-align: left;
-  background-color: var(--white);
-  border: 1px solid #f3f4f6;
+  background-color: var(--superficie);
+  border: 1px solid var(--cinza-suave);
   border-radius: var(--border-radius);
   padding: 14px;
   margin-bottom: 12px;
@@ -665,7 +697,7 @@ body {
   justify-content: center;
   min-width: 48px;
   padding: 8px 0;
-  background-color: #eff6ff;
+  background-color: var(--azul-suave);
   border-radius: 10px;
   color: var(--primary-blue);
 }
@@ -695,7 +727,7 @@ body {
   align-items: center;
   gap: 8px;
   border: 2px solid var(--primary-blue);
-  background-color: #eff6ff;
+  background-color: var(--azul-suave);
 }
 
 .codigo-label {
@@ -769,8 +801,8 @@ body {
   gap: 4px;
   padding: 14px;
   text-align: left;
-  background-color: var(--white);
-  border: 1px solid #e5e7eb;
+  background-color: var(--superficie);
+  border: 1px solid var(--borda-cinza);
   border-radius: var(--border-radius);
   cursor: pointer;
   color: var(--text-gray);
@@ -778,7 +810,7 @@ body {
 
 .escopo-opcao.active {
   border-color: var(--primary-blue);
-  background-color: #eff6ff;
+  background-color: var(--azul-suave);
   color: var(--primary-blue);
 }
 
@@ -833,7 +865,7 @@ body {
   justify-content: space-between;
   padding: 10px 14px;
   margin-bottom: 16px;
-  background-color: #eff6ff;
+  background-color: var(--azul-suave);
   border-radius: var(--border-radius);
 }
 
@@ -888,6 +920,15 @@ body {
   margin-bottom: 12px;
 }
 
+/* Mensagem de validação embaixo de um campo (Cadastro, Dependentes). Era um
+   `style={{ fontSize: '12px' }}` repetido em cada tela, e por ser inline não
+   acompanhava o ajuste de tamanho do texto. */
+.campo-erro {
+  font-size: calc(12px * var(--escala-fonte));
+  color: var(--status-bad);
+  margin-top: 4px;
+}
+
 .form-ok {
   display: flex;
   align-items: center;
@@ -900,8 +941,8 @@ body {
 
 /* Estado vazio padrão das listas */
 .empty-state {
-  background-color: var(--white);
-  border: 1px dashed #e5e7eb;
+  background-color: var(--superficie);
+  border: 1px dashed var(--borda-cinza);
   border-radius: var(--border-radius);
   padding: 20px;
   text-align: center;
@@ -916,7 +957,7 @@ body {
 
 /* Timeline */
 .timeline-container {
-  border-left: 2px solid #e5e7eb;
+  border-left: 2px solid var(--borda-cinza);
   margin-left: 12px;
   padding-bottom: 16px;
 }
@@ -938,8 +979,8 @@ body {
   height: 20px;
   border-radius: 50%;
   background-color: var(--primary-blue);
-  border: 2px solid var(--white);
-  color: var(--white);
+  border: 2px solid var(--superficie);
+  color: var(--texto-sobre-cor);
 }
 
 /* Exame usa outra cor para diferenciar da consulta na mesma linha do tempo. */
@@ -957,9 +998,9 @@ body {
   display: block;
   width: 100%;
   text-align: left;
-  background-color: var(--white);
+  background-color: var(--superficie);
   padding: 16px;
-  border: 1px solid #f3f4f6;
+  border: 1px solid var(--cinza-suave);
   border-radius: var(--border-radius);
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
   margin-top: 12px;
@@ -973,8 +1014,8 @@ body {
 button.record-card:hover { border-color: var(--primary-blue); }
 
 /* Misc */
-.border-red { border: 1px solid #fee2e2; }
-.border-blue { border: 1px solid #dbeafe; }
+.border-red { border: 1px solid var(--vermelho-claro); }
+.border-blue { border: 1px solid var(--azul-claro); }
 .text-red { color: #ef4444; }
 .text-blue { color: #3b82f6; }
 
@@ -1150,7 +1191,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   width: 56px;
   height: 56px;
   background-color: var(--primary-blue);
-  color: white;
+  color: var(--texto-sobre-cor);
   border-radius: 50%;
   border: none;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
@@ -1172,14 +1213,14 @@ button.record-card:hover { border-color: var(--primary-blue); }
   max-width: calc(100vw - 40px);
   height: 450px;
   max-height: calc(100vh - 160px);
-  background-color: var(--white);
+  background-color: var(--superficie);
   border-radius: 16px;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   margin-bottom: 16px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--borda-cinza);
   animation: slideUpFade 0.2s ease-out forwards;
   transform-origin: bottom left;
 }
@@ -1206,7 +1247,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
 }
 
 .chat-bot-status { display: flex; flex-direction: column; }
-.chat-bot-name { color: white; font-weight: 600; font-size: calc(14px * var(--escala-fonte)); }
+.chat-bot-name { color: var(--texto-sobre-cor); font-weight: 600; font-size: calc(14px * var(--escala-fonte)); }
 .chat-status-indicator { display: flex; align-items: center; gap: 6px; }
 .status-dot { width: 8px; height: 8px; background-color: #4ade80; border-radius: 50%; }
 .status-text { color: #dbeafe; font-size: calc(12px * var(--escala-fonte)); font-weight: 500; }
@@ -1219,13 +1260,13 @@ button.record-card:hover { border-color: var(--primary-blue); }
   padding: 4px;
   border-radius: 50%;
 }
-.chat-close-btn:hover { color: white; background-color: rgba(255, 255, 255, 0.1); }
+.chat-close-btn:hover { color: var(--texto-sobre-cor); background-color: rgba(255, 255, 255, 0.1); }
 
 .chat-body {
   flex: 1;
   padding: 16px;
   overflow-y: auto;
-  background-color: #f8fafc;
+  background-color: var(--fundo-chat);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1242,16 +1283,16 @@ button.record-card:hover { border-color: var(--primary-blue); }
   font-size: calc(14px * var(--escala-fonte));
   line-height: 1.5;
 }
-.chat-bubble.user { background-color: var(--primary-blue); color: white; border-top-right-radius: 4px; }
-.chat-bubble.bot { background-color: white; color: var(--text-dark); border: 1px solid #e5e7eb; border-top-left-radius: 4px; }
+.chat-bubble.user { background-color: var(--primary-blue); color: var(--texto-sobre-cor); border-top-right-radius: 4px; }
+.chat-bubble.bot { background-color: var(--superficie); color: var(--text-dark); border: 1px solid var(--borda-cinza); border-top-left-radius: 4px; }
 
 .chat-input-area {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 12px;
-  background-color: white;
-  border-top: 1px solid #e5e7eb;
+  background-color: var(--superficie);
+  border-top: 1px solid var(--borda-cinza);
 }
 
 .chat-input {
@@ -1259,20 +1300,20 @@ button.record-card:hover { border-color: var(--primary-blue); }
   padding: 10px 16px;
   border-radius: 20px;
   border: none;
-  background-color: #f1f5f9;
+  background-color: var(--cinza-ardosia);
   font-size: calc(14px * var(--escala-fonte));
   outline: none;
 }
 .chat-input:focus { box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2); }
 
-.chat-send-btn { width: 40px; height: 40px; border-radius: 50%; background-color: var(--primary-blue); color: white; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+.chat-send-btn { width: 40px; height: 40px; border-radius: 50%; background-color: var(--primary-blue); color: var(--texto-sobre-cor); border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
 .chat-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* Aviso sob a caixa de texto: o que for digitado pode sair do app para a IA. */
 .chat-aviso-privacidade {
   margin: 0;
   padding: 0 12px 10px;
-  background-color: white;
+  background-color: var(--superficie);
   color: var(--text-gray);
   font-size: calc(11px * var(--escala-fonte));
   line-height: 1.35;
@@ -1295,13 +1336,13 @@ button.record-card:hover { border-color: var(--primary-blue); }
   padding: 8px 14px;
   border-radius: 16px;
   border: 1px solid var(--primary-blue);
-  background-color: white;
+  background-color: var(--superficie);
   color: var(--primary-blue);
   font-size: calc(13px * var(--escala-fonte));
   cursor: pointer;
   transition: background-color 0.15s, color 0.15s;
 }
-.chat-suggestion-btn:hover { background-color: var(--primary-blue); color: white; }
+.chat-suggestion-btn:hover { background-color: var(--primary-blue); color: var(--texto-sobre-cor); }
 
 .pdf-download-btn {
   display: inline-flex;
@@ -1311,7 +1352,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   border-radius: 10px;
   border: none;
   background-color: var(--primary-blue);
-  color: white;
+  color: var(--texto-sobre-cor);
   font-size: calc(13px * var(--escala-fonte));
   font-weight: 600;
   cursor: pointer;
@@ -1360,7 +1401,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   padding: 20px;
 }
 .modal-box {
-  background-color: var(--white);
+  background-color: var(--superficie);
   border-radius: var(--border-radius);
   width: 100%;
   max-width: 400px;
@@ -1375,7 +1416,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--borda-cinza);
   flex-shrink: 0;
 }
 .modal-title { font-size: calc(16px * var(--escala-fonte)); font-weight: 700; color: var(--text-dark); }
@@ -1399,7 +1440,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   gap: 12px;
   align-items: flex-start;
   padding: 12px 0;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--cinza-suave);
 }
 .aviso-item:first-child { padding-top: 0; }
 .aviso-item:last-child { padding-bottom: 0; border-bottom: none; }
@@ -1415,7 +1456,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
 }
 .aviso-item.alta .aviso-icone { background-color: var(--status-bad-bg); color: var(--status-bad); }
 .aviso-item.media .aviso-icone { background-color: var(--status-warn-bg); color: var(--status-warn); }
-.aviso-item.baixa .aviso-icone { background-color: #eff6ff; color: var(--primary-blue); }
+.aviso-item.baixa .aviso-icone { background-color: var(--azul-suave); color: var(--primary-blue); }
 
 .aviso-texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .aviso-titulo { font-size: calc(14px * var(--escala-fonte)); font-weight: 600; color: var(--text-dark); line-height: 1.4; }
@@ -1441,8 +1482,8 @@ button.record-card:hover { border-color: var(--primary-blue); }
   gap: 6px;
   padding: 8px 14px;
   border-radius: 9999px;
-  border: 1px solid #e5e7eb;
-  background-color: var(--white);
+  border: 1px solid var(--borda-cinza);
+  background-color: var(--superficie);
   color: var(--text-gray);
   font-size: calc(13px * var(--escala-fonte));
   font-weight: 600;
@@ -1451,8 +1492,8 @@ button.record-card:hover { border-color: var(--primary-blue); }
   transition: background-color 0.15s, border-color 0.15s, color 0.15s;
 }
 .vacina-pessoa-pill.active {
-  background-color: #eff6ff;
-  border-color: #bfdbfe;
+  background-color: var(--azul-suave);
+  border-color: var(--azul-claro-forte);
   color: var(--primary-blue);
 }
 /* Ícone do dependente colorido por gênero: azul para meninos, rosa para
@@ -1489,24 +1530,24 @@ button.record-card:hover { border-color: var(--primary-blue); }
   padding: 14px;
   border-radius: 12px;
   margin-bottom: 10px;
-  border: 1px solid #e5e7eb;
-  background-color: var(--white);
+  border: 1px solid var(--borda-cinza);
+  background-color: var(--superficie);
 }
 /* A carteira tem três estados desde que as doses passaram a ser registradas:
    aplicada (verde), prevista (âmbar, ainda vai chegar) e atrasada (vermelho,
    venceu sem registro). Antes eram dois, porque a tela deduzia da idade que a
    dose tinha sido tomada e o atraso não existia. */
 .vacina-item.aplicada {
-  background-color: #f0fdf4;
-  border-color: #bbf7d0;
+  background-color: var(--verde-fundo);
+  border-color: var(--verde-borda);
 }
 .vacina-item.prevista {
-  background-color: #fffbeb;
-  border-color: #fde68a;
+  background-color: var(--amarelo-fundo);
+  border-color: var(--amarelo-borda);
 }
 .vacina-item.atrasada {
-  background-color: #fef2f2;
-  border-color: #fecaca;
+  background-color: var(--vermelho-fundo);
+  border-color: var(--vermelho-borda);
 }
 .vacina-status-icon {
   width: 30px;
@@ -1516,7 +1557,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: var(--white);
+  color: var(--texto-sobre-cor);
 }
 .vacina-status-icon.aplicada { background-color: #22c55e; }
 .vacina-status-icon.prevista { background-color: #f59e0b; }
@@ -1561,8 +1602,8 @@ button.record-card:hover { border-color: var(--primary-blue); }
   font-size: calc(12px * var(--escala-fonte));
   font-weight: 600;
   border-radius: 8px;
-  border: 1px solid #d1d5db;
-  background-color: var(--white);
+  border: 1px solid var(--borda-cinza-forte);
+  background-color: var(--superficie);
   color: var(--text-muted);
   cursor: pointer;
 }
@@ -1582,7 +1623,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
 }
 .faq-categoria-titulo { font-size: calc(15px * var(--escala-fonte)); font-weight: 700; color: var(--text-dark); }
 
-.faq-item { border-bottom: 1px solid #f3f4f6; }
+.faq-item { border-bottom: 1px solid var(--cinza-suave); }
 .faq-item:last-child { border-bottom: none; }
 
 .faq-pergunta {
@@ -1636,8 +1677,8 @@ button.record-card:hover { border-color: var(--primary-blue); }
   gap: 5px;
   padding: 8px 14px;
   border-radius: 9999px;
-  border: 1px solid #e5e7eb;
-  background-color: var(--white);
+  border: 1px solid var(--borda-cinza);
+  background-color: var(--superficie);
   color: var(--text-gray);
   font-size: calc(13px * var(--escala-fonte));
   font-weight: 600;
@@ -1675,7 +1716,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
      arquivo: lá a regra empataria em especificidade com a do botão de enviar
      abaixo e, por vir depois, apagaria a borda azul-forte dele. */
   border: 1px solid var(--borda-azul);
-  background-color: var(--white);
+  background-color: var(--superficie);
   color: var(--text-gray);
   cursor: pointer;
 }
@@ -1683,14 +1724,14 @@ button.record-card:hover { border-color: var(--primary-blue); }
 .rede-busca-acao[type="submit"] {
   background-color: var(--primary-blue);
   border-color: var(--primary-blue);
-  color: var(--white);
+  color: var(--texto-sobre-cor);
 }
 .rede-busca-acao[type="submit"]:hover { background-color: var(--primary-hover); }
 
 .rede-busca .form-erro { margin: 8px 0 0; }
 .rede-filtro.active {
-  background-color: #eff6ff;
-  border-color: #bfdbfe;
+  background-color: var(--azul-suave);
+  border-color: var(--azul-claro-forte);
   color: var(--primary-blue);
 }
 
@@ -1698,8 +1739,8 @@ button.record-card:hover { border-color: var(--primary-blue); }
   display: flex;
   align-items: flex-start;
   gap: 14px;
-  background-color: var(--white);
-  border: 1px solid #f3f4f6;
+  background-color: var(--superficie);
+  border: 1px solid var(--cinza-suave);
   border-radius: var(--border-radius);
   padding: 14px;
   margin-bottom: 12px;
@@ -1715,7 +1756,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   min-width: 44px;
   height: 44px;
   border-radius: 10px;
-  background-color: #eff6ff;
+  background-color: var(--azul-suave);
   color: var(--primary-blue);
 }
 .unidade-icone.upa,
@@ -1762,8 +1803,8 @@ button.record-card:hover { border-color: var(--primary-blue); }
   gap: 5px;
   padding: 7px 12px;
   border-radius: 8px;
-  border: 1px solid #e5e7eb;
-  background-color: var(--white);
+  border: 1px solid var(--borda-cinza);
+  background-color: var(--superficie);
   color: var(--text-dark);
   font-size: calc(12px * var(--escala-fonte));
   font-weight: 600;
@@ -1801,8 +1842,8 @@ button.record-card:hover { border-color: var(--primary-blue); }
   flex-shrink: 0;
   padding: 6px 12px;
   border-radius: 9999px;
-  border: 1px solid #e5e7eb;
-  background-color: var(--white);
+  border: 1px solid var(--borda-cinza);
+  background-color: var(--superficie);
   color: var(--text-gray);
   font-size: calc(12px * var(--escala-fonte));
   font-weight: 600;
@@ -1844,7 +1885,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   margin-bottom: 12px;
   border-radius: 12px;
   border: 1px solid var(--borda-azul, #e5e7eb);
-  background-color: var(--white);
+  background-color: var(--superficie);
   font-size: calc(13px * var(--escala-fonte));
   cursor: pointer;
 }
@@ -1954,11 +1995,44 @@ button.record-card:hover { border-color: var(--primary-blue); }
 .explicacao-rodape {
   margin: 14px 0 0;
   padding-top: 10px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--borda-cinza);
   font-size: calc(11px * var(--escala-fonte));
   line-height: 1.4;
   color: var(--text-gray);
 }
+
+/* "Este texto tem algum problema?" — discreto, porque a maioria dos textos
+   está certa, mas à mão de quem achou o erro. */
+.explicacao-relato { margin-top: 10px; }
+.explicacao-relato-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: calc(12px * var(--escala-fonte));
+  color: var(--primary-blue);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.explicacao-relato-titulo {
+  margin: 0 0 8px;
+  font-size: calc(12px * var(--escala-fonte));
+  color: var(--text-dark);
+}
+.explicacao-relato-opcoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.explicacao-relato-opcao {
+  padding: 6px 10px;
+  border: 1px solid var(--borda-azul-forte, #bfdbfe);
+  border-radius: 999px;
+  background: var(--superficie);
+  font-size: calc(12px * var(--escala-fonte));
+  color: var(--text-dark);
+  cursor: pointer;
+}
+.explicacao-relato-opcao:disabled { opacity: 0.6; cursor: wait; }
 
 /* ============================================================
    Detalhes em azul
@@ -2005,10 +2079,10 @@ button.record-card:hover { border-color: var(--primary-blue); }
 
 /* Exceções: cartões que já usam a cor para dizer alguma coisa (situação da
    vacina, alergia em vermelho) mantêm a borda semântica. */
-:root .vacina-item.aplicada { border-color: #bbf7d0; }
-:root .vacina-item.prevista { border-color: #fde68a; }
-:root .vacina-item.atrasada { border-color: #fecaca; }
-:root .card.border-red { border-color: #fecaca; }
+:root .vacina-item.aplicada { border-color: var(--verde-borda); }
+:root .vacina-item.prevista { border-color: var(--amarelo-borda); }
+:root .vacina-item.atrasada { border-color: var(--vermelho-borda); }
+:root .card.border-red { border-color: var(--vermelho-borda); }
 :root .codigo-card { border: 2px solid var(--primary-blue); }
 
 /* O azul mais forte fica para o estado de foco/hover, não para o repouso. */
@@ -2030,14 +2104,14 @@ button.record-card:hover { border-color: var(--primary-blue); }
 /* Cartão do topo do perfil ganha um filete azul na borda de cima. */
 :root .profile-header { border-top: 3px solid var(--primary-blue); }
 :root .profile-avatar {
-  background-color: #eff6ff;
+  background-color: var(--azul-suave);
   border-color: var(--borda-azul);
   color: var(--primary-blue);
 }
 
 /* Ícones que eram cinza passam a ser azuis. */
 :root .icon-box-gray {
-  background-color: #eff6ff;
+  background-color: var(--azul-suave);
   color: var(--primary-blue);
 }
 
@@ -2047,7 +2121,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
 }
 
 :root .input-field {
-  background-color: #f8fbff;
+  background-color: var(--azul-suave-2);
   border-color: var(--borda-azul);
 }
 :root .input-field:focus {
@@ -2100,7 +2174,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   gap: 2px;
   margin-top: 8px;
   padding: 10px 12px;
-  background-color: var(--white);
+  background-color: var(--superficie);
   border: 1px solid var(--borda-azul);
   border-radius: var(--border-radius);
 }
@@ -2133,7 +2207,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   margin-left: 6px;
   border-radius: 999px;
   background-color: var(--primary-blue);
-  color: var(--white);
+  color: var(--texto-sobre-cor);
   font-size: calc(11px * var(--escala-fonte));
   font-weight: 700;
   text-align: center;
@@ -2236,7 +2310,7 @@ button.record-card:hover { border-color: var(--primary-blue); }
   font-size: calc(11px * var(--escala-fonte));
   font-weight: 600;
   color: var(--primary-blue);
-  background-color: #eff6ff;
+  background-color: var(--azul-suave);
   border: 1px solid var(--borda-azul);
   border-radius: 999px;
   padding: 1px 8px;
@@ -2278,9 +2352,17 @@ button.record-card:hover { border-color: var(--primary-blue); }
 body[data-fonte="grande"] { --escala-fonte: 1.15; }
 body[data-fonte="maior"]  { --escala-fonte: 1.3; }
 
-/* Ícone do lucide recebe o tamanho em atributo, em pixel fixo: ele não
-   acompanha o texto. Um empurrãozinho no tamanho mínimo dos botões evita que o
-   rótulo maior encoste na borda. */
+/* Ícone do lucide recebe o tamanho em atributo (`size={18}` vira
+   width="18"), em pixel fixo, e por isso não acompanhava o texto. O `zoom`
+   resolve sem tocar nas ~200 chamadas de ícone: ele escala o desenho E o espaço
+   que ele ocupa no layout — um `transform: scale` cresceria por cima do texto
+   vizinho. O multiplicador é o mesmo da fonte. Todo ícone do lucide nasce com a
+   classe `lucide`, então a regra pega todos e nada além deles. */
+body[data-fonte="grande"] svg.lucide { zoom: 1.15; }
+body[data-fonte="maior"]  svg.lucide { zoom: 1.3; }
+
+/* Um empurrãozinho no tamanho mínimo dos botões evita que o rótulo maior
+   encoste na borda. */
 body[data-fonte="maior"] .btn-primary,
 body[data-fonte="maior"] .btn-secondary,
 body[data-fonte="grande"] .btn-primary,
@@ -2307,6 +2389,77 @@ body[data-contraste="alto"] a {
   color: #1e40af;
 }
 
+/* Fundo escuro — o alto contraste "de verdade". O escurecimento acima ajuda
+   quem não distingue o cinza do branco; este ajuda quem é ofuscado pelo fundo
+   claro (fotofobia, catarata, baixa visão), que é outra queixa.
+
+   Funciona porque fundo e borda do arquivo inteiro saem das variáveis do
+   :root: aqui elas só mudam de valor. O azul fica mais claro para continuar
+   legível como texto sobre fundo escuro, e por isso o texto EM CIMA do azul
+   (botões, balão do chat) passa a ser escuro — branco sobre azul-claro não
+   passaria no contraste mínimo. */
+body[data-contraste="escuro"] {
+  color-scheme: dark; /* campos de data, barras de rolagem e afins */
+  --primary-blue: #60a5fa;
+  --primary-hover: #93c5fd;
+  --bg-gray: #0b1120;
+  --superficie: #1e293b;
+  --texto-sobre-cor: #0b1120;
+  --text-dark: #f8fafc;
+  --text-gray: #cbd5e1;
+  --text-gray-claro: #94a3b8;
+
+  --azul-suave: #172554;
+  --azul-suave-2: #172036;
+  --azul-claro: #1e3a8a;
+  --azul-claro-forte: #1d4ed8;
+  --borda-azul: #334155;
+  --borda-azul-forte: #475569;
+  --divisor-azul: #334155;
+  --borda-cinza: #334155;
+  --borda-cinza-forte: #475569;
+  --cinza-suave: #334155;
+  --cinza-ardosia: #273449;
+  --fundo-chat: #0f172a;
+
+  --status-ok: #4ade80;
+  --status-ok-bg: #052e16;
+  --status-warn: #facc15;
+  --status-warn-bg: #422006;
+  --status-bad: #f87171;
+  --status-bad-bg: #450a0a;
+  --vermelho-claro: #7f1d1d;
+  --vermelho-borda: #991b1b;
+  --vermelho-fundo: #2a0f12;
+  --verde-fundo: #0b2a1a;
+  --verde-borda: #166534;
+  --amarelo-fundo: #2a2008;
+  --amarelo-borda: #854d0e;
+}
+
+/* As poucas cores de TEXTO que ainda são literais (pensadas para fundo
+   branco) ganham a versão clara. */
+body[data-contraste="escuro"] .text-red,
+body[data-contraste="escuro"] .explicacao-estado.erro,
+body[data-contraste="escuro"] .vacina-item.atrasada .vacina-data { color: #f87171; }
+body[data-contraste="escuro"] .text-blue,
+body[data-contraste="escuro"] .vacina-pessoa-icone.menino { color: #60a5fa; }
+body[data-contraste="escuro"] .vacina-pessoa-icone.menina { color: #f472b6; }
+body[data-contraste="escuro"] .vacina-item.aplicada .vacina-data { color: #4ade80; }
+body[data-contraste="escuro"] .vacina-item.prevista .vacina-data { color: #fbbf24; }
+body[data-contraste="escuro"] .explicacao-texto { color: var(--text-dark); }
+
+/* Cabeçalho do chat: o texto claro de lá foi escrito para o azul escuro. */
+body[data-contraste="escuro"] .status-text,
+body[data-contraste="escuro"] .chat-close-btn { color: var(--texto-sobre-cor); }
+
+/* A marca d'água é o logotipo pintado de azul quase transparente; sobre fundo
+   escuro ela precisa clarear em vez de escurecer, senão some. */
+body[data-contraste="escuro"] .app-container::before {
+  filter: grayscale(1) invert(1) sepia(1) hue-rotate(178deg) saturate(2.2);
+  opacity: 0.035;
+}
+
 /* Escolha do tamanho, na tela de Perfil. */
 .acessibilidade-opcoes {
   display: flex;
@@ -2319,7 +2472,7 @@ body[data-contraste="alto"] a {
   padding: 10px 4px;
   border-radius: var(--border-radius);
   border: 1px solid var(--borda-azul);
-  background-color: var(--white);
+  background-color: var(--superficie);
   color: var(--text-gray);
   font-weight: 600;
   cursor: pointer;
@@ -2327,7 +2480,7 @@ body[data-contraste="alto"] a {
 
 .acessibilidade-opcao.active {
   border-color: var(--primary-blue);
-  background-color: #eff6ff;
+  background-color: var(--azul-suave);
   color: var(--primary-blue);
 }
 

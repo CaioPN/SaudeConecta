@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import {
   User, ChevronLeft, Mail, Phone, IdCard, Calendar, Droplet, Venus, MapPin,
-  HeartHandshake, Trash2, Plus, Pencil, Contrast, Check,
+  HeartHandshake, Trash2, Plus, Pencil,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { usePrivacidade } from '../context/PrivacidadeContext';
-import { useAcessibilidade, TAMANHOS } from '../context/AcessibilidadeContext';
+import { useAcessibilidade, TAMANHOS, CONTRASTES } from '../context/AcessibilidadeContext';
 import BotaoPrivacidade from '../components/BotaoPrivacidade';
 import { mascarar } from '../utils/privacidade';
 import { listarFamiliares, cadastrarFamiliar, removerFamiliar } from '../services/familiares';
@@ -313,14 +313,15 @@ function EditarContato({ paciente, aoSalvar, aoFechar }) {
  * Acessibilidade: tamanho do texto e contraste.
  *
  * São dois controles, e não um "modo idoso": quem não enxerga o texto pequeno
- * quer aumentar; quem não distingue o cinza claro do fundo quer escurecer. Um
- * botão só obrigaria a aceitar o que não estava incomodando.
+ * quer aumentar; quem não distingue o cinza claro do fundo quer escurecer; quem
+ * é ofuscado pelo branco quer o fundo escuro. Um botão só obrigaria a aceitar o
+ * que não estava incomodando.
  *
  * O ajuste vale para o app inteiro e fica gravado no aparelho — ao contrário do
  * olhinho, que volta ao normal a cada abertura de propósito.
  */
 function Acessibilidade() {
-  const { fonte, contraste, definirFonte, alternarContraste } = useAcessibilidade();
+  const { fonte, contraste, definirFonte, definirContraste } = useAcessibilidade();
 
   return (
     <>
@@ -343,24 +344,27 @@ function Acessibilidade() {
           ))}
         </div>
 
-        <div className="acessibilidade-linha">
-          <div>
-            <p className="font-bold text-sm">Texto mais escuro</p>
-            <p className="text-xs text-muted">
-              Escurece as legendas e os textos de apoio, que aparecem em cinza claro.
-            </p>
-          </div>
-          <button
-            type="button"
-            className={`btn-secondary ${contraste ? 'active' : ''}`}
-            style={{ margin: 0, width: 'auto', flexShrink: 0 }}
-            onClick={alternarContraste}
-            aria-pressed={contraste}
-          >
-            {contraste ? <Check size={16} /> : <Contrast size={16} />}
-            {contraste ? 'Ativado' : 'Ativar'}
-          </button>
+        <p className="text-sm text-muted mb-4">Contraste</p>
+        <div className="acessibilidade-opcoes">
+          {CONTRASTES.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              className={`acessibilidade-opcao tamanho-padrao ${contraste === c.id ? 'active' : ''}`}
+              onClick={() => definirContraste(c.id)}
+              aria-pressed={contraste === c.id}
+            >
+              {c.rotulo}
+            </button>
+          ))}
         </div>
+        <p className="text-xs text-muted">
+          {contraste === 'escuro'
+            ? 'Fundo escuro e texto claro, para quem se incomoda com o branco da tela.'
+            : contraste === 'alto'
+              ? 'Escurece as legendas e os textos de apoio, que aparecem em cinza claro.'
+              : 'Texto escuro deixa as legendas mais nítidas; fundo escuro reduz o brilho da tela.'}
+        </p>
 
         <p className="text-xs text-muted" style={{ marginTop: '12px' }}>
           O ajuste vale para todas as telas e fica guardado neste aparelho.
@@ -397,7 +401,7 @@ export default function Profile() {
         <div className="profile-avatar">
           <User size={40} />
         </div>
-        <h2 className="header-title" style={{ fontSize: '20px' }}>{nome}</h2>
+        <h2 className="header-title perfil-nome">{nome}</h2>
         <p className="text-sm text-muted">{detalhes || 'Dados do paciente'}</p>
       </div>
 

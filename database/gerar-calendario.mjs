@@ -11,6 +11,12 @@
 //
 //   node database/gerar-calendario.mjs            # mostra o SQL na tela
 //   node database/gerar-calendario.mjs --gravar   # substitui o bloco no seed.sql
+//   node database/gerar-calendario.mjs --conferir # só confere; sai com erro se diferir
+//
+// O --conferir é o que faltava para a regra "mexa no JS e rode o gerador" valer
+// sem depender de memória: o `npm run build` do front o roda antes de compilar
+// (script prebuild), então um vacinas.js alterado sem o seed regenerado derruba
+// o build em vez de chegar à apresentação com dois calendários diferentes.
 //
 // O INSERT sai com IGNORE e a tabela tem UNIQUE (publico, vacina, dose): rodar
 // o seed de novo não duplica dose nenhuma.
@@ -60,13 +66,32 @@ const bloco = [
   FIM,
 ].join('\n');
 
+let seed = fs.readFileSync(SEED, 'utf8');
+
+if (process.argv.includes('--conferir')) {
+  // Compara sem olhar a quebra de linha: com o autocrlf do Git no Windows o
+  // seed.sql pode estar em CRLF, e isso não é diferença de calendário.
+  const normalizar = (t) => t.replace(/\r\n/g, '\n').trim();
+  const ini = seed.indexOf(INICIO);
+  const fim = seed.indexOf(FIM);
+  const atual = ini >= 0 && fim > ini ? seed.slice(ini, fim + FIM.length) : '';
+  if (normalizar(atual) === normalizar(bloco)) {
+    console.log(`Calendário em dia: seed.sql e vacinas.js têm as mesmas ${linhas.length} doses.`);
+    process.exit(0);
+  }
+  console.error(atual
+    ? 'O calendário do seed.sql está diferente de medical-app/src/data/vacinas.js.'
+    : 'O seed.sql não tem o bloco <calendario-vacinal>.');
+  console.error('Rode: node database/gerar-calendario.mjs --gravar');
+  process.exit(1);
+}
+
 if (!process.argv.includes('--gravar')) {
   console.log(bloco);
   console.error(`\n(${linhas.length} doses — rode com --gravar para atualizar o seed.sql)`);
   process.exit(0);
 }
 
-let seed = fs.readFileSync(SEED, 'utf8');
 if (seed.includes(INICIO) && seed.includes(FIM)) {
   const antes = seed.slice(0, seed.indexOf(INICIO));
   const depois = seed.slice(seed.indexOf(FIM) + FIM.length);

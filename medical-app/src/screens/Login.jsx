@@ -101,7 +101,7 @@ export default function Login() {
             </button>
           </div>
         </div>
-        {error && <p style={{ color: '#ef4444', fontSize: '14px', marginBottom: '16px' }}>{error}</p>}
+        {error && <p className="form-erro">{error}</p>}
         <button onClick={handleLogin} className="btn-primary" disabled={loading}>
           {loading ? 'ENTRANDO...' : 'ACESSAR CONTA'}
         </button>

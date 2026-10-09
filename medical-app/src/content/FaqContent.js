@@ -59,7 +59,11 @@ export const FAQ = [
       },
       {
         p: 'Alguns textos cinzas são difíceis de ler. O que faço?',
-        r: 'Na mesma seção "Acessibilidade" do seu perfil, toque em "Ativar" na opção "Texto mais escuro". As legendas e os textos de apoio, que aparecem em cinza claro, passam a ser escritos em um tom bem mais escuro. Você pode combinar isso com o texto maior.',
+        r: 'Na mesma seção "Acessibilidade" do seu perfil, em "Contraste", escolha "Texto escuro". As legendas e os textos de apoio, que aparecem em cinza claro, passam a ser escritos em um tom bem mais escuro. Você pode combinar isso com o texto maior.',
+      },
+      {
+        p: 'A tela branca incomoda os meus olhos. Tem modo escuro?',
+        r: 'Tem. Em "Mais" → "Meu perfil", na seção "Acessibilidade", escolha "Fundo escuro" em "Contraste". O aplicativo inteiro passa a ter fundo escuro e texto claro, o que reduz o brilho da tela. Como os outros ajustes, ele fica guardado no aparelho e pode ser combinado com o texto maior.',
       },
       {
         p: 'Como saio da minha conta?',
@@ -103,7 +107,7 @@ export const FAQ = [
       },
       {
         p: 'Como coloco no app uma consulta que eu marquei?',
-        r: 'Em "Consultas", toque em "Anotar consulta marcada" e informe o profissional, a especialidade, a data, a hora e o local. Ela passa a aparecer em "Próximas", com a etiqueta "anotado por você", e o app te lembra quando a data se aproximar. Se você já foi atendido por aquele profissional, basta escolher o nome na lista: a especialidade e o local vêm preenchidos.',
+        r: 'Em "Consultas", toque em "Anotar consulta marcada" e informe o profissional, a especialidade, a data, a hora e o local. Ela passa a aparecer em "Próximas", com a etiqueta "anotado por você", e o app te lembra quando a data se aproximar. Se você já foi atendido por aquele profissional, basta escolher o nome na lista: a especialidade e o local vêm preenchidos. No campo "Local" aparecem também as unidades de saúde perto de você; escolhendo uma delas, o detalhe da consulta ganha o botão "Como chegar".',
       },
       {
         p: 'Anotar a consulta aqui marca ela na unidade?',
@@ -120,6 +124,10 @@ export const FAQ = [
       {
         p: 'Não entendi o nome de um exame. O app explica?',
         r: 'Sim. Ao lado do nome de cada exame há um "?" — toque nele para abrir uma explicação em linguagem simples do que aquele exame é e por que o profissional costuma pedi-lo. O texto é escrito por inteligência artificial e fala do exame em geral: ele NÃO avalia o seu resultado, e quem interpreta o que deu continua sendo o profissional de saúde.',
+      },
+      {
+        p: 'E se a explicação estiver errada ou confusa?',
+        r: 'Embaixo do texto há o link "Este texto tem algum problema?". Escolha o motivo — informação errada, difícil de entender ou parece falar do seu resultado — e o relato é registrado, sem nenhum texto seu. Quando duas pessoas diferentes relatam problema numa explicação que ninguém conferiu ainda, ela sai do ar até ser revisada. A janela também avisa se o texto já foi conferido pela equipe.',
       },
       {
         p: 'Essa explicação envia o meu resultado para algum lugar?',
@@ -241,7 +249,7 @@ export const FAQ = [
       },
       {
         p: 'Posso escolher o que o médico faz com os meus dados?',
-        r: 'Sim. Ao gerar o código você escolhe entre "Somente leitura", em que o médico apenas consulta, e "Leitura e registro", em que ele também pode lançar a consulta e os exames do dia, atualizar o seu prontuário e registrar doses na carteira de vacinação.',
+        r: 'Sim. Ao gerar o código você escolhe entre "Somente leitura", em que o médico apenas consulta (inclusive a carteira de vacinação), e "Leitura e registro", em que ele também pode lançar a consulta e os exames do dia, atualizar o seu prontuário e registrar doses na carteira de vacinação.',
       },
       {
         p: 'O que exatamente o médico consegue escrever no meu prontuário?',

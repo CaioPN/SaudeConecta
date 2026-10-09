@@ -89,7 +89,7 @@ export default function Cadastro() {
     }
 
     const erroMsg = (campo) => errors[campo] && (
-        <p style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{errors[campo].message}</p>
+        <p className="campo-erro">{errors[campo].message}</p>
     );
 
     return (
@@ -255,7 +255,7 @@ export default function Cadastro() {
                         </div>
                     </div>
 
-                    {erroApi && <p style={{ color: '#ef4444', fontSize: '14px', marginTop: '16px' }}>{erroApi}</p>}
+                    {erroApi && <p className="form-erro" style={{ marginTop: '16px' }}>{erroApi}</p>}
 
                     <button type="submit" className="btn-primary mt-6" style={{ marginTop: '24px' }} disabled={isSubmitting}>
                         {isSubmitting ? 'Cadastrando...' : 'Finalizar Cadastro'}

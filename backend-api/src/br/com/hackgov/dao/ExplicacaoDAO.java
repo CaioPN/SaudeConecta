@@ -1,11 +1,13 @@
 package br.com.hackgov.dao;
 
 import br.com.hackgov.db.Conexao;
+import br.com.hackgov.modelos.Explicacao;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.text.Normalizer;
 
 /**
@@ -32,21 +34,92 @@ import java.text.Normalizer;
 public class ExplicacaoDAO {
 
     /**
-     * Devolve o texto já gravado, ou null se ninguém pediu esse termo ainda.
+     * Quantas PESSOAS diferentes precisam relatar erro para um verbete sair do
+     * ar sozinho. Mais de uma, para uma conta só não conseguir apagar a
+     * explicação de todo mundo; poucas, porque um texto errado sobre saúde
+     * fazendo estrago enquanto espera o décimo relato é pior que um texto
+     * certo fora do ar até alguém conferir.
+     */
+    public static final int RELATOS_PARA_SUSPENDER = 2;
+
+    /** Os motivos aceitos no relato — lista fechada, nunca texto livre. */
+    public static final String[] MOTIVOS = { "errado", "confuso", "resultado" };
+
+    /**
+     * Devolve o verbete já gravado (publicado ou suspenso), ou null se ninguém
+     * pediu esse termo ainda.
+     *
+     * O suspenso volta também, de propósito: quem chama precisa saber que ele
+     * existe para NÃO pedir outro ao modelo — senão relatar um erro só faria o
+     * texto ser reescrito na hora, sem ninguém conferir.
      *
      * @param tipo  "exame" ou "vacina".
      * @param termo o nome como veio da tela (a normalização é feita aqui).
      */
-    public String buscar(String tipo, String termo) throws SQLException {
-        String sql = "SELECT texto FROM explicacoes_ia WHERE tipo = ? AND termo = ?";
+    public Explicacao buscar(String tipo, String termo) throws SQLException {
+        String sql = "SELECT id, tipo, texto, modelo, status, revisado_em "
+                   + "  FROM explicacoes_ia WHERE tipo = ? AND termo = ?";
         try (Connection con = Conexao.abrir();
              PreparedStatement st = con.prepareStatement(sql)) {
             st.setString(1, tipo);
             st.setString(2, normalizar(termo));
             try (ResultSet rs = st.executeQuery()) {
-                return rs.next() ? rs.getString("texto") : null;
+                if (!rs.next()) return null;
+                Explicacao e = new Explicacao();
+                e.setId(rs.getInt("id"));
+                e.setTipo(rs.getString("tipo"));
+                e.setTexto(rs.getString("texto"));
+                e.setModelo(rs.getString("modelo"));
+                e.setStatus(rs.getString("status"));
+                Timestamp revisado = rs.getTimestamp("revisado_em");
+                e.setRevisadoEm(revisado == null ? null : revisado.toLocalDateTime().toString());
+                return e;
             }
         }
+    }
+
+    /**
+     * Registra que um paciente achou problema no verbete e, se for o caso,
+     * tira o verbete do ar.
+     *
+     * Um relato por pessoa (INSERT IGNORE na chave única): tocar duas vezes no
+     * botão não conta dobrado. A suspensão olha a contagem no próprio UPDATE,
+     * na mesma conexão, e só vale para texto que ninguém revisou — um verbete
+     * conferido por uma pessoa não é derrubado por relato automático; os
+     * relatos dele ficam para a próxima revisão (database/revisar-glossario.sql).
+     *
+     * @return true se este relato foi o que suspendeu o verbete.
+     */
+    public boolean reportar(int idExplicacao, int idPaciente, String motivo) throws SQLException {
+        String inserir = "INSERT IGNORE INTO explicacoes_reportes (explicacao_id, paciente_id, motivo) "
+                       + "VALUES (?, ?, ?)";
+        String suspender = "UPDATE explicacoes_ia SET status = ? "
+                         + " WHERE id = ? AND status = ? AND revisado_em IS NULL "
+                         + "   AND (SELECT COUNT(*) FROM explicacoes_reportes WHERE explicacao_id = ?) >= ?";
+        try (Connection con = Conexao.abrir()) {
+            try (PreparedStatement st = con.prepareStatement(inserir)) {
+                st.setInt(1, idExplicacao);
+                st.setInt(2, idPaciente);
+                st.setString(3, motivo);
+                st.executeUpdate();
+            }
+            try (PreparedStatement st = con.prepareStatement(suspender)) {
+                st.setString(1, Explicacao.STATUS_SUSPENSA);
+                st.setInt(2, idExplicacao);
+                st.setString(3, Explicacao.STATUS_PUBLICADA);
+                st.setInt(4, idExplicacao);
+                st.setInt(5, RELATOS_PARA_SUSPENDER);
+                return st.executeUpdate() > 0;
+            }
+        }
+    }
+
+    /** Se o motivo está na lista fechada de {@link #MOTIVOS}. */
+    public static boolean motivoValido(String motivo) {
+        for (String m : MOTIVOS) {
+            if (m.equals(motivo)) return true;
+        }
+        return false;
     }
 
     /**

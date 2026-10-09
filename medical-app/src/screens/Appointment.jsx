@@ -109,7 +109,7 @@ export default function Appointment() {
           Data e hora ficam: dizem quando, não o quê. */}
       <div className="card mb-6">
         <div className="detail-card-header">
-          <div className="icon-box icon-box-lg" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
+          <div className="icon-box icon-box-lg" style={{ backgroundColor: 'var(--azul-suave)', color: 'var(--primary-blue)' }}>
             <User size={28} />
           </div>
           <div style={{ flex: 1 }}>

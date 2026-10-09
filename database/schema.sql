@@ -562,6 +562,65 @@ CREATE TABLE IF NOT EXISTS explicacoes_ia (
   rotulo     VARCHAR(160) NOT NULL,          -- como o termo aparece na tela
   texto      TEXT         NOT NULL,
   modelo     VARCHAR(60),
+  -- 'publicada' (aparece para todos) ou 'suspensa' (saiu do ar depois de
+  -- relatos de erro e espera revisão). Ver explicacoes_reportes abaixo.
+  status     VARCHAR(20)  NOT NULL DEFAULT 'publicada',
+  -- Quando uma pessoa conferiu o texto. NULL = ninguém revisou ainda, e a
+  -- tela diz isso. A revisão é feita no banco (database/revisar-glossario.sql).
+  revisado_em DATETIME    NULL,
   criado_em  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uk_explicacao (tipo, termo)
 );
+
+-- ============================================================
+--  Relatos de erro no glossário
+--  O botão "Este texto tem algum problema?" da janela de explicação.
+--  O texto do glossário é escrito por um modelo e mostrado a todos os
+--  pacientes; sem um caminho de volta, um verbete errado ficaria no
+--  ar para sempre.
+--
+--  O motivo é uma lista fechada ('errado', 'confuso', 'resultado'),
+--  e não texto livre: o paciente escreveria o próprio caso ali ("o
+--  meu deu 140"), e esta tabela não deve guardar dado clínico.
+--
+--  paciente_id existe só para contar PESSOAS diferentes — a chave
+--  única impede uma conta sozinha de tirar um verbete do ar. Quando
+--  o verbete é revisado ou apagado, os relatos vão junto (CASCADE):
+--  o vínculo "esta pessoa olhou o exame X" não fica guardado à toa.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS explicacoes_reportes (
+  id             INT AUTO_INCREMENT PRIMARY KEY,
+  explicacao_id  INT          NOT NULL,
+  paciente_id    INT          NOT NULL,
+  motivo         VARCHAR(20)  NOT NULL,
+  criado_em      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_reporte_pessoa (explicacao_id, paciente_id),
+  FOREIGN KEY (explicacao_id) REFERENCES explicacoes_ia(id) ON DELETE CASCADE,
+  FOREIGN KEY (paciente_id)   REFERENCES pacientes(id)      ON DELETE CASCADE
+);
+
+-- Migração do glossário. Fica aqui, e não no bloco de migração do meio
+-- do arquivo, porque a tabela explicacoes_ia só é criada neste ponto.
+DROP PROCEDURE IF EXISTS sc_adicionar_coluna;
+DELIMITER $$
+CREATE PROCEDURE sc_adicionar_coluna(
+  IN p_tabela VARCHAR(64), IN p_coluna VARCHAR(64), IN p_definicao TEXT)
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = p_tabela
+       AND COLUMN_NAME = p_coluna
+  ) THEN
+    SET @sql = CONCAT('ALTER TABLE `', p_tabela, '` ADD COLUMN `', p_coluna, '` ', p_definicao);
+    PREPARE stmt FROM @sql;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+  END IF;
+END$$
+DELIMITER ;
+
+CALL sc_adicionar_coluna('explicacoes_ia', 'status', "VARCHAR(20) NOT NULL DEFAULT 'publicada'");
+CALL sc_adicionar_coluna('explicacoes_ia', 'revisado_em', 'DATETIME NULL');
+
+DROP PROCEDURE IF EXISTS sc_adicionar_coluna;
