@@ -38,6 +38,12 @@ const REGISTROS = [
     titulo: 'Dependentes',
     descricao: 'Familiares vinculados à conta',
   },
+  {
+    rota: '/emergencia',
+    icone: ICONES.emergencia,
+    titulo: 'Ficha de emergência',
+    descricao: 'Tipo sanguíneo, alergias e medicações para o socorrista',
+  },
 ];
 
 export default function PatientProfile() {

@@ -16,6 +16,10 @@ export const FAQ = [
         r: 'É um aplicativo que reúne em um só lugar as suas informações de saúde: tipo sanguíneo, carteira de vacinação, consultas, exames e prontuário. A ideia é funcionar como uma extensão do SUS, para você ter os seus dados à mão em qualquer atendimento.',
       },
       {
+        p: 'O que é a ficha de emergência?',
+        r: 'É uma tela feita para mostrar ao socorrista ou à triagem do pronto-socorro: tipo sanguíneo, alergias, condições e medicações em uso, em letra grande, mais um botão para ligar para o SAMU (192). Ela abre pelo botão vermelho "Emergência" no topo da tela inicial, ou em "Minha Saúde" → "Ficha de emergência", e também vale para cada dependente. Os seus contatos de emergência só aparecem nela se você ligar a opção no fim da ficha, porque são dados de outras pessoas.',
+      },
+      {
         p: 'O app substitui a consulta médica?',
         r: 'Não. Ele organiza e guarda as suas informações, mas quem avalia, diagnostica e prescreve é o profissional de saúde. Em caso de emergência, ligue para o SAMU (192) ou procure o pronto-socorro mais próximo.',
       },
@@ -124,6 +128,10 @@ export const FAQ = [
       {
         p: 'Não entendi o nome de um exame. O app explica?',
         r: 'Sim. Ao lado do nome de cada exame há um "?" — toque nele para abrir uma explicação em linguagem simples do que aquele exame é e por que o profissional costuma pedi-lo. O texto é escrito por inteligência artificial e fala do exame em geral: ele NÃO avalia o seu resultado, e quem interpreta o que deu continua sendo o profissional de saúde.',
+      },
+      {
+        p: 'Dá para ver como um exame mudou ao longo do tempo?',
+        r: 'Dá. Quando o mesmo exame aparece em duas ou mais coletas, surge um pequeno ícone de gráfico ao lado do nome dele. Tocando nele você vê um gráfico com todos os resultados, a faixa de referência sombreada e uma tabela com as datas e os valores. O gráfico só mostra os números: quem interpreta a evolução é o profissional de saúde. Com os dados ocultos (o "olhinho" fechado), o gráfico não aparece.',
       },
       {
         p: 'E se a explicação estiver errada ou confusa?',

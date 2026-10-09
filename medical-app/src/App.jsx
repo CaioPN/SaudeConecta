@@ -22,6 +22,7 @@ import Profile from './screens/Profile';
 import Terms from './screens/Terms';
 import Privacy from './screens/Privacy';
 import Faq from './screens/Faq';
+import FichaEmergencia from './screens/FichaEmergencia';
 import './app.css';
 
 export default function App() {
@@ -43,6 +44,7 @@ export default function App() {
             <Route path="/appointment/:id" element={<Appointment />} />
             <Route path="/dependentes" element={<Dependentes />} />
             <Route path="/vacinas" element={<Vacinas />} />
+            <Route path="/emergencia" element={<FichaEmergencia />} />
             <Route path="/rede-saude" element={<RedeSaude />} />
             <Route path="/acesso-medico" element={<AcessoMedico />} />
             <Route path="/acessos-log" element={<HistoricoAcessos />} />

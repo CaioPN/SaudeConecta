@@ -33,6 +33,27 @@ const BASE_CONHECIMENTO = [
             'O PDF abre com senha: os 4 primeiros dígitos do seu CPF.',
     },
     {
+        chaves: ['evolucao', 'evolução', 'grafico', 'gráfico', 'comparar', 'subiu', 'baixou',
+                 'mudou', 'historico do exame', 'histórico do exame', 'ao longo do tempo'],
+        resposta:
+            'Quando o mesmo exame aparece em duas ou mais coletas, a tela de Exames mostra um ícone de ' +
+            'gráfico ao lado do nome dele. Tocando nele você vê todos os resultados num gráfico, com a ' +
+            'faixa de referência sombreada, e uma tabela com as datas e os valores. O gráfico só mostra os ' +
+            'números — quem interpreta a evolução é o profissional de saúde.',
+    },
+    {
+        // Só chaves sobre a FICHA. "Emergência", "samu", "desmaio" e afins ficam
+        // com a regra de urgência lá embaixo, que manda ligar 192: quem está
+        // numa emergência real não pode receber o tutorial de uma tela.
+        chaves: ['ficha de emergencia', 'ficha de emergência', 'socorrista', 'ficha medica',
+                 'ficha médica', 'mostrar ao socorrista', 'tipo sanguineo no celular'],
+        resposta:
+            'Use a ficha de emergência: o botão vermelho "Emergência" no topo da tela inicial (ou ' +
+            '"Minha Saúde" → "Ficha de emergência"). Ela mostra em letra grande o tipo sanguíneo, as ' +
+            'alergias, as condições e as medicações em uso, para o socorrista ler, e tem um botão para ' +
+            'ligar 192 (SAMU). Se for uma emergência agora, ligue 192.',
+    },
+    {
         chaves: ['pdf', 'baixar pdf', 'relatorio', 'relatório', 'senha do pdf', 'arquivo'],
         resposta:
             'O botão "Baixar PDF", na tela de Exames, gera um relatório com todas as coletas e os exames de imagem. ' +
@@ -229,7 +250,9 @@ export default function MedicalChatbot() {
     }, [messages, isTyping, isOpen]);
 
     // Esconde no login, no cadastro e no portal do médico (que não é do paciente).
-    if (['/', '/cadastro', '/medico'].includes(location.pathname)) return null;
+    // E na ficha de emergência: quem a lê é o socorrista, e o botão flutuante
+    // ficaria por cima justamente das medicações.
+    if (['/', '/cadastro', '/medico', '/emergencia'].includes(location.pathname)) return null;
 
     // Acrescenta uma fala do bot e libera o input.
     const responder = (texto) => {

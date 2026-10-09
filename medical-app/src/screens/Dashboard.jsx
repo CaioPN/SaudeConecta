@@ -189,9 +189,21 @@ export default function Dashboard() {
     <div className="screen-container tela-rolagem">
       {/* A saudação fica parada; avisos, novidades e atalhos rolam. */}
       <div className="tela-topo">
-        <header className="mb-6">
-          <h1 className="header-title">Olá, {primeiroNome}!</h1>
-          <p className="header-subtitle">Resumo de hoje</p>
+        <header className="mb-6 section-header">
+          <div>
+            <h1 className="header-title">Olá, {primeiroNome}!</h1>
+            <p className="header-subtitle">Resumo de hoje</p>
+          </div>
+          {/* No cabeçalho parado, e não no meio dos atalhos: numa emergência
+              ninguém deveria precisar rolar a tela para achá-la. */}
+          <button
+            type="button"
+            className="botao-emergencia"
+            onClick={() => navigate('/emergencia')}
+            aria-label="Abrir ficha de emergência"
+          >
+            <ICONES.emergencia size={18} /> Emergência
+          </button>
         </header>
       </div>
 

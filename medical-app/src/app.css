@@ -2334,6 +2334,200 @@ button.record-card:hover { border-color: var(--primary-blue); }
 .form-botoes .btn-secondary { margin: 0; flex: 1; }
 
 /* ============================================================
+   Evolução de um item de exame (GraficoEvolucao.jsx)
+   Cores todas por variável: o mesmo SVG serve ao fundo claro e
+   ao escuro. Os pontos usam as cores de situação dos selos.
+   ============================================================ */
+.evolucao-grafico {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-bottom: 8px;
+}
+.evolucao-faixa { fill: var(--status-ok-bg); }
+.evolucao-base { stroke: var(--borda-cinza); stroke-width: 1; }
+.evolucao-linha {
+  fill: none;
+  stroke: var(--primary-blue);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.evolucao-ponto { stroke: var(--superficie); stroke-width: 2; }
+.evolucao-ponto.normal { fill: var(--status-ok); }
+.evolucao-ponto.limite { fill: var(--status-warn); }
+.evolucao-ponto.alterado { fill: var(--status-bad); }
+.evolucao-valor { font-size: 11px; font-weight: 700; fill: var(--text-dark); }
+.evolucao-eixo { font-size: 10px; fill: var(--text-gray); }
+
+.evolucao-legenda {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: calc(12px * var(--escala-fonte));
+  color: var(--text-gray);
+}
+.evolucao-legenda-faixa {
+  flex-shrink: 0;
+  width: 14px;
+  height: 10px;
+  border-radius: 2px;
+  background-color: var(--status-ok-bg);
+}
+
+.evolucao-tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: calc(13px * var(--escala-fonte));
+  color: var(--text-dark);
+}
+.evolucao-tabela th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-gray);
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--borda-cinza);
+}
+.evolucao-tabela td {
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--cinza-suave);
+}
+
+/* ============================================================
+   Ficha de emergência (FichaEmergencia.jsx)
+   Feita para OUTRA pessoa ler depressa — o socorrista, a triagem.
+   Letra maior que no resto do app, o tipo sanguíneo em destaque e
+   as alergias em vermelho, que é o que mais muda a conduta.
+   ============================================================ */
+.botao-emergencia {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--vermelho-borda);
+  background-color: var(--vermelho-fundo);
+  color: var(--status-bad);
+  font-size: calc(13px * var(--escala-fonte));
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ficha-cabecalho {
+  background-color: var(--status-bad);
+  color: var(--texto-sobre-cor);
+  border-radius: var(--border-radius);
+  padding: 18px 16px;
+  margin-bottom: 16px;
+}
+.ficha-titulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: calc(13px * var(--escala-fonte));
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.9;
+}
+.ficha-nome {
+  margin-top: 10px;
+  font-size: calc(22px * var(--escala-fonte));
+  font-weight: 700;
+  line-height: 1.2;
+}
+.ficha-idade { font-size: calc(15px * var(--escala-fonte)); opacity: 0.9; }
+.ficha-sangue {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.35);
+  font-size: calc(15px * var(--escala-fonte));
+}
+.ficha-sangue strong {
+  margin-left: auto;
+  font-size: calc(30px * var(--escala-fonte));
+  line-height: 1;
+}
+
+.ficha-bloco {
+  background-color: var(--superficie);
+  border: 1px solid var(--borda-cinza);
+  border-radius: var(--border-radius);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.ficha-bloco.alerta {
+  border: 2px solid var(--vermelho-borda);
+  background-color: var(--vermelho-fundo);
+}
+.ficha-bloco.alerta .ficha-bloco-titulo { color: var(--status-bad); }
+.ficha-bloco-titulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: calc(16px * var(--escala-fonte));
+  font-weight: 700;
+  color: var(--text-dark);
+}
+.ficha-item {
+  font-size: calc(18px * var(--escala-fonte));
+  font-weight: 700;
+  color: var(--text-dark);
+  line-height: 1.35;
+}
+.ficha-detalhe {
+  font-size: calc(14px * var(--escala-fonte));
+  font-weight: 400;
+  color: var(--text-gray);
+}
+.ficha-vazio {
+  font-size: calc(15px * var(--escala-fonte));
+  color: var(--text-gray);
+}
+.ficha-medicacao + .ficha-medicacao,
+.ficha-contato + .ficha-contato {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--borda-cinza);
+}
+.ficha-ligar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: calc(15px * var(--escala-fonte));
+  font-weight: 600;
+  color: var(--primary-blue);
+  text-decoration: none;
+}
+.ficha-samu {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 4px 0 12px;
+  padding: 14px;
+  border-radius: var(--border-radius);
+  background-color: var(--status-bad);
+  color: var(--texto-sobre-cor);
+  font-size: calc(16px * var(--escala-fonte));
+  font-weight: 700;
+  text-decoration: none;
+}
+.ficha-rodape {
+  font-size: calc(12px * var(--escala-fonte));
+  color: var(--text-gray);
+  line-height: 1.45;
+  margin-bottom: 16px;
+}
+.ficha-config { margin-bottom: 0; }
+
+/* ============================================================
    Acessibilidade — texto maior e texto mais escuro
    Duas queixas diferentes, dois controles separados: quem não
    enxerga o tamanho quer aumentar; quem não distingue o cinza

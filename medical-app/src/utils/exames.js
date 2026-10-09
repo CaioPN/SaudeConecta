@@ -56,6 +56,50 @@ export function mesAbreviado(dataIso) {
   return MESES[mes - 1] || '';
 }
 
+/**
+ * Chave que junta o mesmo item em coletas diferentes: nome sem acento, sem
+ * maiúscula e sem espaço sobrando, MAIS a unidade. A unidade entra porque 14
+ * g/dL e 140 g/L são a mesma hemoglobina em escalas diferentes — no mesmo
+ * gráfico, pareceria que ela decuplicou.
+ */
+export function chaveDoItem({ nome, unidade }) {
+  const nomeLimpo = String(nome || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+  return `${nomeLimpo}|${String(unidade || '').trim()}`;
+}
+
+/**
+ * Agrupa os resultados de todas as coletas por item, do mais antigo para o
+ * mais recente: { "hemoglobina|g/dL": [{ data, valor, min, max, situacao }] }.
+ *
+ * Cada ponto leva a SUA faixa de referência, e não a da última coleta: dois
+ * laboratórios podem usar faixas diferentes, e a situação de um resultado
+ * antigo é a que o laboratório dele disse.
+ */
+export function seriesPorItem(coletas) {
+  const series = {};
+  coletas.forEach((coleta) => {
+    coleta.itens.forEach((item) => {
+      const chave = chaveDoItem(item);
+      (series[chave] = series[chave] || []).push({
+        data: coleta.data,
+        valor: item.valor,
+        min: item.min,
+        max: item.max,
+        unidade: item.unidade,
+        situacao: situacaoItem(item),
+      });
+    });
+  });
+  // Datas ISO comparam como texto.
+  Object.values(series).forEach((pontos) => pontos.sort((a, b) => (a.data < b.data ? -1 : 1)));
+  return series;
+}
+
 /** Quantos itens da coleta estão fora da faixa de referência. */
 export function totalAlterados(coleta) {
   return coleta.itens.filter((i) => situacaoItem(i) === 'alterado').length;

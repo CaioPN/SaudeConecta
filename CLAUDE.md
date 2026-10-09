@@ -70,6 +70,7 @@ medical-app/          front-end React + Vite
       SeletorPessoa.jsx  pílulas de titular/dependente nas telas clínicas
       BotaoExplicacao.jsx  o "?" que explica um exame ou uma vacina
       InfoField.jsx, StatusBadge.jsx, ResultRow.jsx  (exibição compartilhada)
+      GraficoEvolucao.jsx  gráfico SVG de um item de exame entre as coletas
     content/          textos estáticos (LegalContent, FaqContent)
     context/
       AuthContext.jsx   estado de autenticação global
@@ -89,6 +90,7 @@ medical-app/          front-end React + Vite
       AcessoMedico.jsx  (paciente gera o código)
       HistoricoAcessos.jsx  (trilha do médico + a do próprio paciente)
       PortalMedico.jsx  (médico usa o código — fora do app do paciente)
+      FichaEmergencia.jsx  (o que mostrar ao socorrista)
       Privacy.jsx, Terms.jsx, Faq.jsx
     services/         chamadas HTTP para a API (uma por assunto) — api (axios
                       com o JWT), avisos, consultas, exames, prontuario,
@@ -280,7 +282,7 @@ sem lógica de banco).
       "O QUE O APP NÃO FAZ". Ao mudar um fluxo, esse bloco entra na mesma
       revisão do FAQ e da base de regras.
 - **Dúvidas frequentes** (`Faq.jsx`, rota `/faq`, texto em
-  `content/FaqContent.js`): sanfona com 62 perguntas em oito categorias — o item
+  `content/FaqContent.js`): sanfona com 64 perguntas em oito categorias — o item
   "Dúvidas frequentes" do menu "Mais" apontava para uma rota que não existia.
   As respostas descrevem o que o app faz **hoje** (dizem, por exemplo, que
   anotar uma consulta não a marca na unidade, e explicam a conferência de três
@@ -855,6 +857,48 @@ sem lógica de banco).
   `DIAS_CONSULTA_ALERTA` do `AvisoDAO`. O documento traz também a análise Big O
   do que já existia no código (índice B+, Top-K geográfico, intercalação de
   duas filas, fila FIFO da auditoria), com `EXPLAIN` medido.
+- **Ficha de emergência** (`FichaEmergencia.jsx`, rota `/emergencia`, botão
+  vermelho "Emergência" no cabeçalho fixo do Início e item em "Minha Saúde"):
+  tipo sanguíneo, alergias, condições e medicações em uso, em letra grande,
+  mais um botão `tel:192`. É a proposta do app no caso extremo — o paciente
+  que não consegue falar nem gerar código, e o socorrista que precisa saber
+  da alergia em dez segundos.
+  - **Não tem rota nova**: usa `GET /api/prontuario` e `/api/familiares`. A
+    leitura cai na trilha como `consultou_prontuario`, como qualquer outra.
+  - **Ignora o olhinho** de propósito: abrir a ficha é escolher mostrá-la, e
+    uma alergia em bolinhas não serve ao socorrista.
+  - "Nenhuma alergia registrada **no app**", com essas palavras: para quem
+    atende, "não tem" e "ninguém cadastrou" são coisas diferentes.
+  - **Contato de emergência é opt-in**, pela regra do dado de terceiro: só
+    aparece (e só é buscado) se o paciente ligar a opção no fim da ficha. A
+    preferência fica no `localStorage` (`sc_ficha_contatos`) — é preferência
+    de exibição, não dado de saúde. Na ficha de um dependente, o telefone do
+    **responsável** aparece sempre, porque é do próprio titular.
+  - Vale para cada dependente pelo `SeletorPessoa`; o `PessoasContext` passou
+    a levar `tipo_sanguineo` (e o telefone do titular).
+  - O chatbot some nesta tela: o botão flutuante ficava por cima das
+    medicações. A configuração da ficha fica no **fim**, para quem mostra a
+    tela ao socorrista não esbarrar num botão no caminho.
+- **Evolução de um item de exame** (`components/GraficoEvolucao.jsx`,
+  `seriesPorItem` e `chaveDoItem` em `utils/exames.js`): quando o mesmo item
+  aparece em duas ou mais coletas, um ícone de gráfico ao lado do nome abre a
+  série inteira — gráfico, faixa de referência e tabela.
+  - **SVG desenhado à mão**, sem biblioteca de gráfico: uma faixa, uma linha e
+    alguns pontos não justificam dependência nova.
+  - O eixo X é proporcional ao **tempo**, não à ordem: coletas com intervalos
+    diferentes não podem parecer igualmente espaçadas.
+  - O mesmo item é reconhecido por nome normalizado **e unidade**: 14 g/dL e
+    140 g/L na mesma linha pareceriam um salto de dez vezes.
+  - Cada ponto tem a cor da situação na faixa do **laboratório dele**; a faixa
+    sombreada é a da coleta mais recente (está escrito na legenda).
+  - Numa referência "até 200" o eixo **não desce até o zero**, senão a variação
+    entre 178 e 196 viraria uma linha reta no topo.
+  - Não faz requisição (usa as coletas que a tela já tem), então não gera
+    linha nova na auditoria. Some com o olhinho fechado, porque é feito só de
+    valores. E **não interpreta**: nenhuma frase diz "melhorou" ou "piorou".
+  - O SVG tem `aria-label` com todos os valores e a tabela repete tudo em
+    texto, para leitor de tela.
+
 ## O que falta
 
 - A recuperação de senha prova a identidade conferindo três dados do cadastro.
@@ -941,6 +985,15 @@ sem lógica de banco).
 - O **`zoom`** que escala os ícones é padrão recente (Firefox só a partir da
   126, de 2024). Num navegador antigo o texto cresce e o ícone não, que era o
   comportamento de antes.
+- A **ficha de emergência precisa de internet e de login**. Ela vem da API a
+  cada abertura, e não há cópia no aparelho: guardar alergias e medicações no
+  `localStorage` iria contra a regra de não deixar dado de saúde no navegador
+  sem necessidade. Também não aparece na tela de bloqueio — isso só um app
+  nativo (ou o recurso "Ficha Médica" do próprio celular) consegue. O caminho
+  seria um PWA com cache só da ficha, decidido pelo paciente.
+- O gráfico de evolução só junta itens com o **mesmo nome e a mesma unidade**.
+  "Glicemia de jejum" num laboratório e "Glicose (jejum)" no outro viram duas
+  séries; reconhecer sinônimos exigiria uma tabela de equivalência de exames.
 - O acesso do médico continua **só de leitura e registro clínico**: ele não
   edita o cadastro do paciente nem marca vacina de quem não é o dono do
   código.

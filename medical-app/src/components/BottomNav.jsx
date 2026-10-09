@@ -12,7 +12,7 @@ const ABAS = [
     label: 'Minha Saúde',
     icone: ICONES.saude,
     destino: '/patient',
-    rotas: ['/record', '/exams', '/appointment', '/vacinas', '/dependentes'],
+    rotas: ['/record', '/exams', '/appointment', '/vacinas', '/dependentes', '/emergencia'],
   },
   { label: 'Rede', icone: ICONES.rede, destino: '/rede-saude', rotas: [] },
 ];

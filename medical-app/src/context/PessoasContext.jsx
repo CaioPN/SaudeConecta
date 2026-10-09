@@ -55,6 +55,8 @@ export function PessoasProvider({ children }) {
       id: TITULAR,
       nome: paciente?.nome || 'Você',
       data_nascimento: paciente?.data_nascimento,
+      tipo_sanguineo: paciente?.tipo_sanguineo,
+      telefone: paciente?.telefone,
       titular: true,
     },
     ...dependentes.map((d) => ({
@@ -62,6 +64,8 @@ export function PessoasProvider({ children }) {
       nome: d.nome,
       data_nascimento: d.data_nascimento,
       genero: d.genero,
+      // A ficha de emergência precisa do tipo sanguíneo de cada pessoa.
+      tipo_sanguineo: d.tipo_sanguineo,
       titular: false,
     })),
   ], [paciente, dependentes]);

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, Image as ImageIcon, Droplet, Download, Calendar, Building2, Stethoscope, AlertTriangle, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
@@ -12,9 +12,13 @@ import ResultRow from '../components/ResultRow';
 import BotaoExplicacao from '../components/BotaoExplicacao';
 import InfoField from '../components/InfoField';
 import StatusBadge from '../components/StatusBadge';
+import Modal from '../components/Modal';
+import GraficoEvolucao from '../components/GraficoEvolucao';
 import { buscarExames } from '../services/exames';
 import { registrarExportacao } from '../services/auditoria';
-import { situacaoItem, textoReferencia, formatarData, totalAlterados } from '../utils/exames';
+import {
+  situacaoItem, textoReferencia, formatarData, totalAlterados, seriesPorItem, chaveDoItem,
+} from '../utils/exames';
 
 // Senha do PDF: os 4 primeiros dígitos do CPF do paciente. Devolve null quando
 // o cadastro não tem CPF válido — nesse caso o arquivo sai sem proteção e a
@@ -34,6 +38,15 @@ export default function Exams() {
   const [imagem, setImagem] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
+  // Item cujo gráfico de evolução está aberto ({ nome, chave }), ou null.
+  const [evolucao, setEvolucao] = useState(null);
+
+  // As séries saem das coletas que a tela já tem: o gráfico não faz
+  // requisição nenhuma, e por isso também não gera linha nova na auditoria.
+  const series = useMemo(() => seriesPorItem(coletas), [coletas]);
+
+  // Trocar de pessoa fecha o gráfico, que era de outra pessoa.
+  useEffect(() => setEvolucao(null), [dependenteId]);
 
   // Refaz a busca ao trocar de pessoa no seletor. O estado volta ao início
   // junto, senão os exames de quem estava selecionado antes ficariam na tela
@@ -278,7 +291,12 @@ export default function Exams() {
                 </div>
 
                 {coleta.itens.map((item) => (
-                  <ResultRow key={item.id} item={item} />
+                  <ResultRow
+                    key={item.id}
+                    item={item}
+                    medicoes={series[chaveDoItem(item)]?.length || 1}
+                    onEvolucao={(it) => setEvolucao({ nome: it.nome, chave: chaveDoItem(it) })}
+                  />
                 ))}
               </div>
             );
@@ -327,6 +345,18 @@ export default function Exams() {
         )
       )}
       </div>
+
+      {/* Fechar o olhinho com o gráfico aberto também o esconde: ele é feito
+          inteiro de valores. */}
+      <Modal
+        open={Boolean(evolucao) && !oculto && Boolean(series[evolucao?.chave])}
+        title={evolucao ? `Evolução · ${evolucao.nome}` : ''}
+        onClose={() => setEvolucao(null)}
+      >
+        {evolucao && series[evolucao.chave] && (
+          <GraficoEvolucao nome={evolucao.nome} pontos={series[evolucao.chave]} />
+        )}
+      </Modal>
     </div>
   );
 }

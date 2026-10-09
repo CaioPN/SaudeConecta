@@ -3,6 +3,7 @@ import StatusBadge from './StatusBadge';
 import BotaoExplicacao from './BotaoExplicacao';
 import { usePrivacidade } from '../context/PrivacidadeContext';
 import { mascararValor } from '../utils/privacidade';
+import { ICONES } from '../utils/icones';
 import {
   situacaoItem,
   posicaoNaFaixa,
@@ -10,6 +11,8 @@ import {
   FAIXA_INICIO,
   FAIXA_FIM,
 } from '../utils/exames';
+
+const IconeEvolucao = ICONES.evolucao;
 
 /**
  * Linha de resultado de exame: nome, valor, faixa de referência e situação.
@@ -21,8 +24,12 @@ import {
  * Com o olhinho fechado, o valor vira máscara e o marcador some: a posição na
  * régua e a cor do selo entregariam o resultado mesmo com o número escondido.
  * O nome do exame e a faixa de referência ficam, porque não são dado pessoal.
+ *
+ * `medicoes` é quantas vezes o item aparece nas coletas da pessoa. Com duas ou
+ * mais, surge o botão de evolução; com uma só não há o que comparar. Ele some
+ * com o olhinho fechado, porque o gráfico é feito de valores.
  */
-export default function ResultRow({ item }) {
+export default function ResultRow({ item, medicoes = 1, onEvolucao }) {
   const { oculto } = usePrivacidade();
   const situacao = situacaoItem(item);
   const posicao = posicaoNaFaixa(item);
@@ -34,6 +41,17 @@ export default function ResultRow({ item }) {
           {item.nome}
           {/* Só o nome do exame vai para o glossário — nunca o valor. */}
           <BotaoExplicacao tipo="exame" termo={item.nome} />
+          {medicoes > 1 && onEvolucao && !oculto && (
+            <button
+              type="button"
+              className="botao-explicacao"
+              onClick={() => onEvolucao(item)}
+              aria-label={`Ver a evolução de ${item.nome} (${medicoes} coletas)`}
+              title={`Evolução em ${medicoes} coletas`}
+            >
+              <IconeEvolucao size={15} />
+            </button>
+          )}
         </span>
         <span className={`result-valor ${oculto ? 'valor-oculto' : ''}`}>
           {oculto ? mascararValor() : item.valor.toLocaleString('pt-BR')}

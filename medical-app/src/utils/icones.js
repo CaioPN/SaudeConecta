@@ -12,6 +12,7 @@ import {
   FileText, Activity, Syringe, Users, Calendar,
   KeyRound, History, ShieldCheck,
   User, HelpCircle, ScrollText, Lock, LogOut,
+  Siren, ChartLine,
 } from 'lucide-react';
 
 export const ICONES = {
@@ -27,6 +28,11 @@ export const ICONES = {
   consultas: Calendar,
   vacinas: Syringe,
   dependentes: Users,
+  // Ficha de emergência — o que mostrar ao socorrista. Sirene, e não a
+  // ambulância: a ambulância já é a UPA na Rede de Saúde.
+  emergencia: Siren,
+  // Evolução de um item de exame ao longo das coletas.
+  evolucao: ChartLine,
 
   // Privacidade
   acessoMedico: KeyRound,
