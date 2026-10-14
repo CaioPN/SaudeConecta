@@ -1,10 +1,13 @@
 import axios from 'axios';
+import { usarServidorDemo } from '../demo/modo';
 
 // Instância própria, SEM o interceptor que injeta o token do paciente: o portal
 // do médico usa o token temporário do acesso, que é passado a cada chamada.
 const apiMedico = axios.create({
   baseURL: 'http://localhost:3001/api',
 });
+
+usarServidorDemo(apiMedico);
 
 const auth = (token) => ({ headers: { Authorization: `Bearer ${token}` } });
 

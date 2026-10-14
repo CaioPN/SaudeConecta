@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ICONES } from '../utils/icones';
+import { MODO_DEMO } from '../demo/modo';
 
 // Abas da barra inferior. `rotas` lista o que pertence à aba além do destino:
 // sem isso, entrar em /exams ou /vacinas apagava a barra inteira, e o usuário
@@ -98,6 +99,14 @@ export default function BottomNav() {
             <ICONES.termos size={20} />
             <span>Termos de Uso</span>
           </button>
+          {/* No app o portal é uma URL à parte, digitada no consultório. Na
+              demonstração não há como adivinhá-la, então ela ganha atalho. */}
+          {MODO_DEMO && (
+            <button onClick={() => irPara('/medico')} className="more-menu-item">
+              <ICONES.acessoMedico size={20} />
+              <span>Portal do médico (demonstração)</span>
+            </button>
+          )}
 
           <div className="more-menu-divider"></div>
           <button onClick={encerrarSessao} className="more-menu-item logout">

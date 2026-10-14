@@ -1,4 +1,5 @@
 import api from './api';
+import { MODO_DEMO } from '../demo/modo';
 
 /**
  * GET /api/rede-saude — UBS, UPAs e prontos-socorros perto do paciente.
@@ -67,7 +68,10 @@ export async function definirUnidadeReferencia(codigoCnes) {
  */
 export function localizacaoDoNavegador() {
   return new Promise((resolve) => {
-    if (!navigator.geolocation) {
+    // Na demonstração a lista é medida sempre do CEP do paciente fictício:
+    // pedir a localização de quem abriu o QR Code na feira seria pedir um dado
+    // pessoal para não usar.
+    if (MODO_DEMO || !navigator.geolocation) {
       resolve(null);
       return;
     }

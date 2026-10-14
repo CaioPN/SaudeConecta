@@ -51,11 +51,8 @@ database/             scripts SQL (schema com migração no fim, seeds)
   revisar-glossario.sql consultas de revisão dos verbetes relatados (manual)
 docs/                 documentação do trabalho
   evolucao-do-projeto.md  registro detalhado da evolução (para a entrega)
-demo/                 versão HTML de demonstração — APOSENTADA, não atualizar
-  app.template.html   marcação das telas, escrita à mão
-  gerar.mjs           recorta os originais e monta o index.html
-  gerar-icones.mjs    extrai os SVG do lucide para icones.js
-  testar.mjs          teste de fumaça: roda cada tela num DOM de mentira
+demo/                 build de demonstração (GERADO por `npm run build:demo`,
+                      não editar à mão) — publicado no GitHub Pages
 medical-app/          front-end React + Vite
   public/
   src/
@@ -96,6 +93,9 @@ medical-app/          front-end React + Vite
                       com o JWT), avisos, consultas, exames, prontuario,
                       vacinas, familiares, notificacoes, acessos, auditoria,
                       medico, redeSaude, senha, perfil, chatbot, explicacoes
+    demo/             modo demonstração: modo.js (MODO_DEMO e o adapter),
+                      servidor.js (rotas falsas, mesmo JSON do ApiServer),
+                      dados.js, glossario.js, unidades.js (CNES real)
     App.jsx, main.jsx, app.css
   index.html, package.json
 ```
@@ -805,43 +805,45 @@ sem lógica de banco).
   Ações novas: `consultou_vacinas`, `atualizou_perfil` e `definiu_referencia`
   (`registrou_vacina` e `removeu_vacina` nasceram aqui e migraram para a
   trilha do acesso quando a carteira passou a ser escrita pelo médico).
-- **Versão HTML de demonstração** (`demo/`) — **APOSENTADA (10/09/2026).** Não
-  será mais usada: **não regenere, não teste e não atualize nada dentro de
-  `demo/`**. Ao mexer no `app.css`, no FAQ, na base de regras do chatbot ou em
-  qualquer outro arquivo que o `gerar.mjs` recortava, **não** rode o
-  `gerar.mjs` nem o `testar.mjs` — a pasta fica congelada como está, e o que
-  ela mostra hoje já não corresponde ao app. O que segue descreve como ela
-  funcionava, para quem precisar entender o que está lá:
-  o app inteiro — as telas do paciente e o portal do médico — num **arquivo
-  só**, sem Node, sem Java e sem MySQL, para mostrar o projeto a quem não vai
-  clonar o repositório. As rotas usam `#`, então funciona até aberto do disco.
-  - Não é uma cópia paralela que envelhece sozinha: o `gerar.mjs` recorta dos
-    originais o `app.css`, `utils/exames.js`, `utils/privacidade.js`,
-    `utils/prontuario.js`, `data/vacinas.js`, `content/FaqContent.js`,
-    `content/LegalContent.jsx` e a base de regras do `MedicalChatbot.jsx`, e
-    embute o logotipo e os ícones do lucide em base64/SVG. Só a marcação das
-    telas é escrita à mão, em JavaScript puro, no `app.template.html`.
-    **Depois de mexer em algum desses arquivos, rode o `gerar.mjs` de novo.**
-  - Acompanha as telas do app: a trilha do paciente com os filtros
-    "Tudo / Profissionais / Você" e por pessoa, o seletor de pessoa em Exames,
-    Consultas, Prontuário e Vacinas, o card "Novidades" do Dashboard (com
-    lembrete de consulta), os contatos de emergência do Perfil, a recuperação
-    de senha, a carteira com os três estados (só leitura) e a aba Vacinas do
-    portal do médico, que é onde a dose é registrada, a
-    edição de contato e endereço, o código de acesso por pessoa com os contatos
-    opcionais, e a Rede de Saúde com "O que tem lá", "Definir como minha" e a
-    unidade de cidade vizinha.
-  - `node demo/testar.mjs` é o teste de fumaça: monta um DOM de mentira e
-    chama cada tela em quatro cenários. A demo não tem build nem lint, então uma
-    função renomeada num lugar e esquecida em outro só apareceria na hora de
-    mostrar o projeto. Rode depois do `gerar.mjs`.
-  - Tudo o que ela mostra é fictício e mora só na memória da página; o que
-    depende do que não existe ali (PDF, mapa, ligação, IA do chatbot) avisa em
-    vez de fingir que funcionou.
-  - Cuidado com **nomes repetidos**: como tudo cai no mesmo escopo, o
-    `formatarData` do `vacinas.js` (recebe `Date`) atropelava o do `exames.js`
-    (recebe ISO) e derrubava três telas. O `gerar.mjs` renomeia esse, e o
-    `demo/README.md` explica o resto.
+- **Demonstração online = o próprio app em modo demo** (`src/demo/`,
+  `npm run build:demo` → pasta `demo/` da raiz, publicada no GitHub Pages em
+  `https://caiopn.github.io/SaudeConecta/demo/`, que é o link do QR Code do
+  banner da feira). Substituiu, em 13/10/2026, a versão HTML escrita à mão
+  (`app.template.html` + `gerar.mjs`), que tinha sido aposentada em 10/09
+  justamente porque cada tela precisava ser reescrita a cada mudança do app.
+  - **As telas e os services são os do app, sem cópia.** O que muda é só o
+    `adapter` do axios: `demo/modo.js` → `usarServidorDemo(api)` faz o
+    `services/api.js` (e o `apiMedico`) responder por `demo/servidor.js`, um
+    roteador que devolve o **mesmo JSON do `ApiServer`** (snake_case, `{ erro }`
+    nos 4xx, mesmos textos de aviso do `AvisoDAO`, mesma regra da
+    `CarteiraVacinal`, mesma trilha agrupada de 10 min). Mudou uma rota ou um
+    campo no backend? **Mude no `servidor.js` também**, senão a demo quebra
+    calada.
+  - `MODO_DEMO` é `import.meta.env.MODE === 'demo'`: o Vite troca por
+    constante, e no build normal o servidor fictício **não entra no bundle**
+    (conferido: `grep criarEstado dist/assets/*.js` não acha nada). O import do
+    servidor é dinâmico, num arquivo à parte que só a demo baixa.
+  - Diferenças propositais: `HashRouter` (o Pages não tem servidor para
+    devolver o `index.html` em `/dashboard`); login já preenchido e qualquer
+    senha entra; selo "Demonstração" no topo; nota no Login e item "Portal do
+    médico (demonstração)" no menu Mais; **qualquer código entra no portal**
+    (quem chega pelo QR não tem o app do paciente na mão) — um código gerado
+    em "Acesso do médico" continua valendo e respeitando escopo e dependente;
+    **sem GPS** na Rede (pedir a localização do visitante para não usar seria
+    pedir dado à toa); chatbot e glossário de termo novo respondem como o app
+    responde com a IA fora do ar.
+  - `demo/dados.js`: a história clínica do `seed-caio.sql` com paciente e
+    dependentes inventados, e **datas relativas ao dia em que a página abre**
+    (`dia(n)`): numa feira semanas depois, a "consulta daqui a 2 dias" continua
+    daqui a 2 dias. `demo/glossario.js` traz os verbetes que o próprio
+    `ChatIA` escreveu. `demo/unidades.js` são **unidades reais do CNES** (São
+    Paulo perto da Paulista e Guarulhos), baixadas com as regras do `CnesApi`,
+    sem três UBS de coordenada errada.
+  - Tudo mora na memória da página: recarregar volta ao início, e nada do que
+    o visitante digita sai do navegador.
+  - **Para publicar**: `npm run build:demo` dentro de `medical-app/`, commit da
+    pasta `demo/` e push — o Pages só atualiza depois do push. O build esvazia
+    a pasta antes, então não guarde nada escrito à mão lá dentro.
 - **Consultas analíticas da entrega** (`database/analise.sql`,
   `docs/parte4-analise-e-eficiencia-dos-dados.md` com o SQL e as medições,
   `docs/parte4-explicacao-didatica.md` com a explicação sem código para a
@@ -1127,9 +1129,13 @@ o paciente já esteja cadastrado e **não toca nos dependentes**:
 mysql -u root -p --default-character-set=utf8mb4 < database/seed-caio.sql
 ```
 
-A demonstração (`demo/`) está **aposentada**: não rode mais o `gerar.mjs` nem o
-`testar.mjs`, e não mexa em nada dentro da pasta. Ela ficou congelada no estado
-do dia 10/09/2026 e não acompanha mais o app.
+A demonstração online (`demo/`, link do QR Code do banner) é gerada pelo
+próprio app, com dados fictícios no navegador:
+
+```bash
+cd medical-app
+npm run build:demo   # reescreve ../demo inteira; depois commit + push
+```
 
 ## Como conferir uma mudança de verdade
 

@@ -1,5 +1,6 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, HashRouter, Routes, Route } from 'react-router-dom';
+import { MODO_DEMO } from './demo/modo';
 import BottomNav from './components/BottomNav';
 import MedicalChatbot from './components/MedicalChatbot';
 import VLibras from './components/VLibras';
@@ -25,11 +26,17 @@ import Faq from './screens/Faq';
 import FichaEmergencia from './screens/FichaEmergencia';
 import './app.css';
 
+// A demonstração é publicada como arquivos estáticos (GitHub Pages), onde não
+// há servidor para devolver o index.html em /dashboard ou /exams. Com `#` na
+// rota, o caminho fica todo no navegador e qualquer link abre direto.
+const Router = MODO_DEMO ? HashRouter : BrowserRouter;
+
 export default function App() {
   return (
     <Router>
       {/* Mobile viewport wrapper */}
       <div className="app-container">
+        {MODO_DEMO && <div className="demo-selo">Demonstração</div>}
         <div className="app-content">
           <Routes>
             <Route path="/" element={<Login />} />

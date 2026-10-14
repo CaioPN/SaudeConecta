@@ -9,8 +9,8 @@ import api from './api';
  * cópias — uma em JS, outra em Java — sairiam do ar uma da outra no primeiro
  * ajuste do Ministério da Saúde.
  *
- * (`data/vacinas.js` continua existindo para a versão de demonstração em
- * `demo/`, que não tem backend nenhum para consultar.)
+ * (`data/vacinas.js` continua sendo a fonte do seed e do servidor fictício
+ * da demonstração em `src/demo/`, que não tem banco para consultar.)
  */
 
 function normalizarDose(d) {

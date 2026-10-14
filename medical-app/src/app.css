@@ -2690,3 +2690,53 @@ body[data-contraste="escuro"] .app-container::before {
   justify-content: space-between;
   gap: 12px;
 }
+
+/* ============================================================
+   Demonstração (`npm run build:demo`)
+   Só aparece no build de demonstração, publicado no GitHub Pages: o selo
+   diz que os dados são fictícios e a nota do Login explica como entrar.
+   ============================================================ */
+.demo-selo {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 120;
+  padding: 2px 10px;
+  border-radius: 9999px;
+  background-color: var(--primary-blue);
+  color: var(--texto-sobre-cor);
+  font-size: calc(10px * var(--escala-fonte));
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.85;
+  /* É etiqueta, não botão: o toque passa para o que estiver embaixo. */
+  pointer-events: none;
+}
+
+.demo-nota {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 20px;
+  padding: 12px 14px;
+  border: 1px dashed var(--azul-claro-forte);
+  border-radius: var(--border-radius);
+  background-color: var(--azul-suave-2);
+  font-size: calc(12px * var(--escala-fonte));
+  color: var(--text-gray);
+  line-height: 1.5;
+  text-align: left;
+}
+.demo-nota svg { flex-shrink: 0; margin-top: 2px; color: var(--primary-blue); }
+.demo-nota button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--primary-blue);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}

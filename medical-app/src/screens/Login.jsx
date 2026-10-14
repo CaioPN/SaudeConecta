@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
-import { Activity, Fingerprint, Eye, EyeOff } from 'lucide-react';
+import { Activity, Fingerprint, Eye, EyeOff, Info } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
+import { MODO_DEMO } from '../demo/modo';
 
 export default function Login() {
   const navigate = useNavigate();
   const { entrar } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  // Na demonstração o formulário já vem preenchido: quem chega pelo QR Code
+  // da feira entra com um toque, sem ter de inventar uma conta.
+  const [email, setEmail] = useState(MODO_DEMO ? 'gabriel@example.com' : '');
+  const [password, setPassword] = useState(MODO_DEMO ? 'demonstracao' : '');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -114,6 +117,19 @@ export default function Login() {
       <div className="login-footer">
         Não tem uma conta? <button type="button" onClick={() => navigate('/cadastro')} className="login-footer-link">Clique aqui.</button>
       </div>
+
+      {MODO_DEMO && (
+        <p className="demo-nota">
+          <Info size={14} />
+          <span>
+            <strong>Demonstração do Saúde Conecta.</strong> Os dados são fictícios e ficam só
+            neste navegador: recarregar a página volta tudo ao início. Para ver o lado do
+            profissional, abra o{' '}
+            <button type="button" onClick={() => navigate('/medico')}>portal do médico</button>
+            {' '}— qualquer código entra.
+          </span>
+        </p>
+      )}
     </div>
   );
 }

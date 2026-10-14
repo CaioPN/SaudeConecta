@@ -7,6 +7,7 @@
     "dev": "vite",
     "prebuild": "node ../database/gerar-calendario.mjs --conferir",
     "build": "vite build",
+    "build:demo": "vite build --mode demo --base ./ --outDir ../demo --emptyOutDir",
     "conferir-calendario": "node ../database/gerar-calendario.mjs --conferir",
     "preview": "vite preview"
   },

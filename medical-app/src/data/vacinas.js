@@ -1,12 +1,11 @@
 // Calendário Nacional de Vacinação (PNI — Ministério da Saúde / SUS).
 //
-// ATENÇÃO — quem usa este arquivo hoje é a versão de demonstração (demo/).
-// No aplicativo, o calendário mora no banco (tabela `calendario_vacinal`) e a
-// carteira é montada pela API, porque ela tem dois leitores: a tela e o
-// AvisoDAO, que conta as doses atrasadas para o Dashboard. A demo não tem
-// backend nenhum, então continua montando a carteira aqui, com as mesmas
-// regras — ao mexer no calendário, mexa nos dois (o seed.sql é gerado a
-// partir desta lista).
+// ATENÇÃO — no aplicativo, o calendário mora no banco (tabela
+// `calendario_vacinal`) e a carteira é montada pela API, porque ela tem dois
+// leitores: a tela e o AvisoDAO, que conta as doses atrasadas para o
+// Dashboard. Esta lista é a FONTE: o seed.sql é gerado a partir dela
+// (database/gerar-calendario.mjs), e o servidor fictício da demonstração
+// (src/demo/) monta a carteira a partir dela, já que lá não há banco.
 //
 // Cada dose tem uma idade recomendada, então dá para calcular a data prevista
 // e comparar com o que foi registrado como aplicado.
