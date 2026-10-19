@@ -12,7 +12,7 @@ import {
   FileText, Activity, Syringe, Users, Calendar,
   KeyRound, History, ShieldCheck,
   User, HelpCircle, ScrollText, Lock, LogOut,
-  Siren, ChartLine,
+  Siren, ChartLine, Star,
 } from 'lucide-react';
 
 export const ICONES = {
@@ -49,6 +49,8 @@ export const ICONES = {
   explicacao: HelpCircle,
   termos: ScrollText,
   sair: LogOut,
+  // Avaliação do projeto pelos visitantes da feira (só na demonstração).
+  avaliacao: Star,
 };
 
 export default ICONES;

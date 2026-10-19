@@ -71,6 +71,14 @@ export default function BottomNav() {
     <div className="bottom-nav" ref={menuRef}>
       {isMenuOpen && (
         <div className="more-menu-overlay">
+          {/* Na feira, a avaliação é a primeira coisa do menu: é o que se pede
+              a quem acabou de experimentar o app. */}
+          {MODO_DEMO && (
+            <button onClick={() => irPara('/avaliar')} className="more-menu-item">
+              <ICONES.avaliacao size={20} />
+              <span>Avaliar o projeto</span>
+            </button>
+          )}
           <button onClick={() => irPara('/profile')} className="more-menu-item">
             <ICONES.perfil size={20} />
             <span>Meu perfil</span>

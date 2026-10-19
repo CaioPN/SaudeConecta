@@ -840,7 +840,29 @@ sem lógica de banco).
     Paulo perto da Paulista e Guarulhos), baixadas com as regras do `CnesApi`,
     sem três UBS de coordenada errada.
   - Tudo mora na memória da página: recarregar volta ao início, e nada do que
-    o visitante digita sai do navegador.
+    o visitante digita sai do navegador — **exceto a avaliação**, abaixo.
+  - **"Avaliar o projeto"** (`screens/AvaliarProjeto.jsx`, rota `/avaliar`,
+    `demo/avaliacao.js`): só existe na demo — no item do menu "Mais", num
+    convite no fim do Início, e a rota só é registrada com `MODO_DEMO`. O
+    visitante dá nota de 0 a 5 em sete critérios (layout, facilidade de uso,
+    funcionalidades, utilidade, acessibilidade, privacidade e nota geral), diz
+    quem é (Professor, Aluno, Visitante), o recurso de que mais gostou e,
+    opcionalmente, deixa um feedback escrito. Sem nome: é anônima.
+    - **A tela espelha o formulário**: opções com o texto exato do Forms e o
+      mesmo obrigatório. Se um campo obrigatório no Forms faltar, o Google
+      recusa a resposta inteira, e a tela não fica sabendo. Mudou o Forms?
+      Mude `demo/avaliacao.js` junto.
+    - Como a demo não tem servidor, o envio vai para um **Google Forms**
+      (`POST` em `formResponse`, `no-cors`), e as respostas caem na planilha
+      dele. O `FORM_ID` e os `entry` de cada campo ficam em
+      `demo/avaliacao.js`; enquanto estiverem vazios, a tela avisa que não
+      envia. `no-cors` devolve resposta opaca: a tela só detecta falta de
+      internet, não um `entry` errado — confira na planilha depois de ligar.
+    - O `lazy()` usa `import.meta.env.MODE` direto, e não a constante
+      `MODO_DEMO`: com a constante importada, o build normal ainda gerava o
+      arquivo da tela.
+    - Depois de enviar, o formulário volta em branco ("Enviar outra
+      avaliação"), porque o estande costuma ter um aparelho só.
   - **Para publicar**: `npm run build:demo` dentro de `medical-app/`, commit da
     pasta `demo/` e push — o Pages só atualiza depois do push. O build esvazia
     a pasta antes, então não guarde nada escrito à mão lá dentro.

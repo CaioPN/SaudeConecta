@@ -251,8 +251,9 @@ export default function MedicalChatbot() {
 
     // Esconde no login, no cadastro e no portal do médico (que não é do paciente).
     // E na ficha de emergência: quem a lê é o socorrista, e o botão flutuante
-    // ficaria por cima justamente das medicações.
-    if (['/', '/cadastro', '/medico', '/emergencia'].includes(location.pathname)) return null;
+    // ficaria por cima justamente das medicações. Na avaliação da demo, cobria
+    // a mensagem de erro e o botão de enviar.
+    if (['/', '/cadastro', '/medico', '/emergencia', '/avaliar'].includes(location.pathname)) return null;
 
     // Acrescenta uma fala do bot e libera o input.
     const responder = (texto) => {

@@ -2740,3 +2740,115 @@ body[data-contraste="escuro"] .app-container::before {
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* ============================================================
+   Avaliação do projeto (só na demonstração)
+   Tela "Avaliar o projeto" e o convite no fim do Início, para os
+   visitantes da feira darem nota de 0 a 5 e deixarem feedback.
+   ============================================================ */
+.avaliacao-convite {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 16px;
+  border: 1px dashed var(--azul-claro-forte);
+  border-radius: var(--border-radius);
+  background-color: var(--azul-suave);
+  color: var(--primary-blue);
+  text-align: left;
+  cursor: pointer;
+}
+.avaliacao-convite strong {
+  display: block;
+  font-size: calc(15px * var(--escala-fonte));
+}
+.avaliacao-convite small {
+  display: block;
+  font-size: calc(12px * var(--escala-fonte));
+  color: var(--text-gray);
+}
+
+.avaliacao-criterio {
+  border: none;
+  padding: 0 0 18px;
+  margin: 0 0 18px;
+  border-bottom: 1px solid var(--borda-cinza);
+}
+.avaliacao-criterio:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+.avaliacao-titulo {
+  display: block;
+  font-size: calc(15px * var(--escala-fonte));
+  font-weight: 600;
+  color: var(--text-dark);
+  margin-bottom: 4px;
+}
+.avaliacao-titulo .text-muted { font-weight: 400; font-size: calc(12px * var(--escala-fonte)); }
+
+.avaliacao-pergunta {
+  font-size: calc(13px * var(--escala-fonte));
+  color: var(--text-gray);
+  margin-bottom: 10px;
+}
+
+.avaliacao-notas {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+.avaliacao-nota {
+  padding: 10px 0;
+  border: 1px solid var(--borda-cinza-forte);
+  border-radius: 10px;
+  background-color: var(--superficie);
+  color: var(--text-dark);
+  font-size: calc(16px * var(--escala-fonte));
+  font-weight: 600;
+  cursor: pointer;
+}
+.avaliacao-nota.ativa,
+.avaliacao-opcao.ativa {
+  background-color: var(--primary-blue);
+  border-color: var(--primary-blue);
+  color: var(--texto-sobre-cor);
+}
+
+.avaliacao-opcoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.avaliacao-opcao {
+  padding: 8px 14px;
+  border: 1px solid var(--borda-cinza-forte);
+  border-radius: 9999px;
+  background-color: var(--superficie);
+  color: var(--text-dark);
+  font-size: calc(13px * var(--escala-fonte));
+  cursor: pointer;
+}
+
+.avaliacao-texto {
+  margin-top: 8px;
+  resize: vertical;
+  font-family: inherit;
+}
+.avaliacao-aviso {
+  margin-top: 6px;
+  font-size: calc(12px * var(--escala-fonte));
+  color: var(--text-gray);
+}
+
+.avaliacao-obrigado {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 40px;
+  text-align: center;
+}
+.avaliacao-obrigado > svg { color: var(--status-ok); margin-bottom: 8px; }
+.avaliacao-obrigado .btn-primary { margin-top: 16px; }

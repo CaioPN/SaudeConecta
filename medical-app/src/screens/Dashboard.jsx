@@ -6,6 +6,7 @@ import { usePrivacidade } from '../context/PrivacidadeContext';
 import BotaoPrivacidade from '../components/BotaoPrivacidade';
 import { mascararTexto } from '../utils/privacidade';
 import { ICONES } from '../utils/icones';
+import { MODO_DEMO } from '../demo/modo';
 import api from '../services/api';
 import { buscarAvisos } from '../services/avisos';
 import { listarNotificacoes, marcarTodasLidas } from '../services/notificacoes';
@@ -259,6 +260,18 @@ export default function Dashboard() {
           </button>
         ))}
       </div>
+
+      {/* Só na demonstração da feira: quem chega pelo QR Code dificilmente abre
+          o menu "Mais", então o convite para avaliar fica no fim do Início. */}
+      {MODO_DEMO && (
+        <button type="button" className="avaliacao-convite" onClick={() => navigate('/avaliar')}>
+          <ICONES.avaliacao size={22} />
+          <span>
+            <strong>Avaliar o projeto</strong>
+            <small>Dê sua nota e deixe um feedback</small>
+          </span>
+        </button>
+      )}
       </div>
     </div>
   );

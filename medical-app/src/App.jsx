@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, HashRouter, Routes, Route } from 'react-router-dom';
 import { MODO_DEMO } from './demo/modo';
 import BottomNav from './components/BottomNav';
@@ -25,6 +25,12 @@ import Privacy from './screens/Privacy';
 import Faq from './screens/Faq';
 import FichaEmergencia from './screens/FichaEmergencia';
 import './app.css';
+
+// Só a demonstração tem a avaliação da feira. Com o import dinâmico dentro do
+// MODO_DEMO, o Vite descarta a tela do build normal.
+// Usa import.meta.env direto, e não a constante MODO_DEMO importada: assim o
+// Vite resolve a condição antes de separar os arquivos, e o pedaço some.
+const AvaliarProjeto = import.meta.env.MODE === 'demo' ? lazy(() => import('./screens/AvaliarProjeto')) : null;
 
 // A demonstração é publicada como arquivos estáticos (GitHub Pages), onde não
 // há servidor para devolver o index.html em /dashboard ou /exams. Com `#` na
@@ -60,6 +66,12 @@ export default function App() {
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/faq" element={<Faq />} />
+            {MODO_DEMO && (
+              <Route
+                path="/avaliar"
+                element={<Suspense fallback={null}><AvaliarProjeto /></Suspense>}
+              />
+            )}
           </Routes>
         </div>
         <BottomNav />
