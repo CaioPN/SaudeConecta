@@ -269,11 +269,11 @@ export const FAQ = [
       },
       {
         p: 'O app me lembra das consultas?',
-        r: 'Sim. Quando falta um ou dois dias para uma consulta agendada — sua ou de um dependente —, aparece um lembrete no card "Novidades" da tela inicial. Ele continua lá depois da data, para você ver que foi avisado.',
+        r: 'Sim. Quando falta um ou dois dias para uma consulta agendada — sua ou de um dependente —, aparece um lembrete no topo do card "Avisos" da tela inicial, com a etiqueta "Novo". Ele continua lá depois da data, até você tocar em "Marcar como lidas", para você ver que foi avisado.',
       },
       {
         p: 'Fico sabendo quando um médico registra alguma coisa?',
-        r: 'Sim. Assim que ele registra uma consulta, um exame ou um item do prontuário, aparece um bloco "Novidades" na tela inicial dizendo o que foi feito e por quem. A mensagem não traz diagnóstico nem resultado — para isso você abre a tela correspondente.',
+        r: 'Sim. Assim que ele registra uma consulta, um exame ou um item do prontuário, aparece no topo do card "Avisos" da tela inicial, com a etiqueta "Novo", dizendo o que foi feito e por quem. A mensagem não traz diagnóstico nem resultado — para isso você abre a tela correspondente.',
       },
       {
         p: 'Consigo cancelar um acesso já concedido?',

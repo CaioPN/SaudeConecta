@@ -87,7 +87,7 @@ const BASE_CONHECIMENTO = [
                  'aviso do medico', 'aviso do médico'],
         resposta:
             'Quando um profissional registra uma consulta, um exame ou um item do prontuário com um código ' +
-            'seu, aparece o bloco "Novidades" na tela inicial dizendo o que foi feito e por quem. A mensagem ' +
+            'seu, aparece no topo do card "Avisos" da tela inicial, com a etiqueta "Novo", dizendo o que foi feito e por quem. A mensagem ' +
             'não traz diagnóstico nem resultado — para isso você abre a tela correspondente.',
     },
     {

@@ -71,31 +71,25 @@ const ICONES_NOTIFICACAO = {
 /**
  * Notificações: o que aconteceu na conta enquanto o paciente não estava olhando.
  *
- * Fica separado do card "Avisos" de propósito, porque as duas coisas respondem
- * a perguntas diferentes. Aviso é DERIVADO ("faz um ano do seu último exame") e
- * some sozinho quando deixa de ser verdade; notificação é um FATO que aconteceu
- * uma vez ("Dr. Fulano registrou uma consulta") e continua valendo mesmo depois
- * de lida. Misturar os dois num card só faria o paciente não saber o que some e
- * o que fica.
- *
- * O bloco não aparece quando não há nada não lido — quem abre o app todo dia
- * não precisa ver um card vazio.
+ * Aparecem DENTRO do card "Avisos", mas continuam sendo coisas diferentes.
+ * Aviso é DERIVADO ("faz um ano do seu último exame") e some sozinho quando
+ * deixa de ser verdade; notificação é um FATO ("Dr. Fulano registrou uma
+ * consulta") e só sai da lista quando o paciente marca como lida. Por isso ela
+ * vem primeiro, com a etiqueta "Novo", e o "Marcar como lidas" só aparece
+ * quando há alguma: assim continua claro o que some sozinho e o que não.
  */
-function Notificacoes({ oculto }) {
+function useNotificacoes() {
   const [lista, setLista] = useState([]);
-  const [naoLidas, setNaoLidas] = useState(0);
 
   useEffect(() => {
     let ativo = true;
     listarNotificacoes()
-      .then(({ notificacoes, naoLidas: total }) => {
-        if (!ativo) return;
-        setLista(notificacoes.filter((n) => !n.lida));
-        setNaoLidas(total);
+      .then(({ notificacoes }) => {
+        if (ativo) setLista(notificacoes.filter((n) => !n.lida));
       })
       .catch(() => {
-        // Notificação é conveniência: se a busca falhar, o bloco não aparece e
-        // o resto do Dashboard segue normal.
+        // Notificação é conveniência: se a busca falhar, o card mostra só os
+        // avisos e o resto do Dashboard segue normal.
         if (ativo) setLista([]);
       });
     return () => {
@@ -105,7 +99,6 @@ function Notificacoes({ oculto }) {
 
   const limpar = async () => {
     setLista([]);
-    setNaoLidas(0);
     try {
       await marcarTodasLidas();
     } catch {
@@ -114,34 +107,23 @@ function Notificacoes({ oculto }) {
     }
   };
 
-  if (naoLidas === 0 || lista.length === 0) return null;
+  return { novidades: lista, limpar };
+}
 
+function NovidadeItem({ notificacao, oculto }) {
+  const Icone = ICONES_NOTIFICACAO[notificacao.tipo] || Bell;
   return (
-    <>
-      <div className="section-header">
-        <h3 className="section-title">
-          Novidades <span className="notificacao-contador">{naoLidas}</span>
-        </h3>
-        <button type="button" className="notificacao-limpar" onClick={limpar}>
-          Marcar como lidas
-        </button>
+    <div className="aviso-item novidade">
+      <div className="aviso-icone"><Icone size={18} /></div>
+      <div className="aviso-texto">
+        <span className="aviso-pessoa">Novo</span>
+        {/* A mensagem traz o nome do profissional e o que ele fez — sem
+            diagnóstico nem resultado —, mas ainda assim segue o olhinho. */}
+        <p className={`aviso-titulo ${oculto ? 'valor-oculto' : ''}`}>
+          {oculto ? mascararTexto(notificacao.mensagem) : notificacao.mensagem}
+        </p>
       </div>
-      <div className="card">
-        {lista.map((n) => {
-          const Icone = ICONES_NOTIFICACAO[n.tipo] || Bell;
-          return (
-            <div key={n.id} className="notificacao-item">
-              <div className="icon-box icon-box-gray"><Icone size={18} /></div>
-              {/* A mensagem traz o nome do profissional e o que ele fez — sem
-                  diagnóstico nem resultado —, mas ainda assim segue o olhinho. */}
-              <p className={`text-sm ${oculto ? 'valor-oculto' : ''}`}>
-                {oculto ? mascararTexto(n.mensagem) : n.mensagem}
-              </p>
-            </div>
-          );
-        })}
-      </div>
-    </>
+    </div>
   );
 }
 
@@ -151,6 +133,7 @@ export default function Dashboard() {
   const { oculto } = usePrivacidade();
   const [totalDependentes, setTotalDependentes] = useState(null);
   const [avisos, setAvisos] = useState(null);
+  const { novidades, limpar } = useNotificacoes();
 
   // Usa o primeiro nome do paciente logado; tem um fallback amigável.
   const primeiroNome = paciente?.nome ? paciente.nome.split(' ')[0] : 'Visitante';
@@ -188,7 +171,7 @@ export default function Dashboard() {
 
   return (
     <div className="screen-container tela-rolagem">
-      {/* A saudação fica parada; avisos, novidades e atalhos rolam. */}
+      {/* A saudação fica parada; atalhos, avisos e dependentes rolam. */}
       <div className="tela-topo">
         <header className="mb-6 section-header">
           <div>
@@ -209,6 +192,56 @@ export default function Dashboard() {
       </div>
 
       <div className="tela-lista">
+      {/* Ações rápidas primeiro: são o que se usa todo dia. */}
+      <h3 className="section-title">Ações Rápidas</h3>
+      <div className="quick-actions-grid">
+        {ATALHOS.map((atalho) => (
+          <button
+            key={atalho.rota}
+            onClick={() => navigate(atalho.rota)}
+            className="action-btn"
+          >
+            <div className="icon-box icon-box-gray">
+              <atalho.icone size={24} />
+            </div>
+            <span className="font-bold text-sm">{atalho.label}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="section-header">
+        <h3 className="section-title text-red">
+          Avisos
+          {novidades.length > 0 && <span className="notificacao-contador">{novidades.length}</span>}
+        </h3>
+        <div className="avisos-acoes">
+          {novidades.length > 0 && (
+            <button type="button" className="notificacao-limpar" onClick={limpar}>
+              Marcar como lidas
+            </button>
+          )}
+          <BotaoPrivacidade rotulo="avisos" />
+        </div>
+      </div>
+      <div className="card">
+        {avisos === null ? (
+          <p className="text-sm text-muted">Carregando avisos...</p>
+        ) : avisos.length === 0 && novidades.length === 0 ? (
+          <p className="text-sm text-muted">Não há avisos no momento.</p>
+        ) : (
+          <>
+            {novidades.map((n) => (
+              <NovidadeItem key={`novidade-${n.id}`} notificacao={n} oculto={oculto} />
+            ))}
+            {avisos.map((aviso, i) => (
+              <AvisoItem key={`${aviso.tipo}-${i}`} aviso={aviso} />
+            ))}
+          </>
+        )}
+      </div>
+
+      {/* Depois das ações rápidas: o número de dependentes não muda de um dia
+          para o outro e não merecia o primeiro lugar da tela, acima dos avisos. */}
       <div
         className="card patient-summary"
         onClick={() => navigate('/dependentes')}
@@ -225,40 +258,6 @@ export default function Dashboard() {
         <div className="icon-box">
           <ICONES.dependentes size={24} />
         </div>
-      </div>
-
-      <Notificacoes oculto={oculto} />
-
-      <div className="section-header">
-        <h3 className="section-title text-red">Avisos</h3>
-        <BotaoPrivacidade rotulo="avisos" />
-      </div>
-      <div className="card">
-        {avisos === null ? (
-          <p className="text-sm text-muted">Carregando avisos...</p>
-        ) : avisos.length === 0 ? (
-          <p className="text-sm text-muted">Não há avisos no momento.</p>
-        ) : (
-          avisos.map((aviso, i) => (
-            <AvisoItem key={`${aviso.tipo}-${i}`} aviso={aviso} />
-          ))
-        )}
-      </div>
-
-      <h3 className="section-title">Ações Rápidas</h3>
-      <div className="quick-actions-grid">
-        {ATALHOS.map((atalho) => (
-          <button
-            key={atalho.rota}
-            onClick={() => navigate(atalho.rota)}
-            className="action-btn"
-          >
-            <div className="icon-box icon-box-gray">
-              <atalho.icone size={24} />
-            </div>
-            <span className="font-bold text-sm">{atalho.label}</span>
-          </button>
-        ))}
       </div>
 
       {/* Só na demonstração da feira: quem chega pelo QR Code dificilmente abre

@@ -386,6 +386,8 @@ button, input, select, textarea {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+  /* O cartão "Meus dependentes" vem logo depois e ficava colado na grade. */
+  margin-bottom: 16px;
 }
 
 .action-btn {
@@ -2889,3 +2891,15 @@ body[data-contraste="escuro"] .app-container::before {
   cursor: pointer;
 }
 .confirmar-botoes > button:disabled { opacity: 0.6; cursor: default; }
+
+/* ============================================================
+   Card "Avisos" do Início com as novidades dentro
+   As notificações não lidas entram no topo do card, com a
+   etiqueta "Novo" e o ícone em azul: informam, não alertam.
+   ============================================================ */
+.aviso-item.novidade .aviso-icone { background-color: var(--azul-suave); color: var(--primary-blue); }
+.avisos-acoes {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}

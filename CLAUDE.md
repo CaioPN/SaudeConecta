@@ -530,12 +530,15 @@ sem lógica de banco).
     o paciente ver no histórico se alguém tentou trocar a senha no lugar dele.
 - **Notificações** (`Notificacao`, `NotificacaoDAO`, `GET /api/notificacoes`,
   `POST /api/notificacoes/{id}/lida` e `/lidas`, `services/notificacoes.js`):
-  card **"Novidades"** no Dashboard com o que aconteceu na conta enquanto o
-  paciente não estava olhando — um médico registrou consulta, exame ou item de
-  prontuário pelo acesso temporário.
+  o que aconteceu na conta enquanto o paciente não estava olhando — um médico
+  registrou consulta, exame ou item de prontuário pelo acesso temporário.
+  Desde 19/10/2026 elas aparecem **dentro do card "Avisos"** do Início (era um
+  card "Novidades" à parte), no topo, com a etiqueta "Novo" e o "Marcar como
+  lidas" no cabeçalho. O Início ficou: Ações Rápidas, Avisos, Meus dependentes.
   - Não confundir com os **avisos**: aviso é calculado na hora a partir dos
     exames e das consultas e não tem linha no banco; notificação é um fato que
-    aconteceu uma vez e fica gravado, com `lida_em`.
+    aconteceu uma vez e fica gravado, com `lida_em`. Por isso, mesmo no mesmo
+    card, a notificação tem etiqueta e só sai quando é marcada como lida.
 - **Contatos de emergência** (`Familiar`, `FamiliarDAO`, `GET/POST /api/familiares`,
   `DELETE /api/familiares/{id}`, `services/familiares.js`): quem avisar se algo
   acontecer com o paciente, cadastrado no Perfil. São dados de **outra pessoa**,
