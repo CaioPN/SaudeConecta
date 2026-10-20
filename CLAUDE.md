@@ -541,6 +541,17 @@ sem lógica de banco).
   acontecer com o paciente, cadastrado no Perfil. São dados de **outra pessoa**,
   então de propósito não entram no resumo enviado ao médico pelo acesso
   temporário — quem consentiu com o cadastro foi o paciente, não o familiar.
+- **Confirmação antes de excluir** (`components/ConfirmarExclusao.jsx`): a
+  lixeira de um dependente (`Dependentes.jsx`) e a de um contato de emergência
+  (`Profile.jsx`) abrem "Deseja excluir...?" antes de apagar. É o `Modal` do
+  app, e não o `window.confirm`, para seguir a fonte e o modo escuro.
+  - No dependente, a janela avisa que consultas, exames, vacinas e prontuário
+    vão junto: o schema apaga tudo em cascata (`ON DELETE CASCADE`) e não há
+    como desfazer.
+  - Os botões travam enquanto a exclusão roda, para um segundo toque não
+    mandar o DELETE duas vezes.
+  - A anotação de consulta continua **sem** confirmação, de propósito (ver o
+    comentário em `Appointment.jsx`): ela se digita de novo em quatro campos.
 - **O médico edita o prontuário** (`POST /api/medico/prontuario`,
   `DELETE /api/medico/prontuario/{tipo}/{id}`, `PortalMedico.jsx`): antes ele
   registrava consulta e exame, mas uma alergia descoberta na consulta não tinha

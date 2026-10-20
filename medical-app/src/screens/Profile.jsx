@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { usePrivacidade } from '../context/PrivacidadeContext';
 import { useAcessibilidade, TAMANHOS, CONTRASTES } from '../context/AcessibilidadeContext';
 import BotaoPrivacidade from '../components/BotaoPrivacidade';
+import ConfirmarExclusao from '../components/ConfirmarExclusao';
 import { mascarar } from '../utils/privacidade';
 import { listarFamiliares, cadastrarFamiliar, removerFamiliar } from '../services/familiares';
 import { atualizarPerfil } from '../services/perfil';
@@ -104,6 +105,8 @@ function ContatosEmergencia() {
   const [abrindo, setAbrindo] = useState(false);
   const [erro, setErro] = useState('');
   const [carregando, setCarregando] = useState(true);
+  // Contato cuja exclusão espera confirmação; null = janela fechada.
+  const [aExcluir, setAExcluir] = useState(null);
 
   useEffect(() => {
     let ativo = true;
@@ -145,6 +148,8 @@ function ContatosEmergencia() {
       setContatos((atual) => atual.filter((c) => c.id !== id));
     } catch (err) {
       setErro(err?.response?.data?.erro || 'Não foi possível remover o contato.');
+    } finally {
+      setAExcluir(null);
     }
   };
 
@@ -176,7 +181,7 @@ function ContatosEmergencia() {
             </div>
             <button
               type="button"
-              onClick={() => remover(c.id)}
+              onClick={() => setAExcluir(c)}
               className="icon-box icon-box-gray"
               style={{ cursor: 'pointer', border: 'none' }}
               title={`Remover ${c.nome}`}
@@ -229,6 +234,15 @@ function ContatosEmergencia() {
           </button>
         )}
       </div>
+
+      <ConfirmarExclusao
+        aberto={aExcluir !== null}
+        titulo="Excluir contato de emergência"
+        mensagem={`Deseja excluir ${aExcluir?.nome ?? 'este contato'} dos contatos de emergência?`}
+        aviso="O contato deixa de aparecer na ficha de emergência e para o médico."
+        onConfirmar={() => remover(aExcluir.id)}
+        onCancelar={() => setAExcluir(null)}
+      />
     </>
   );
 }

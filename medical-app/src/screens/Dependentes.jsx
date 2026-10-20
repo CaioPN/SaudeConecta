@@ -5,6 +5,7 @@ import * as yup from 'yup';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Trash2, Users } from 'lucide-react';
 import BotaoPrivacidade from '../components/BotaoPrivacidade';
+import ConfirmarExclusao from '../components/ConfirmarExclusao';
 import { usePessoas } from '../context/PessoasContext';
 import { usePrivacidade } from '../context/PrivacidadeContext';
 import { mascarar } from '../utils/privacidade';
@@ -48,6 +49,8 @@ export default function Dependentes() {
     const [dependentes, setDependentes] = useState([]);
     const [erro, setErro] = useState('');
     const [carregando, setCarregando] = useState(true);
+    // Dependente cuja exclusão espera confirmação; null = janela fechada.
+    const [aExcluir, setAExcluir] = useState(null);
 
     async function carregarDependentes() {
         try {
@@ -83,6 +86,8 @@ export default function Dependentes() {
             recarregar();
         } catch (err) {
             setErro(err?.response?.data?.erro || 'Não foi possível remover o dependente.');
+        } finally {
+            setAExcluir(null);
         }
     }
 
@@ -187,7 +192,7 @@ export default function Dependentes() {
                             </p>
                         </div>
                         <button
-                            onClick={() => removerDependente(dep.id)}
+                            onClick={() => setAExcluir(dep)}
                             className="icon-box icon-box-gray"
                             style={{ cursor: 'pointer', border: 'none' }}
                             title="Remover dependente"
@@ -198,6 +203,18 @@ export default function Dependentes() {
                 ))
             )}
             </div>
+
+            {/* Excluir o dependente apaga em cascata consultas, exames, vacinas e
+                prontuário dele (ON DELETE CASCADE no schema): a janela diz isso,
+                porque não há como desfazer. */}
+            <ConfirmarExclusao
+                aberto={aExcluir !== null}
+                titulo="Excluir dependente"
+                mensagem={`Deseja excluir ${aExcluir?.nome ?? 'este dependente'}?`}
+                aviso={`As consultas, os exames, as vacinas e o prontuário de ${aExcluir?.nome?.split(' ')[0] ?? 'quem for excluído'} também serão apagados. Isso não pode ser desfeito.`}
+                onConfirmar={() => removerDependente(aExcluir.id)}
+                onCancelar={() => setAExcluir(null)}
+            />
         </div>
     );
 }
