@@ -23,7 +23,8 @@ const BASE_CONHECIMENTO = [
             'Em "Mais" → "Meu perfil", no fim da tela, existe a seção "Acessibilidade". Lá você escolhe o ' +
             'tamanho do texto (Padrão, Grande ou Maior) e o contraste: "Texto escuro" escurece as legendas ' +
             'em cinza claro, e "Fundo escuro" deixa o app com fundo escuro e texto claro, para quem se ' +
-            'incomoda com o branco da tela. O ajuste vale para todas as telas e fica guardado no aparelho.',
+            'incomoda com o branco da tela. O ajuste vale para todas as telas e fica guardado no aparelho. ' +
+            'A partir dos 50 anos o texto já começa em Grande, e você pode trocar quando quiser.',
     },
     {
         chaves: ['exame', 'exames', 'resultado', 'sangue', 'hemograma', 'imagem', 'laudo'],

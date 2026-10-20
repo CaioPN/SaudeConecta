@@ -13,7 +13,7 @@
   /* Multiplicador do tamanho do texto (acessibilidade). Todo `font-size` do
      arquivo é `calc(Npx * var(--escala-fonte))`, então trocar esta variável
      redimensiona o app inteiro. Ver o bloco "Acessibilidade" no fim. */
-  --escala-fonte: 1;
+  --escala-fonte: 1.07;
   --border-radius: 12px;
   /* Situação de resultados/eventos clínicos */
   --status-ok: #16a34a;
@@ -1964,8 +1964,9 @@ button.record-card:hover { border-color: var(--primary-blue); }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-left: 5px;
-  padding: 0;
+  margin-left: 4px;
+  /* Área de toque maior que o desenho: com 15px e sem folga, o dedo errava. */
+  padding: 4px;
   border: none;
   background: none;
   color: var(--text-gray-claro);
@@ -2543,8 +2544,8 @@ button.record-card:hover { border-color: var(--primary-blue); }
    modal é desenhado por portal direto no body — fora do quadro,
    ele ficaria de fora do ajuste.
    ============================================================ */
-body[data-fonte="grande"] { --escala-fonte: 1.15; }
-body[data-fonte="maior"]  { --escala-fonte: 1.3; }
+body[data-fonte="grande"] { --escala-fonte: 1.2; }
+body[data-fonte="maior"]  { --escala-fonte: 1.35; }
 
 /* Ícone do lucide recebe o tamanho em atributo (`size={18}` vira
    width="18"), em pixel fixo, e por isso não acompanhava o texto. O `zoom`
@@ -2552,8 +2553,8 @@ body[data-fonte="maior"]  { --escala-fonte: 1.3; }
    que ele ocupa no layout — um `transform: scale` cresceria por cima do texto
    vizinho. O multiplicador é o mesmo da fonte. Todo ícone do lucide nasce com a
    classe `lucide`, então a regra pega todos e nada além deles. */
-body[data-fonte="grande"] svg.lucide { zoom: 1.15; }
-body[data-fonte="maior"]  svg.lucide { zoom: 1.3; }
+body[data-fonte="grande"] svg.lucide { zoom: 1.2; }
+body[data-fonte="maior"]  svg.lucide { zoom: 1.35; }
 
 /* Um empurrãozinho no tamanho mínimo dos botões evita que o rótulo maior
    encoste na borda. */

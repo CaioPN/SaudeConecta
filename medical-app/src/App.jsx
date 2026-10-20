@@ -1,6 +1,8 @@
-import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, HashRouter, Routes, Route } from 'react-router-dom';
 import { MODO_DEMO } from './demo/modo';
+import { useAuth } from './context/AuthContext';
+import { useAcessibilidade } from './context/AcessibilidadeContext';
 import BottomNav from './components/BottomNav';
 import MedicalChatbot from './components/MedicalChatbot';
 import VLibras from './components/VLibras';
@@ -38,6 +40,16 @@ const AvaliarProjeto = import.meta.env.MODE === 'demo' ? lazy(() => import('./sc
 const Router = MODO_DEMO ? HashRouter : BrowserRouter;
 
 export default function App() {
+  // Texto maior por padrão a partir dos 50 anos (ver AcessibilidadeContext).
+  // Mora aqui porque o provedor de acessibilidade fica FORA do AuthProvider —
+  // para valer já no login — e não enxerga o paciente.
+  const { paciente } = useAuth();
+  const { sugerirFontePorIdade } = useAcessibilidade();
+  const dataNascimento = paciente?.data_nascimento;
+  useEffect(() => {
+    if (dataNascimento) sugerirFontePorIdade(dataNascimento);
+  }, [dataNascimento, sugerirFontePorIdade]);
+
   return (
     <Router>
       {/* Mobile viewport wrapper */}

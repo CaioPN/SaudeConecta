@@ -49,7 +49,7 @@ export default function ResultRow({ item, medicoes = 1, onEvolucao }) {
               aria-label={`Ver a evolução de ${item.nome} (${medicoes} coletas)`}
               title={`Evolução em ${medicoes} coletas`}
             >
-              <IconeEvolucao size={15} />
+              <IconeEvolucao size={20} />
             </button>
           )}
         </span>

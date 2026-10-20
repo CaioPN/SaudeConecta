@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
 /**
  * Tamanho do texto e contraste — os dois ajustes de acessibilidade do app.
@@ -32,7 +32,24 @@ export const CONTRASTES = [
   { id: 'escuro', rotulo: 'Fundo escuro' },
 ];
 
-const PADRAO = { fonte: 'padrao', contraste: 'normal' };
+// fonteEscolhida diz se o tamanho veio da pessoa (botão no Perfil) ou da
+// sugestão pela idade. Só o que ela não escolheu pode ser trocado sozinho.
+const PADRAO = { fonte: 'padrao', contraste: 'normal', fonteEscolhida: false };
+
+// A partir desta idade o texto já começa em "Grande": a vista cansada
+// (presbiopia) costuma aparecer pelos 40 e incomodar de vez pelos 50, e boa
+// parte de quem chega a essa idade não sabe que o ajuste existe no Perfil.
+export const IDADE_FONTE_GRANDE = 50;
+
+function idadeEmAnos(dataNascimento) {
+  const nascimento = new Date(`${String(dataNascimento).slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(nascimento.getTime())) return null;
+  const hoje = new Date();
+  let idade = hoje.getFullYear() - nascimento.getFullYear();
+  const m = hoje.getMonth() - nascimento.getMonth();
+  if (m < 0 || (m === 0 && hoje.getDate() < nascimento.getDate())) idade--;
+  return idade;
+}
 
 // Lê o que estiver gravado, aceitando só valores conhecidos: um localStorage
 // adulterado (ou de uma versão antiga) não pode deixar o app com um atributo
@@ -43,9 +60,14 @@ function lerGravado() {
     if (!bruto) return PADRAO;
     // Até a versão anterior o contraste era um booleano (true = texto escuro).
     const contraste = bruto.contraste === true ? 'alto' : bruto.contraste;
+    const fonte = TAMANHOS.some((t) => t.id === bruto.fonte) ? bruto.fonte : PADRAO.fonte;
     return {
-      fonte: TAMANHOS.some((t) => t.id === bruto.fonte) ? bruto.fonte : PADRAO.fonte,
+      fonte,
       contraste: CONTRASTES.some((c) => c.id === contraste) ? contraste : PADRAO.contraste,
+      // As versões antigas gravavam tudo sem dizer se foi escolha. Um tamanho
+      // diferente do padrão só pode ter sido escolhido; o padrão, não dá para
+      // saber, e fica livre para a sugestão pela idade.
+      fonteEscolhida: bruto.fonteEscolhida === true || fonte !== PADRAO.fonte,
     };
   } catch {
     return PADRAO;
@@ -77,12 +99,22 @@ export function AcessibilidadeProvider({ children }) {
     }
   }, [ajustes]);
 
-  const definirFonte = (fonte) => setAjustes((a) => ({ ...a, fonte }));
+  const definirFonte = (fonte) => setAjustes((a) => ({ ...a, fonte, fonteEscolhida: true }));
+
+  // Chamada quando o paciente entra ou se cadastra. Não passa por cima do que a
+  // pessoa escolheu no Perfil; e devolve o mesmo objeto quando nada muda, para
+  // não gravar nem redesenhar à toa.
+  const sugerirFontePorIdade = useCallback((dataNascimento) => {
+    const idade = idadeEmAnos(dataNascimento);
+    if (idade === null) return;
+    const sugerida = idade >= IDADE_FONTE_GRANDE ? 'grande' : 'padrao';
+    setAjustes((a) => (a.fonteEscolhida || a.fonte === sugerida ? a : { ...a, fonte: sugerida }));
+  }, []);
   const definirContraste = (contraste) => setAjustes((a) => ({ ...a, contraste }));
 
   return (
     <AcessibilidadeContext.Provider
-      value={{ ...ajustes, definirFonte, definirContraste }}
+      value={{ ...ajustes, definirFonte, definirContraste, sugerirFontePorIdade }}
     >
       {children}
     </AcessibilidadeContext.Provider>

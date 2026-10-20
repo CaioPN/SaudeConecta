@@ -699,7 +699,9 @@ sem lógica de banco).
     incomodando.
   - Quem faz o trabalho é o **CSS**, por variável: todo `font-size` do
     `app.css` virou `calc(Npx * var(--escala-fonte))` (89 regras, de uma vez),
-    e `body[data-fonte="grande"|"maior"]` troca o multiplicador (1,15 e 1,3).
+    e `body[data-fonte="grande"|"maior"]` troca o multiplicador.
+    O **padrão é 1,07**, e não 1: em 19/10/2026 todo o texto ficou um pouco
+    maior depois da feira; Grande e Maior são 1,2 e 1,35.
     O alto contraste redefine `--text-dark`, `--text-gray` e
     `--text-gray-claro` — os cinzas literais que havia em cinco regras viraram
     variável para isso funcionar. **Regra nova com `font-size` em px puro não
@@ -714,13 +716,24 @@ sem lógica de banco).
     com um atributo que o CSS não entende.
   - O provedor fica **fora de todos os outros** no `main.jsx`: o ajuste vale
     inclusive no login, antes de existir paciente.
+  - **A partir dos 50 anos o texto já começa em Grande**
+    (`IDADE_FONTE_GRANDE`, `sugerirFontePorIdade`). Quem chama é o `App.jsx`,
+    quando o paciente entra ou se cadastra, porque o provedor fica fora do
+    `AuthProvider` e não enxerga a data de nascimento. A sugestão **nunca passa
+    por cima de uma escolha**: o `fonteEscolhida` gravado separa o tamanho que a
+    pessoa tocou no Perfil do que veio da idade, e o Perfil diz em uma linha
+    que o Grande veio da idade. Gravação antiga sem esse campo: tamanho
+    diferente do padrão conta como escolha; o padrão fica livre para a sugestão.
+  - O "?" do glossário e o ícone do gráfico de evolução ao lado de cada exame
+    passaram de 15 para 20px, com folga de toque: os visitantes da feira não
+    conseguiam acertá-los.
   - **O tamanho alcança tudo agora.** Três buracos foram fechados:
     - **Botão e campo não herdam `font-size`** — o navegador lhes dá 13,33px
       fixos. Todo botão sem regra própria ("Voltar", "Adicionar contato") ficava
       de fora; uma regra de elemento logo depois do `body` dá a eles
       `calc(13.333px * var(--escala-fonte))`, o mesmo tamanho de antes.
     - **Os ícones do lucide** recebem o tamanho em atributo, em px. Em vez de
-      mexer nas ~200 chamadas, `svg.lucide { zoom: 1.15 | 1.3 }`: o `zoom`
+      mexer nas ~200 chamadas, `svg.lucide { zoom: 1.2 | 1.35 }`: o `zoom`
       escala o desenho **e** o espaço que ele ocupa; `transform: scale` faria o
       ícone crescer por cima do texto vizinho.
     - Os sete `style={{ fontSize }}` inline (erros do Cadastro, Login e

@@ -335,7 +335,7 @@ function EditarContato({ paciente, aoSalvar, aoFechar }) {
  * olhinho, que volta ao normal a cada abertura de propósito.
  */
 function Acessibilidade() {
-  const { fonte, contraste, definirFonte, definirContraste } = useAcessibilidade();
+  const { fonte, fonteEscolhida, contraste, definirFonte, definirContraste } = useAcessibilidade();
 
   return (
     <>
@@ -357,6 +357,13 @@ function Acessibilidade() {
             </button>
           ))}
         </div>
+        {/* Sem esta linha, quem tem 50 anos ou mais veria o texto maior sem
+            saber por quê — nem que pode voltar ao padrão. */}
+        {!fonteEscolhida && fonte === 'grande' && (
+          <p className="text-xs text-muted mb-4">
+            O texto começou em Grande pela sua idade. Se preferir, escolha outro tamanho.
+          </p>
+        )}
 
         <p className="text-sm text-muted mb-4">Contraste</p>
         <div className="acessibilidade-opcoes">

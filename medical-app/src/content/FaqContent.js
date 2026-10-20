@@ -59,7 +59,7 @@ export const FAQ = [
       },
       {
         p: 'O texto está pequeno demais. Dá para aumentar?',
-        r: 'Dá. Em "Mais" → "Meu perfil", no fim da tela, existe a seção "Acessibilidade": escolha entre Padrão, Grande e Maior. O tamanho vale para todas as telas do aplicativo e fica guardado no aparelho, então você só precisa ajustar uma vez.',
+        r: 'Dá. Em "Mais" → "Meu perfil", no fim da tela, existe a seção "Acessibilidade": escolha entre Padrão, Grande e Maior. O tamanho vale para todas as telas do aplicativo e fica guardado no aparelho, então você só precisa ajustar uma vez. Para quem tem 50 anos ou mais, o texto já começa em Grande; se preferir outro tamanho, é só escolher, e a sua escolha passa a valer.',
       },
       {
         p: 'Alguns textos cinzas são difíceis de ler. O que faço?',

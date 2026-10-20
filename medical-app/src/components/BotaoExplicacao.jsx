@@ -76,7 +76,7 @@ export default function BotaoExplicacao({ tipo, termo }) {
         aria-label={`O que é ${termo}?`}
         title={`O que é ${termo}?`}
       >
-        <IconeAjuda size={15} />
+        <IconeAjuda size={20} />
       </button>
 
       <Modal open={aberto} title={termo} onClose={() => setAberto(false)}>
