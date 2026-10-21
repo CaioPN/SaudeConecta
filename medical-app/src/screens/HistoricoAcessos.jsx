@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import useVoltar from '../hooks/useVoltar';
 import {
   ChevronLeft, Ban, ShieldCheck, ShieldAlert, LogIn, Download, Stethoscope, User,
   Pill, KeyRound, HeartHandshake,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { usePrivacidade } from '../context/PrivacidadeContext';
 import BotaoPrivacidade from '../components/BotaoPrivacidade';
 import { mascararTexto } from '../utils/privacidade';
@@ -86,7 +86,7 @@ function dataHora(iso) {
 }
 
 export default function HistoricoAcessos() {
-  const navigate = useNavigate();
+  const voltar = useVoltar('/dashboard');
   const { oculto } = usePrivacidade();
   const [registros, setRegistros] = useState(null);
   const [erro, setErro] = useState(null);
@@ -134,7 +134,7 @@ export default function HistoricoAcessos() {
       {/* Cabeçalho, explicação e os dois filtros ficam parados: eles comandam
           a trilha, e numa conta com muito registro sumiam da tela. */}
       <div className="tela-topo">
-      <button onClick={() => navigate(-1)} className="back-btn">
+      <button onClick={() => voltar()} className="back-btn">
         <ChevronLeft size={20} /> Voltar
       </button>
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronLeft, CheckCircle, Info } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import useVoltar from '../hooks/useVoltar';
 import { ICONES } from '../utils/icones';
 import {
   CRITERIOS, PERFIS, RECURSOS, FORMULARIO_CONFIGURADO, enviarAvaliacao,
@@ -16,6 +17,7 @@ const notasVazias = () => Object.fromEntries(CRITERIOS.map((c) => [c.id, null]))
 
 export default function AvaliarProjeto() {
   const navigate = useNavigate();
+  const voltar = useVoltar('/dashboard');
   const [notas, setNotas] = useState(notasVazias);
   const [perfil, setPerfil] = useState('');
   const [recurso, setRecurso] = useState('');
@@ -87,7 +89,7 @@ export default function AvaliarProjeto() {
   return (
     <div className="screen-container tela-rolagem">
       <div className="tela-topo">
-        <button onClick={() => navigate(-1)} className="back-btn">
+        <button onClick={() => voltar()} className="back-btn">
           <ChevronLeft size={20} /> Voltar
         </button>
 

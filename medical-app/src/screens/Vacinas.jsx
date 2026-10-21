@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import useVoltar from '../hooks/useVoltar';
 import { ChevronLeft, Check, Clock, AlertTriangle, ShieldCheck } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { usePessoas } from '../context/PessoasContext';
 import { usePrivacidade } from '../context/PrivacidadeContext';
 import BotaoPrivacidade from '../components/BotaoPrivacidade';
@@ -70,7 +70,7 @@ function VacinaItem({ v, oculto }) {
 }
 
 export default function Vacinas() {
-  const navigate = useNavigate();
+  const voltar = useVoltar('/patient');
   const { pessoa, dependenteId } = usePessoas();
   const { oculto } = usePrivacidade();
 
@@ -105,7 +105,7 @@ export default function Vacinas() {
     <div className="screen-container tela-rolagem">
       {/* Cabeçalho fixo: só a lista de doses rola. */}
       <div className="tela-topo">
-        <button onClick={() => navigate(-1)} className="back-btn">
+        <button onClick={() => voltar()} className="back-btn">
           <ChevronLeft size={20} /> Voltar
         </button>
 

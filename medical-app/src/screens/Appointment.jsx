@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { buscarDetalhesUnidade } from '../services/redeSaude';
 import { useNavigate, useParams } from 'react-router-dom';
+import useVoltar from '../hooks/useVoltar';
 import InfoField from '../components/InfoField';
 import StatusBadge from '../components/StatusBadge';
 import BotaoPrivacidade from '../components/BotaoPrivacidade';
@@ -24,6 +25,9 @@ function hojeIso() {
 
 export default function Appointment() {
   const navigate = useNavigate();
+  // Volta para quem abriu a consulta (lista, prontuário, aviso) em vez de
+  // empilhar a lista: empilhar prendia Exames → consulta → lista num vaivém.
+  const voltar = useVoltar('/appointment');
   const { id } = useParams();
   const { oculto } = usePrivacidade();
   const [consulta, setConsulta] = useState(null);
@@ -64,7 +68,7 @@ export default function Appointment() {
   if (carregando || !consulta) {
     return (
       <div className="screen-container">
-        <button onClick={() => navigate('/appointment')} className="back-btn">
+        <button onClick={() => voltar()} className="back-btn">
           <ChevronLeft size={20} /> Voltar
         </button>
         <p className="empty-state">
@@ -95,14 +99,14 @@ export default function Appointment() {
     // consulta volta a ser digitada em quatro campos, e a trilha de auditoria
     // guarda que a exclusão aconteceu.
     excluirConsulta(consulta.id)
-      .then(() => navigate('/appointment'))
+      .then(() => voltar())
       .catch(() => setErroAcao('Não foi possível apagar esta anotação.'));
   };
 
   return (
     <div className="screen-container tela-rolagem">
       <div className="tela-topo">
-        <button onClick={() => navigate('/appointment')} className="back-btn">
+        <button onClick={() => voltar()} className="back-btn">
           <ChevronLeft size={20} /> Voltar
         </button>
 
@@ -260,7 +264,7 @@ export default function Appointment() {
           // do atendimento que já aconteceu.
           consulta={{ ...consulta, id: null, data: '', hora: '' }}
           dependenteId={consulta.dependenteId}
-          onPronto={() => { setAnotandoRetorno(false); navigate('/appointment'); }}
+          onPronto={() => { setAnotandoRetorno(false); voltar(); }}
           onCancelar={() => setAnotandoRetorno(false)}
         />
       </Modal>

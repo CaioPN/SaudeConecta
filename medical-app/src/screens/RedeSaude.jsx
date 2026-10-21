@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import useVoltar from '../hooks/useVoltar';
 import {
   ChevronLeft, MapPin, Phone, Navigation, Hospital, Ambulance, HeartPulse,
   Clock, Search, X, Star, Info,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import {
   buscarRedeSaude, localizacaoDoNavegador, buscarDetalhesUnidade,
   definirUnidadeReferencia,
@@ -136,7 +136,7 @@ function UnidadeItem({ unidade, municipioAtual, ehReferencia, aoMarcarReferencia
 }
 
 export default function RedeSaude() {
-  const navigate = useNavigate();
+  const voltar = useVoltar('/dashboard');
   const [origem, setOrigem] = useState(null);
   const [unidades, setUnidades] = useState([]);
   const [referencia, setReferencia] = useState(null);
@@ -236,7 +236,7 @@ export default function RedeSaude() {
       {/* Cabeçalho, troca de cidade e filtros ficam parados: eles são o
           controle da lista, e sumiam da tela assim que se descia um pouco. */}
       <div className="tela-topo">
-      <button onClick={() => navigate(-1)} className="back-btn">
+      <button onClick={() => voltar()} className="back-btn">
         <ChevronLeft size={20} /> Voltar
       </button>
 

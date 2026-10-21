@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import useVoltar from '../hooks/useVoltar';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Trash2, Users } from 'lucide-react';
 import BotaoPrivacidade from '../components/BotaoPrivacidade';
 import ConfirmarExclusao from '../components/ConfirmarExclusao';
@@ -47,7 +47,7 @@ function calcularIdade(dataIso) {
 }
 
 export default function Dependentes() {
-    const navigate = useNavigate();
+    const voltar = useVoltar('/patient');
     // O seletor de pessoa das outras telas lê a mesma lista; sem avisar o
     // contexto, um dependente recém-cadastrado só apareceria lá depois de
     // recarregar a página.
@@ -109,7 +109,7 @@ export default function Dependentes() {
     return (
         <div className="screen-container tela-rolagem">
             <div className="tela-topo">
-                <button onClick={() => navigate(-1)} className="back-btn">
+                <button onClick={() => voltar()} className="back-btn">
                     <ChevronLeft size={20} /> Voltar
                 </button>
 

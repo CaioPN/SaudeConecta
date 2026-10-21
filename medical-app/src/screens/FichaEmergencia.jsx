@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import useVoltar from '../hooks/useVoltar';
 import { ChevronLeft, AlertCircle, Heart, Pill, Phone, Droplet } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { usePessoas } from '../context/PessoasContext';
 import SeletorPessoa from '../components/SeletorPessoa';
@@ -60,7 +60,7 @@ const linkTelefone = (tel) => `tel:${String(tel || '').replace(/\D/g, '')}`;
  * `consultou_prontuario`).
  */
 export default function FichaEmergencia() {
-  const navigate = useNavigate();
+  const voltar = useVoltar('/patient');
   const { paciente } = useAuth();
   const { pessoa, dependenteId } = usePessoas();
   const [prontuario, setProntuario] = useState(null);
@@ -107,7 +107,7 @@ export default function FichaEmergencia() {
   return (
     <div className="screen-container tela-rolagem">
       <div className="tela-topo">
-        <button onClick={() => navigate(-1)} className="back-btn">
+        <button onClick={() => voltar()} className="back-btn">
           <ChevronLeft size={20} /> Voltar
         </button>
         <SeletorPessoa />

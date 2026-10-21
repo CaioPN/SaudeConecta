@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import useVoltar from '../hooks/useVoltar';
 import { ChevronLeft, KeyRound, ShieldCheck, BookOpen, PenLine, Ban, Clock, Copy, Check } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import StatusBadge from '../components/StatusBadge';
 import SeletorPessoa from '../components/SeletorPessoa';
 import { usePessoas } from '../context/PessoasContext';
@@ -36,7 +36,7 @@ function dataHora(iso) {
 }
 
 export default function AcessoMedico() {
-  const navigate = useNavigate();
+  const voltar = useVoltar('/dashboard');
   const [acessos, setAcessos] = useState([]);
   const [novo, setNovo] = useState(null); // { codigo, expiraEm, escopo }
   const [escopo, setEscopo] = useState('escrita');
@@ -111,7 +111,7 @@ export default function AcessoMedico() {
   return (
     <div className="screen-container tela-rolagem">
       <div className="tela-topo">
-        <button onClick={() => navigate(-1)} className="back-btn">
+        <button onClick={() => voltar()} className="back-btn">
           <ChevronLeft size={20} /> Voltar
         </button>
 

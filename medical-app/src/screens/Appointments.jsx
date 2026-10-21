@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, Calendar, MapPin, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import useVoltar from '../hooks/useVoltar';
 import StatusBadge from '../components/StatusBadge';
 import BotaoPrivacidade from '../components/BotaoPrivacidade';
 import SeletorPessoa from '../components/SeletorPessoa';
@@ -63,6 +64,7 @@ function ConsultaItem({ consulta, onClick, oculto }) {
 
 export default function Appointments() {
   const navigate = useNavigate();
+  const voltar = useVoltar('/patient');
   const { pessoa, dependenteId } = usePessoas();
   const { oculto } = usePrivacidade();
   const [consultas, setConsultas] = useState([]);
@@ -99,7 +101,7 @@ export default function Appointments() {
     <div className="screen-container tela-rolagem">
       {/* Cabeçalho e seletor de pessoa ficam parados; só a lista rola. */}
       <div className="tela-topo">
-        <button onClick={() => navigate(-1)} className="back-btn">
+        <button onClick={() => voltar()} className="back-btn">
           <ChevronLeft size={20} /> Voltar
         </button>
 

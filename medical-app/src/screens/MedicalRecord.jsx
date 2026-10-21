@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AlertCircle, Heart, Clock, ChevronLeft, Pill, Stethoscope, Droplet, Plus, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import useVoltar from '../hooks/useVoltar';
 import { usePessoas } from '../context/PessoasContext';
 import { usePrivacidade } from '../context/PrivacidadeContext';
 import BotaoPrivacidade from '../components/BotaoPrivacidade';
@@ -51,6 +52,7 @@ function ItemProntuario({ item, tipo, oculto, aoApagar }) {
 
 export default function MedicalRecord() {
   const navigate = useNavigate();
+  const voltar = useVoltar('/patient');
   const { pessoa, dependenteId } = usePessoas();
   const { oculto } = usePrivacidade();
   const [prontuario, setProntuario] = useState({ alergias: [], condicoes: [], medicacoes: [] });
@@ -147,7 +149,7 @@ export default function MedicalRecord() {
     <div className="screen-container tela-rolagem">
       {/* Cabeçalho e seletor de pessoa ficam parados; só o conteúdo rola. */}
       <div className="tela-topo">
-        <button onClick={() => navigate(-1)} className="back-btn">
+        <button onClick={() => voltar()} className="back-btn">
           <ChevronLeft size={20} /> Voltar
         </button>
 

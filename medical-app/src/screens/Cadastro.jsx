@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { useNavigate } from 'react-router-dom';
+import useVoltar from '../hooks/useVoltar';
 import { ChevronLeft } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Modal from '../components/Modal';
@@ -49,6 +50,7 @@ const schema = yup.object().shape({
 
 export default function Cadastro() {
     const navigate = useNavigate();
+    const voltar = useVoltar('/');
     const { cadastrar } = useAuth();
     const { register, handleSubmit, formState: { errors, isSubmitting }, setValue, setFocus } = useForm({
         resolver: yupResolver(schema)
@@ -94,7 +96,7 @@ export default function Cadastro() {
 
     return (
         <div className="screen-container">
-            <button onClick={() => navigate(-1)} className="back-btn">
+            <button onClick={() => voltar()} className="back-btn">
                 <ChevronLeft size={20} /> Voltar para o Login
             </button>
 

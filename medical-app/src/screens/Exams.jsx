@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import useVoltar from '../hooks/useVoltar';
 import { ChevronLeft, Image as ImageIcon, Droplet, Download, Calendar, Building2, Stethoscope, AlertTriangle, Lock } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import { useAuth } from '../context/AuthContext';
 import { usePessoas } from '../context/PessoasContext';
@@ -29,7 +29,7 @@ function senhaDoPaciente(paciente) {
 }
 
 export default function Exams() {
-  const navigate = useNavigate();
+  const voltar = useVoltar('/patient');
   const { paciente } = useAuth();
   const { pessoa, dependenteId } = usePessoas();
   const { oculto } = usePrivacidade();
@@ -209,7 +209,7 @@ export default function Exams() {
       {/* Cabeçalho, seletor de pessoa e abas ficam parados: as abas são o
           controle da lista e não podem sumir junto com ela. */}
       <div className="tela-topo">
-      <button onClick={() => navigate(-1)} className="back-btn">
+      <button onClick={() => voltar()} className="back-btn">
         <ChevronLeft size={20} /> Voltar
       </button>
 

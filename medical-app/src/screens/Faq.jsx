@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
+import useVoltar from '../hooks/useVoltar';
 import {
   ChevronLeft, ChevronDown, HelpCircle, Info, KeyRound, Users,
   Stethoscope, Syringe, UserCheck, Lock, MessageCircle, MapPin,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { FAQ } from '../content/FaqContent';
 
 // Ícone de cada categoria. A chave é o `id` definido em content/FaqContent.js.
@@ -19,7 +19,7 @@ const ICONES = {
 };
 
 export default function Faq() {
-  const navigate = useNavigate();
+  const voltar = useVoltar('/dashboard');
   // Guarda a pergunta aberta como "categoria-índice"; null = todas fechadas.
   // Só uma fica aberta por vez, para a tela não virar um paredão de texto.
   const [aberta, setAberta] = useState(null);
@@ -31,7 +31,7 @@ export default function Faq() {
       {/* São 51 perguntas: sem o título parado, quem desce perde a referência
           de onde está. */}
       <div className="tela-topo">
-        <button onClick={() => navigate(-1)} className="back-btn">
+        <button onClick={() => voltar()} className="back-btn">
           <ChevronLeft size={20} /> Voltar
         </button>
 

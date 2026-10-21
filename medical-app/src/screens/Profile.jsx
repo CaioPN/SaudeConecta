@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import useVoltar from '../hooks/useVoltar';
 import {
   User, ChevronLeft, Mail, Phone, IdCard, Calendar, Droplet, Venus, MapPin,
   HeartHandshake, Trash2, Plus, Pencil,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { usePrivacidade } from '../context/PrivacidadeContext';
 import { useAcessibilidade, TAMANHOS, CONTRASTES } from '../context/AcessibilidadeContext';
@@ -396,7 +396,7 @@ function Acessibilidade() {
 }
 
 export default function Profile() {
-  const navigate = useNavigate();
+  const voltar = useVoltar('/dashboard');
   const { paciente, atualizarPaciente } = useAuth();
   const [editando, setEditando] = useState(false);
 
@@ -412,7 +412,7 @@ export default function Profile() {
       {/* Só o "Voltar" fica parado. O cartão do avatar é alto e, fixo, comeria
           metade da área de leitura numa tela de celular. */}
       <div className="tela-topo">
-        <button onClick={() => navigate(-1)} className="back-btn">
+        <button onClick={() => voltar()} className="back-btn">
           <ChevronLeft size={20} /> Voltar
         </button>
       </div>

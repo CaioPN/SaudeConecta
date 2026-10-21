@@ -77,6 +77,7 @@ medical-app/          front-end React + Vite
       PessoasContext.jsx  de quem são os dados na tela (idem, não persistido)
     data/             vacinas.js — calendário do PNI. Hoje serve à DEMO e ao
                       seed; o app lê o calendário do banco (calendario_vacinal)
+    hooks/            useVoltar.js — o "Voltar" do topo de toda tela
     utils/            regras puras (faixa de referência, datas, linha do tempo)
                       icones.js — um ícone por assunto, usado por todas as telas
                       privacidade.js — máscaras do "olhinho"
@@ -104,6 +105,20 @@ medical-app/          front-end React + Vite
 Regra geral no front: **tela** vai em `screens/`, **pedaço reutilizável** vai
 em `components/`, **chamada de API** vai em `services/` (nunca `fetch` solto
 dentro do componente).
+
+O botão **"Voltar"** de toda tela usa `useVoltar('/rota-mãe')`
+(`hooks/useVoltar.js`), nunca `navigate('/rota')` nem `navigate(-1)` direto:
+- `navigate('/rota')` **empilha** a rota em vez de voltar. Era o que o detalhe
+  da consulta fazia, e com o "Ver exames" isso prendia Exames → consulta →
+  lista → consulta → lista num vaivém que nunca chegava ao Início.
+- `navigate(-1)` sozinho não faz nada (ou sai do app) quando a tela foi aberta
+  por link, numa aba nova ou recarregada. O hook olha o `idx` que o React
+  Router grava em `history.state` (0 = primeira tela do app) e, sem tela
+  anterior, vai para a rota-mãe com `replace`. A `location.key` não serve para
+  isso: o `replace` gera chave nova, e o segundo "Voltar" saía do app.
+- A rota-mãe segue a barra de navegação: telas de "Minha Saúde" voltam para
+  `/patient`, as do Início e do "Mais" para `/dashboard`, e Termos,
+  Privacidade e Cadastro, que abrem antes do login, para `/`.
 
 Regra geral no back: rota nova entra em `ApiServer`, SQL fica **só** dentro
 dos DAOs, e as classes de `modelos/` são POJOs (atributos + getters/setters,

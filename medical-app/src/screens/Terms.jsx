@@ -1,15 +1,15 @@
 import React from 'react';
+import useVoltar from '../hooks/useVoltar';
 import { ChevronLeft, FileText } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { TermsContent } from '../content/LegalContent';
 
 export default function Terms() {
-  const navigate = useNavigate();
+  const voltar = useVoltar('/');
 
   return (
     <div className="screen-container tela-rolagem">
       <div className="tela-topo">
-      <button onClick={() => navigate(-1)} className="back-btn">
+      <button onClick={() => voltar()} className="back-btn">
         <ChevronLeft size={20} /> Voltar
       </button>
 

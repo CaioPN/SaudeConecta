@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import useVoltar from '../hooks/useVoltar';
 import { useAuth } from '../context/AuthContext';
 import { ICONES } from '../utils/icones';
 
@@ -48,6 +49,7 @@ const REGISTROS = [
 
 export default function PatientProfile() {
   const navigate = useNavigate();
+  const voltar = useVoltar('/dashboard');
   const { paciente } = useAuth();
 
   const primeiroNome = paciente?.nome ? paciente.nome.split(' ')[0] : null;
@@ -55,7 +57,7 @@ export default function PatientProfile() {
   return (
     <div className="screen-container tela-rolagem">
       <div className="tela-topo">
-        <button onClick={() => navigate(-1)} className="back-btn">
+        <button onClick={() => voltar()} className="back-btn">
           <ChevronLeft size={20} /> Voltar
         </button>
 
