@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { Calendar, Syringe, FlaskConical, Activity, Bell, Stethoscope, FileText } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  Calendar, Syringe, FlaskConical, Activity, Bell, Stethoscope, FileText, ChevronDown, ChevronUp,
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { usePrivacidade } from '../context/PrivacidadeContext';
@@ -10,6 +12,7 @@ import { MODO_DEMO } from '../demo/modo';
 import api from '../services/api';
 import { buscarAvisos } from '../services/avisos';
 import { listarNotificacoes, marcarTodasLidas } from '../services/notificacoes';
+import { marcasDosItens, lerVistos, gravarVistos } from '../utils/avisosVistos';
 
 // Cada tipo de aviso tem seu ícone; "exame" é o padrão para o que não casar.
 const ICONES_AVISO = {
@@ -134,6 +137,23 @@ export default function Dashboard() {
   const [totalDependentes, setTotalDependentes] = useState(null);
   const [avisos, setAvisos] = useState(null);
   const { novidades, limpar } = useNotificacoes();
+  // O card começa recolhido a cada visita (de propósito não é gravado): o
+  // Início fica limpo, e a bolinha vermelha diz quando vale a pena abrir.
+  const [avisosAbertos, setAvisosAbertos] = useState(false);
+  const [vistos, setVistos] = useState(lerVistos);
+
+  const marcas = useMemo(
+    () => (avisos === null ? [] : marcasDosItens(avisos, novidades)),
+    [avisos, novidades],
+  );
+  const temNaoVisto = marcas.some((m) => !vistos.has(m));
+  const totalAvisos = avisos === null ? 0 : avisos.length + novidades.length;
+
+  // Abrir o card é ver os avisos: o que estava na tela passa a contar como
+  // visto, e a bolinha só volta quando surgir um aviso novo.
+  useEffect(() => {
+    if (avisosAbertos && temNaoVisto) setVistos((atual) => gravarVistos(atual, marcas));
+  }, [avisosAbertos, temNaoVisto, marcas]);
 
   // Usa o primeiro nome do paciente logado; tem um fallback amigável.
   const primeiroNome = paciente?.nome ? paciente.nome.split(' ')[0] : 'Visitante';
@@ -212,10 +232,12 @@ export default function Dashboard() {
       <div className="section-header">
         <h3 className="section-title text-red">
           Avisos
-          {novidades.length > 0 && <span className="notificacao-contador">{novidades.length}</span>}
+          {temNaoVisto && !avisosAbertos && (
+            <span className="avisos-ponto" role="status" aria-label="Há avisos que você ainda não viu" />
+          )}
         </h3>
         <div className="avisos-acoes">
-          {novidades.length > 0 && (
+          {avisosAbertos && novidades.length > 0 && (
             <button type="button" className="notificacao-limpar" onClick={limpar}>
               Marcar como lidas
             </button>
@@ -223,6 +245,23 @@ export default function Dashboard() {
           <BotaoPrivacidade rotulo="avisos" />
         </div>
       </div>
+      {!avisosAbertos ? (
+        <button
+          type="button"
+          className="card avisos-recolhido"
+          onClick={() => setAvisosAbertos(true)}
+          aria-expanded="false"
+        >
+          <span>
+            {avisos === null
+              ? 'Carregando avisos...'
+              : totalAvisos === 0
+                ? 'Não há avisos no momento.'
+                : `${totalAvisos} ${totalAvisos === 1 ? 'aviso' : 'avisos'}. Clique aqui para ver.`}
+          </span>
+          {totalAvisos > 0 && <ChevronDown size={18} />}
+        </button>
+      ) : (
       <div className="card">
         {avisos === null ? (
           <p className="text-sm text-muted">Carregando avisos...</p>
@@ -238,7 +277,16 @@ export default function Dashboard() {
             ))}
           </>
         )}
+        <button
+          type="button"
+          className="avisos-recolher"
+          onClick={() => setAvisosAbertos(false)}
+          aria-expanded="true"
+        >
+          Recolher <ChevronUp size={16} />
+        </button>
       </div>
+      )}
 
       {/* Depois das ações rápidas: o número de dependentes não muda de um dia
           para o outro e não merecia o primeiro lugar da tela, acima dos avisos. */}

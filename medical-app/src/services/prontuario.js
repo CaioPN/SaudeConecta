@@ -23,3 +23,27 @@ export async function buscarProntuario(dependenteId) {
     })),
   };
 }
+
+/**
+ * POST /api/prontuario — o paciente informa uma alergia ou uma condição dele
+ * ou de um dependente. Fica gravada como "informada pelo paciente".
+ *
+ * @param {{tipo: 'alergia'|'condicao', descricao: string, desde?: string, dependenteId?: number}} item
+ */
+export async function informarItem({ tipo, descricao, desde, dependenteId }) {
+  const { data } = await api.post('/prontuario', {
+    tipo,
+    descricao,
+    desde: desde || undefined,
+    dependenteId: dependenteId || undefined,
+  });
+  return data;
+}
+
+/**
+ * DELETE /api/prontuario/{tipo}/{id} — apaga uma alergia ou condição que o
+ * próprio paciente informou. O que o profissional registrou devolve 404.
+ */
+export async function apagarItemInformado(tipo, id) {
+  await api.delete(`/prontuario/${tipo}/${id}`);
+}

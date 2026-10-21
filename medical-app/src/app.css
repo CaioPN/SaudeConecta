@@ -2903,3 +2903,81 @@ body[data-contraste="escuro"] .app-container::before {
   align-items: center;
   gap: 12px;
 }
+
+/* ============================================================
+   Prontuário: alergia e condição informadas pelo paciente
+   A etiqueta separa o que o paciente declarou do que o
+   profissional registrou — no app, na ficha e no portal.
+   ============================================================ */
+.prontuario-visao-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+}
+.prontuario-visao-item + .prontuario-visao-item { margin-top: 6px; }
+.etiqueta-informado {
+  display: block;
+  font-size: calc(10px * var(--escala-fonte));
+  font-weight: 600;
+  color: var(--text-gray);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.prontuario-apagar {
+  flex-shrink: 0;
+  display: inline-flex;
+  padding: 4px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-gray);
+  cursor: pointer;
+}
+.prontuario-apagar:hover { color: var(--status-bad); background-color: var(--vermelho-fundo); }
+.prontuario-informar { margin-top: 0; margin-bottom: 24px; }
+.ficha-origem {
+  display: block;
+  font-size: calc(12px * var(--escala-fonte));
+  font-weight: 500;
+  color: var(--text-gray);
+}
+
+/* Card "Avisos" recolhido: começa fechado; a bolinha vermelha marca aviso
+   que a pessoa ainda não viu (ver utils/avisosVistos.js). */
+.avisos-ponto {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-left: 8px;
+  border-radius: 50%;
+  background-color: var(--status-bad);
+  vertical-align: middle;
+}
+.avisos-recolhido {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  text-align: left;
+  color: var(--primary-blue);
+  font-size: calc(14px * var(--escala-fonte));
+  font-weight: 600;
+  cursor: pointer;
+}
+.avisos-recolher {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 6px;
+  border: none;
+  background: none;
+  color: var(--text-gray);
+  font-weight: 600;
+  cursor: pointer;
+}

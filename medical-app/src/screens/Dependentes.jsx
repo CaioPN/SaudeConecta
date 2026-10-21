@@ -13,12 +13,23 @@ import api from '../services/api';
 
 const TIPOS_SANGUINEOS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
+// Data de hoje no fuso do aparelho. toISOString() daria o dia em UTC, que no
+// Brasil já é "amanhã" depois das 21h.
+function hojeIso() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 const schema = yup.object().shape({
     nome: yup.string().required('O nome é obrigatório!'),
     cpf: yup.string()
         .matches(/^\d{11}$/, 'O CPF deve ter exatamente 11 dígitos numéricos!')
         .required('O CPF é obrigatório!'),
-    dataNascimento: yup.string().required('A data de nascimento é obrigatória!'),
+    dataNascimento: yup.string()
+        .required('A data de nascimento é obrigatória!')
+        // Texto ISO compara como data: "2027-01-05" > "2026-10-20".
+        .test('nao-futura', 'A data de nascimento não pode estar no futuro!',
+            (valor) => !valor || valor <= hojeIso()),
     genero: yup.string().required('Selecione o gênero!'),
     tipoSanguineo: yup.string().required('Selecione o tipo sanguíneo!'),
 });
@@ -130,7 +141,7 @@ export default function Dependentes() {
                         </div>
                         <div className="input-group" style={{ marginBottom: 0 }}>
                             <label className="input-label">Data de Nascimento</label>
-                            <input type="date" className="input-field" {...register('dataNascimento')} />
+                            <input type="date" className="input-field" max={hojeIso()} {...register('dataNascimento')} />
                             {erroMsg('dataNascimento')}
                         </div>
                     </div>

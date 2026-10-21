@@ -137,7 +137,14 @@ export default function FichaEmergencia() {
               {prontuario.alergias.length === 0 ? (
                 <p className="ficha-vazio">Nenhuma alergia registrada no app.</p>
               ) : (
-                prontuario.alergias.map((a) => <p key={a.id} className="ficha-item">{a.descricao}</p>)
+                prontuario.alergias.map((a) => (
+                  <p key={a.id} className="ficha-item">
+                    {a.descricao}
+                    {/* Para o socorrista, "declarada pelo paciente" e "registrada
+                        por um médico" pesam diferente: os dois aparecem, marcados. */}
+                    {a.origem === 'paciente' && <span className="ficha-origem">informada pelo paciente</span>}
+                  </p>
+                ))
               )}
             </div>
 
@@ -146,7 +153,12 @@ export default function FichaEmergencia() {
               {prontuario.condicoes.length === 0 ? (
                 <p className="ficha-vazio">Nenhuma condição registrada no app.</p>
               ) : (
-                prontuario.condicoes.map((c) => <p key={c.id} className="ficha-item">{c.descricao}</p>)
+                prontuario.condicoes.map((c) => (
+                  <p key={c.id} className="ficha-item">
+                    {c.descricao}
+                    {c.origem === 'paciente' && <span className="ficha-origem">informada pelo paciente</span>}
+                  </p>
+                ))
               )}
             </div>
 

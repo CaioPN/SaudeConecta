@@ -28,7 +28,8 @@ paciente para facilitar o acesso em atendimentos.
 backend-api/          API Java (pacote br.com.hackgov)
   lib/                mysql-connector-j.jar
   out/                .class compilados
-  config.properties   chave da IA do chatbot (fora do Git; ver .example)
+  config.properties   chaves da IA, conta do banco e segredo do JWT
+                      (fora do Git; ver .example — sem ele a API não lê o banco)
   src/br/com/hackgov/
     api/ApiServer       servidor HTTP + rotas
     dao/                acesso ao banco — Paciente, Dependente, Consulta,
@@ -112,7 +113,8 @@ sem lógica de banco).
 
 - Cadastro de paciente
 - Login / `AuthContext` (front) + `Jwt` e `SenhaUtil` (back)
-- Dependentes (tela + `DependenteDAO`)
+- Dependentes (tela + `DependenteDAO`). A data de nascimento não aceita dia
+  futuro — na tela (`max` + yup) e no `ApiServer.criarDependente`.
 - Vacinas (`Vacinas.jsx`): carteira montada pela API a partir do calendário do
   PNI e da data de nascimento, com seletor de pessoa (titular + dependentes) e
   registro das doses aplicadas (ver o bloco da carteira mais abaixo). Só a
@@ -282,7 +284,7 @@ sem lógica de banco).
       "O QUE O APP NÃO FAZ". Ao mudar um fluxo, esse bloco entra na mesma
       revisão do FAQ e da base de regras.
 - **Dúvidas frequentes** (`Faq.jsx`, rota `/faq`, texto em
-  `content/FaqContent.js`): sanfona com 64 perguntas em oito categorias — o item
+  `content/FaqContent.js`): sanfona com 67 perguntas em oito categorias — o item
   "Dúvidas frequentes" do menu "Mais" apontava para uma rota que não existia.
   As respostas descrevem o que o app faz **hoje** (dizem, por exemplo, que
   anotar uma consulta não a marca na unidade, e explicam a conferência de três
@@ -817,6 +819,10 @@ sem lógica de banco).
       atrás por aqui (409). Auditado como `concluiu_consulta` e
       `cancelou_consulta`; `cancelada` é um selo novo, em cinza, porque
       desmarcar é fato comum e não alerta.
+      **"Sim, fui" só aparece a partir do dia da consulta** (e o `ApiServer`
+      responde 409 antes disso); "Foi cancelada" vale a qualquer momento,
+      porque desmarcar com antecedência é o caso comum. A comparação é por
+      dia, não por hora.
     - Lembrete e aviso saem de graça: `gerarLembretes` e o `AvisoDAO` já olham
       `status = 'agendada'` por data, e agora enxergam também estas.
   - Auditado como `cadastrou_consulta`, `atualizou_consulta` e
@@ -949,8 +955,87 @@ sem lógica de banco).
     valores. E **não interpreta**: nenhuma frase diz "melhorou" ou "piorou".
   - O SVG tem `aria-label` com todos os valores e a tabela repete tudo em
     texto, para leitor de tela.
+- **O paciente informa alergias e condições** (`POST /api/prontuario`,
+  `DELETE /api/prontuario/{tipo}/{id}`, coluna `origem` em `alergias` e
+  `condicoes`, botão "Informar alergia ou condição" no `MedicalRecord.jsx`):
+  a alergia que o paciente conhece desde criança só entrava no app se ele
+  passasse numa consulta com código de acesso.
+  - O item nasce com `origem = 'paciente'`, e o que já existia ficou como
+    `'medico'` (o padrão da coluna). O prontuário mostra "informado por você",
+    e a ficha de emergência e o portal do médico mostram "informada pelo
+    paciente": quem atende precisa separar declaração de diagnóstico.
+  - O paciente apaga só o que ele informou: `origem = 'paciente'` está no
+    `WHERE` do `ProntuarioDAO.excluirDoPaciente`, então o id de um item do
+    médico devolve 404. O X pede confirmação (`ConfirmarExclusao`).
+  - **Medicação fica de fora**: dose e frequência são prescrição.
+  - Auditado como `cadastrou_alergia`/`condicao` e `excluiu_...`, **sem a
+    descrição** no `detalhe` — é diagnóstico, e a trilha não passa pelo olhinho.
+- **Cartão de Avisos retrátil** (`Dashboard.jsx`, `utils/avisosVistos.js`):
+  começa fechado com "N avisos. Clique aqui para ver."; a bolinha vermelha ao
+  lado do título indica aviso ainda não visto e some quando o cartão abre. O
+  que já foi visto fica no `localStorage` (`sc_avisos_vistos`) como uma
+  **marca FNV-1a** de cada aviso, nunca o texto, e notificações entram pelo id.
+- **Segurança do banco e do desenvolvimento** (revisão de 20/10/2026):
+  - **A senha do root do MySQL e o segredo do JWT estavam no código**
+    (`Conexao.java` e `Jwt.java`), num repositório **público**. Com o
+    segredo, qualquer um assinava um token com o id de qualquer paciente.
+    Os dois saíram para o `config.properties` (`db.usuario`, `db.senha`,
+    `jwt.segredo`, ou `DB_USUARIO`/`DB_SENHA`/`JWT_SEGREDO`). Sem
+    `jwt.segredo`, o `Jwt` sorteia um por subida em vez de voltar a um
+    segredo conhecido. Testado: um token assinado com o segredo antigo volta 401.
+  - **A API não entra mais como root**: usa `saudeconecta_api@localhost`, só
+    com `SELECT, INSERT, UPDATE, DELETE` em `saudeconecta.*`. Uma injeção de
+    SQL que escapasse do `PreparedStatement` não conseguiria apagar tabela,
+    ler outro banco nem gravar arquivo no disco. O `schema.sql` continua
+    sendo aplicado com o root, à mão — o Java não roda DDL nenhum.
+  - **Login com limite de tentativas** (10 erros por IP em 10 min → 429), num
+    mapa separado do portal do médico e da recuperação de senha, para quem
+    erra a senha não bloquear o médico ao lado. É por IP, e não por e-mail,
+    para ninguém trancar a conta de outra pessoa de propósito.
+  - **A API escuta só em 127.0.0.1** (era 0.0.0.0): o front a chama por
+    `localhost`, e o resto abria a porta para o Wi-Fi da feira.
+  - **Corpo limitado a 64 KB** (`LIMITE_CORPO_BYTES`): o `readAllBytes` sem
+    teto guardaria na memória o que viesse. O `comCors` responde 400 para
+    `IllegalArgumentException`, então isso vale também nas rotas que não a
+    tratavam.
+  - Toda resposta leva `Cache-Control: no-store` e
+    `X-Content-Type-Options: nosniff`.
+  - **Token sem `exp` é recusado** — antes valeria para sempre.
+  - **O `localStorage` guarda só id, nome, e-mail, data de nascimento e
+    gênero** (`CAMPOS_GRAVADOS` no `AuthContext`). CPF, telefone, endereço e
+    tipo sanguíneo vêm de `GET /api/auth/me` ao abrir o app e ficam na
+    memória; quem entrou antes tem o registro reduzido na primeira abertura.
+    Token vencido no `/auth/me` encerra a sessão em vez de deixar o app com
+    cara de logado.
+  - `npm audit fix` zerou 6 vulnerabilidades (axios, react-router,
+    dompurify, follow-redirects, form-data) **sem biblioteca nova**: só
+    versões dentro das faixas que o `package.json` já declarava.
+  - O que foi conferido e estava certo: todo SQL com `PreparedStatement` (as
+    concatenações que existem são de nome de tabela traduzido de constante e
+    de `?` gerados), erros só no log do servidor, PBKDF2 com salt, JWT com
+    comparação em tempo constante e tipos de token que não se confundem.
+- Dependente: a data de nascimento não aceita dia futuro — `max` no campo,
+  teste no yup e 400 no `ApiServer.criarDependente`.
 
 ## O que falta
+
+- **A senha antiga do root continua no histórico do GitHub** (commit
+  `db67bcb` em diante), e o segredo antigo do JWT também. O segredo já não
+  vale nada (o novo é outro), mas a senha do root vale até ser trocada no
+  MySQL — e, se ela for usada em outro lugar, lá também. Apagar do histórico
+  exigiria reescrever os commits e forçar o push, que fica a critério do dono.
+- O MySQL escuta em todas as interfaces (`bind-address = *`). Hoje as contas
+  só aceitam `@localhost`, então ninguém de fora entra, mas o certo é
+  `bind-address=127.0.0.1` no `my.ini` (precisa de administrador e reiniciar
+  o serviço). A conta `saudeconectaFIAPPP` (ALL PRIVILEGES no banco, não
+  usada pelo código) também merece revisão.
+- **Sair não invalida o token**: o JWT vale 7 dias e não há lista de
+  revogação. Apagar do `localStorage` resolve o aparelho compartilhado, não
+  um token copiado. O limite de tentativas do login fica na memória (reiniciar
+  a API zera) e, como tudo chega de 127.0.0.1, dez erros seguidos bloqueiam o
+  login inteiro por 10 minutos naquela máquina.
+- A conexão com o MySQL é sem TLS (`useSSL=false`) — aceitável enquanto banco
+  e API estão na mesma máquina, não se um dia forem separados.
 
 - A recuperação de senha prova a identidade conferindo três dados do cadastro.
   Sem serviço de e-mail é o mais forte que dá para fazer aqui, mas continua
@@ -1107,6 +1192,11 @@ executar-api.bat    REM sobe a API REST em http://localhost:3001
 
 Os dois scripts apontam para um JDK fixo na variável `JAVA_BIN`; se você tiver
 o `java`/`javac` no PATH, basta deixar `set "JAVA_BIN="`.
+
+**Antes de subir a API**, copie `backend-api/config.properties.example` para
+`backend-api/config.properties` e preencha `db.usuario`, `db.senha` e
+`jwt.segredo` (o próprio `.example` mostra como criar a conta do banco e
+sortear o segredo). Sem isso a API sobe, mas não lê o banco.
 
 Para o chatbot usar IA (opcional — sem isso ele funciona só com as regras
 locais), copie `backend-api/config.properties.example` para

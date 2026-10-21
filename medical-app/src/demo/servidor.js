@@ -447,6 +447,7 @@ const ROTAS = [
     const obrig = ['nome', 'cpf', 'genero', 'tipoSanguineo', 'dataNascimento'];
     if (obrig.some((c) => !campo(corpo, c))) falhar(400, 'Preencha todos os dados do dependente.');
     if (!/^\d{11}$/.test(campo(corpo, 'cpf'))) falhar(400, 'O CPF deve ter exatamente 11 dígitos numéricos.');
+    if (campo(corpo, 'dataNascimento') > hojeIso()) falhar(400, 'A data de nascimento não pode estar no futuro.');
     const d = {
       id: novoId(), nome: campo(corpo, 'nome'), cpf: campo(corpo, 'cpf'), genero: campo(corpo, 'genero'),
       tipo_sanguineo: campo(corpo, 'tipoSanguineo'), data_nascimento: campo(corpo, 'dataNascimento'),
@@ -545,6 +546,7 @@ const ROTAS = [
     if (status !== 'realizada' && status !== 'cancelada') falhar(400, 'Situação inválida: use realizada ou cancelada.');
     const c = estado.consultas.find((x) => x.id === Number(id));
     if (!c) falhar(404, 'Consulta não encontrada.');
+    if (status === 'realizada' && c.data > hojeIso()) falhar(409, 'Esta consulta ainda não aconteceu.');
     if (c.status !== 'agendada') falhar(409, 'Esta consulta já foi concluída ou cancelada.');
     c.status = status;
     auditar(status === 'realizada' ? 'concluiu_consulta' : 'cancelou_consulta', 'consultas', c.motivo, c.dependente_id ?? null);
@@ -586,10 +588,37 @@ const ROTAS = [
     const depId = idDependente(query);
     auditar('consultou_prontuario', 'prontuario', alvoDaLeitura(depId), depId, true);
     return {
-      alergias: estado.alergias.filter(ehDe(depId)).map(({ id, descricao }) => ({ id, descricao })),
-      condicoes: estado.condicoes.filter(ehDe(depId)).map(({ id, descricao, desde }) => ({ id, descricao, desde })),
+      alergias: estado.alergias.filter(ehDe(depId)).map(({ id, descricao, origem }) => ({ id, descricao, origem: origem || 'medico' })),
+      condicoes: estado.condicoes.filter(ehDe(depId)).map(({ id, descricao, desde, origem }) => ({ id, descricao, desde, origem: origem || 'medico' })),
       medicacoes: estado.medicacoes.filter(ehDe(depId)).map(({ id, nome, dosagem, frequencia, desde }) => ({ id, nome, dosagem, frequencia, desde })),
     };
+  }],
+  // Mesmas regras do ApiServer.informarItemProntuario / apagarItemInformado.
+  ['post', '/prontuario', ({ corpo }) => {
+    const tipo = campo(corpo, 'tipo');
+    const descricao = campo(corpo, 'descricao');
+    if (tipo !== 'alergia' && tipo !== 'condicao') falhar(400, 'Tipo inválido: use alergia ou condicao.');
+    if (!descricao) falhar(400, tipo === 'alergia' ? 'Informe a descrição da alergia.' : 'Informe a descrição da condição.');
+    if (descricao.length > 160) falhar(400, 'A descrição pode ter até 160 caracteres.');
+    const desde = campo(corpo, 'desde');
+    if (desde && (Number.isNaN(Date.parse(desde)) || desde > hojeIso())) falhar(400, 'Data inválida.');
+    const depId = typeof corpo.dependenteId === 'number' ? corpo.dependenteId : null;
+    if (depId != null && !dependente(depId)) falhar(404, 'Dependente não encontrado.');
+    const id = novoId();
+    if (tipo === 'alergia') estado.alergias.push({ id, dependente_id: depId, descricao, origem: 'paciente' });
+    else estado.condicoes.push({ id, dependente_id: depId, descricao, desde: desde || null, origem: 'paciente' });
+    auditar(`cadastrou_${tipo}`, 'prontuario', alvoDaLeitura(depId), depId);
+    return [201, { id, sucesso: true }];
+  }],
+  ['delete', '/prontuario/:tipo/:id', ({ tipo, id }) => {
+    const tabela = { alergia: 'alergias', condicao: 'condicoes' }[tipo];
+    if (!tabela) falhar(400, 'Tipo inválido: use alergia ou condicao.');
+    const item = estado[tabela].find((x) => x.id === Number(id) && x.origem === 'paciente');
+    if (!item) falhar(404, 'Item não encontrado ou registrado por um profissional.');
+    estado[tabela] = estado[tabela].filter((x) => x !== item);
+    const depId = item.dependente_id ?? null;
+    auditar(`excluiu_${tipo}`, 'prontuario', alvoDaLeitura(depId), depId);
+    return { sucesso: true };
   }],
 
   // --- IA: sem servidor, responde como o app responde com a IA fora do ar ---
@@ -721,8 +750,8 @@ const ROTAS = [
       paciente: resumoPessoa(dep || estado.paciente),
       titular: dep ? primeiroNome(estado.paciente.nome) : null,
       dependente: dep ? dep.nome : null,
-      alergias: estado.alergias.filter(ehDe(depId)).map((a) => ({ id: a.id, texto: a.descricao })),
-      condicoes: estado.condicoes.filter(ehDe(depId)).map((c) => ({ id: c.id, texto: c.descricao })),
+      alergias: estado.alergias.filter(ehDe(depId)).map((a) => ({ id: a.id, texto: a.descricao, origem: a.origem || 'medico' })),
+      condicoes: estado.condicoes.filter(ehDe(depId)).map((c) => ({ id: c.id, texto: c.descricao, origem: c.origem || 'medico' })),
       medicacoes: estado.medicacoes.filter(ehDe(depId)).map((m) => ({ id: m.id, texto: `${m.nome} ${m.dosagem} — ${m.frequencia}` })),
       contatos,
       escopo: acesso.escopo,
@@ -784,10 +813,10 @@ const ROTAS = [
       descricao = campo(corpo, 'descricao');
       if (!descricao) falhar(400, `Informe a descrição da ${corpo.tipo === 'alergia' ? 'alergia' : 'condição'}.`);
       if (corpo.tipo === 'alergia') {
-        estado.alergias.push({ id, dependente_id: depId, descricao });
+        estado.alergias.push({ id, dependente_id: depId, descricao, origem: 'medico' });
         rotulo = 'alergia';
       } else {
-        estado.condicoes.push({ id, dependente_id: depId, descricao, desde: campo(corpo, 'desde') });
+        estado.condicoes.push({ id, dependente_id: depId, descricao, desde: campo(corpo, 'desde'), origem: 'medico' });
         rotulo = 'condição';
       }
     } else if (corpo.tipo === 'medicacao') {

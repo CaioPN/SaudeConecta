@@ -457,7 +457,10 @@ function FormularioProntuario({ token, dados, onMudou }) {
           ) : (
             secao.itens.map((item) => (
               <div key={item.id} className="prontuario-item">
-                <p className="text-sm">{item.texto}</p>
+                <p className="text-sm">
+                  {item.texto}
+                  {item.origem === 'paciente' && <span className="etiqueta-informado">informado pelo paciente</span>}
+                </p>
                 <button
                   type="button"
                   className="item-remover"
@@ -688,7 +691,12 @@ export default function PortalMedico() {
                   </div>
                   {dados.alergias.length === 0
                     ? <p className="text-sm text-muted">Nenhuma</p>
-                    : dados.alergias.map((a) => <p key={a.id} className="font-bold">{a.texto}</p>)}
+                    : dados.alergias.map((a) => (
+                        <p key={a.id} className="font-bold">
+                          {a.texto}
+                          {a.origem === 'paciente' && <span className="etiqueta-informado">informado pelo paciente</span>}
+                        </p>
+                      ))}
                 </div>
                 <div className="card card-sm border-blue" style={{ marginBottom: 0 }}>
                   <div className="flex items-center gap-4 text-blue mb-2">
@@ -696,7 +704,12 @@ export default function PortalMedico() {
                   </div>
                   {dados.condicoes.length === 0
                     ? <p className="text-sm text-muted">Nenhuma</p>
-                    : dados.condicoes.map((c) => <p key={c.id} className="font-bold">{c.texto}</p>)}
+                    : dados.condicoes.map((c) => (
+                        <p key={c.id} className="font-bold">
+                          {c.texto}
+                          {c.origem === 'paciente' && <span className="etiqueta-informado">informado pelo paciente</span>}
+                        </p>
+                      ))}
                 </div>
               </div>
 

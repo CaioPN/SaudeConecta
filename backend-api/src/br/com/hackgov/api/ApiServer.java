@@ -86,6 +86,8 @@ import br.com.hackgov.util.SenhaUtil;
  *   GET    /api/consultas/{id}    detalhe de uma consulta
  *   GET    /api/exames            coletas de sangue e exames de imagem
  *   GET    /api/prontuario        alergias, condições e medicações
+ *   POST   /api/prontuario        o paciente informa uma alergia ou condição
+ *   DELETE /api/prontuario/{tipo}/{id}  apaga uma que ELE informou
  *   GET    /api/avisos            avisos do Dashboard (derivados dos dados)
  *   GET    /api/rede-saude        UBS, UPAs e prontos-socorros mais próximos
  *   GET    /api/rede-saude/unidades/{cnes}  o que aquela unidade oferece
@@ -703,6 +705,16 @@ public class ApiServer {
             enviarErro(ex, 400, "O CPF deve ter exatamente 11 dígitos numéricos.");
             return;
         }
+        // Dependente ainda não nascido entraria com idade negativa, e a carteira
+        // de vacinação montaria o calendário inteiro a partir de uma data futura.
+        if (!dataValida(dataNascimento)) {
+            enviarErro(ex, 400, "Data de nascimento inválida.");
+            return;
+        }
+        if (LocalDate.parse(dataNascimento).isAfter(LocalDate.now())) {
+            enviarErro(ex, 400, "A data de nascimento não pode estar no futuro.");
+            return;
+        }
 
         Dependente d = new Dependente(userId, nome, cpf, genero, tipoSanguineo, dataNascimento);
         dependenteDAO.inserir(d);
@@ -1289,6 +1301,13 @@ public class ApiServer {
             enviarErro(ex, 404, "Consulta não encontrada.");
             return;
         }
+        // Ninguém foi a uma consulta que ainda não chegou. Cancelar continua
+        // valendo antes do dia — desmarcar com antecedência é o caso comum.
+        if ("realizada".equals(status) && c.getData() != null
+                && dataValida(c.getData()) && LocalDate.parse(c.getData()).isAfter(LocalDate.now())) {
+            enviarErro(ex, 409, "Esta consulta ainda não aconteceu.");
+            return;
+        }
         if (!consultaDAO.atualizarStatus(id, userId, status)) {
             enviarErro(ex, 409, "Esta consulta já foi concluída ou cancelada.");
             return;
@@ -1869,13 +1888,31 @@ public class ApiServer {
         enviarJson(ex, 200, resp);
     }
 
-    /** GET /api/prontuario — alergias, condições e medicações do paciente logado. */
+    /**
+     * /api/prontuario — GET lê alergias, condições e medicações do paciente
+     * logado; POST e DELETE são o paciente informando (ou apagando) uma
+     * alergia ou condição dele ou de um dependente.
+     */
     private static void prontuario(HttpExchange ex) throws IOException {
-        if (!"GET".equals(ex.getRequestMethod())) { enviarErro(ex, 405, "Método não permitido."); return; }
         Integer userId = autenticar(ex);
         if (userId == null) return;
 
+        String metodo = ex.getRequestMethod();
+        String path = ex.getRequestURI().getPath();
         try {
+            if ("POST".equals(metodo) && "/api/prontuario".equals(path)) {
+                informarItemProntuario(ex, userId);
+                return;
+            }
+            if ("DELETE".equals(metodo) && path.startsWith("/api/prontuario/")) {
+                apagarItemInformado(ex, userId, path.substring("/api/prontuario/".length()));
+                return;
+            }
+            if (!"GET".equals(metodo) || !"/api/prontuario".equals(path)) {
+                enviarErro(ex, 405, "Método não permitido.");
+                return;
+            }
+
             Integer dependenteId = idDependente(ex);
 
             List<Object> alergias = new ArrayList<>();
@@ -1883,6 +1920,7 @@ public class ApiServer {
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("id", a.getIdAlergia());
                 m.put("descricao", a.getDescricao());
+                m.put("origem", a.getOrigem());
                 alergias.add(m);
             }
 
@@ -1892,6 +1930,7 @@ public class ApiServer {
                 m.put("id", h.getIdHistorico());
                 m.put("descricao", h.getDescricao());
                 m.put("desde", h.getData());
+                m.put("origem", h.getOrigem());
                 condicoes.add(m);
             }
 
@@ -1919,6 +1958,115 @@ public class ApiServer {
             System.out.println("[ERRO prontuario] " + e.getMessage());
             enviarErro(ex, 500, "Erro ao buscar o prontuário.");
         }
+    }
+
+    /** Tamanho da coluna descricao de alergias e condicoes. */
+    private static final int TAMANHO_DESCRICAO_PRONTUARIO = 160;
+
+    /**
+     * POST /api/prontuario — o paciente informa uma alergia ou uma condição.
+     *
+     * Até aqui só o médico, com código de acesso, escrevia no prontuário, e a
+     * alergia que o paciente conhece desde criança só chegava ao app (e à ficha
+     * de emergência) se ele passasse numa consulta. O que ele informa é gravado
+     * com origem "paciente": a tela, a ficha e o portal do médico mostram isso,
+     * para ninguém confundir o que foi declarado com o que foi diagnosticado.
+     *
+     * Medicação fica de fora de propósito: dose e frequência são prescrição, e
+     * um engano ali vira instrução errada para quem atende.
+     */
+    private static void informarItemProntuario(HttpExchange ex, int userId)
+            throws IOException, SQLException {
+        Map<String, Object> body = lerCorpo(ex);
+        String tipo = campo(body, "tipo");
+        String descricao = campo(body, "descricao");
+
+        if (!"alergia".equals(tipo) && !"condicao".equals(tipo)) {
+            enviarErro(ex, 400, "Tipo inválido: use alergia ou condicao.");
+            return;
+        }
+        if (descricao == null) {
+            enviarErro(ex, 400, "alergia".equals(tipo)
+                    ? "Informe a descrição da alergia." : "Informe a descrição da condição.");
+            return;
+        }
+        if (descricao.length() > TAMANHO_DESCRICAO_PRONTUARIO) {
+            enviarErro(ex, 400, "A descrição pode ter até " + TAMANHO_DESCRICAO_PRONTUARIO + " caracteres.");
+            return;
+        }
+        String desde = campo(body, "desde");
+        if (desde != null && (!dataValida(desde) || LocalDate.parse(desde).isAfter(LocalDate.now()))) {
+            enviarErro(ex, 400, "Data inválida.");
+            return;
+        }
+
+        Integer dependenteId = body.get("dependenteId") instanceof Number
+                ? ((Number) body.get("dependenteId")).intValue()
+                : null;
+        if (dependenteId != null && dependenteDAO.nomeDoPaciente(dependenteId, userId) == null) {
+            enviarErro(ex, 404, "Dependente não encontrado.");
+            return;
+        }
+
+        int id = "alergia".equals(tipo)
+                ? prontuarioDAO.inserirAlergia(userId, dependenteId, descricao, ProntuarioDAO.ORIGEM_PACIENTE)
+                : prontuarioDAO.inserirCondicao(userId, dependenteId, descricao, desde,
+                        ProntuarioDAO.ORIGEM_PACIENTE);
+
+        // O detalhe da trilha nunca leva a descrição: alergia e condição são
+        // diagnóstico, e a trilha é lida na tela sem passar pelo olhinho.
+        auditar(ex, userId, "cadastrou_" + tipo, "prontuario",
+                alvoDaLeitura(userId, dependenteId), dependenteId);
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("id", id);
+        resp.put("sucesso", Boolean.TRUE);
+        enviarJson(ex, 201, resp);
+    }
+
+    /**
+     * DELETE /api/prontuario/{tipo}/{id} — o paciente apaga uma alergia ou
+     * condição que ELE informou. A trava de origem fica no DAO: o que o médico
+     * registrou devolve 404 aqui, e continua podendo ser removido só pelo
+     * portal do médico.
+     */
+    private static void apagarItemInformado(HttpExchange ex, int userId, String resto)
+            throws IOException, SQLException {
+        String[] partes = resto.split("/");
+        if (partes.length != 2) {
+            enviarErro(ex, 400, "Informe o tipo e o id do item.");
+            return;
+        }
+        String tipo = partes[0];
+        // A tabela nunca vem do cliente: o tipo é traduzido para a constante.
+        String tabela;
+        if ("alergia".equals(tipo)) {
+            tabela = ProntuarioDAO.TABELA_ALERGIA;
+        } else if ("condicao".equals(tipo)) {
+            tabela = ProntuarioDAO.TABELA_CONDICAO;
+        } else {
+            enviarErro(ex, 400, "Tipo inválido: use alergia ou condicao.");
+            return;
+        }
+        int id;
+        try {
+            id = Integer.parseInt(partes[1].trim());
+        } catch (NumberFormatException e) {
+            enviarErro(ex, 400, "Id inválido.");
+            return;
+        }
+
+        // Lido antes do DELETE: depois não há de onde tirar de quem era o item.
+        Integer dono = prontuarioDAO.dependenteDe(tabela, id, userId);
+        if (!prontuarioDAO.excluirDoPaciente(tabela, id, userId)) {
+            enviarErro(ex, 404, "Item não encontrado ou registrado por um profissional.");
+            return;
+        }
+        auditar(ex, userId, "excluiu_" + tipo, "prontuario", alvoDaLeitura(userId, dono), dono);
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("sucesso", Boolean.TRUE);
+        enviarJson(ex, 200, resp);
     }
 
     // ===================== ACESSO TEMPORÁRIO (LADO DO PACIENTE) =====================
@@ -2416,11 +2564,11 @@ public class ApiServer {
         // qual linha remover.
         List<Object> alergias = new ArrayList<>();
         for (Alergia a : prontuarioDAO.listarAlergias(acesso.getIdPaciente(), idDependente)) {
-            alergias.add(itemProntuarioJson(a.getIdAlergia(), a.getDescricao()));
+            alergias.add(itemProntuarioJson(a.getIdAlergia(), a.getDescricao(), a.getOrigem()));
         }
         List<Object> condicoes = new ArrayList<>();
         for (HistoricoMedico h : prontuarioDAO.listarCondicoes(acesso.getIdPaciente(), idDependente)) {
-            condicoes.add(itemProntuarioJson(h.getIdHistorico(), h.getDescricao()));
+            condicoes.add(itemProntuarioJson(h.getIdHistorico(), h.getDescricao(), h.getOrigem()));
         }
         List<Object> medicacoes = new ArrayList<>();
         for (Medicacao m : prontuarioDAO.listarMedicacoes(acesso.getIdPaciente(), idDependente)) {
@@ -2650,7 +2798,8 @@ public class ApiServer {
                 enviarErro(ex, 400, "Informe a descrição da alergia.");
                 return;
             }
-            id = prontuarioDAO.inserirAlergia(idPaciente, acesso.getIdDependente(), descricao);
+            id = prontuarioDAO.inserirAlergia(idPaciente, acesso.getIdDependente(), descricao,
+                    ProntuarioDAO.ORIGEM_MEDICO);
             rotulo = "alergia";
 
         } else if ("condicao".equals(tipo)) {
@@ -2660,7 +2809,7 @@ public class ApiServer {
                 return;
             }
             id = prontuarioDAO.inserirCondicao(idPaciente, acesso.getIdDependente(),
-                    descricao, campo(body, "desde"));
+                    descricao, campo(body, "desde"), ProntuarioDAO.ORIGEM_MEDICO);
             rotulo = "condição";
 
         } else if ("medicacao".equals(tipo)) {
@@ -3163,12 +3312,19 @@ public class ApiServer {
 
     /**
      * Item do prontuário no formato que o portal do médico usa: o texto para
-     * mostrar e o id para poder remover.
+     * mostrar e o id para poder remover. "origem" diz se foi o paciente quem
+     * informou — o médico precisa separar declaração de registro clínico.
+     * Medicação não tem origem: só o médico a lança.
      */
     private static Map<String, Object> itemProntuarioJson(int id, String texto) {
+        return itemProntuarioJson(id, texto, null);
+    }
+
+    private static Map<String, Object> itemProntuarioJson(int id, String texto, String origem) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", id);
         m.put("texto", texto);
+        if (origem != null) m.put("origem", origem);
         return m;
     }
 

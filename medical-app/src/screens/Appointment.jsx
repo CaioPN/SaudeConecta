@@ -15,6 +15,13 @@ import { mascararTexto } from '../utils/privacidade';
 import { buscarConsulta, excluirConsulta, definirSituacao } from '../services/consultas';
 import { formatarData } from '../utils/exames';
 
+// Data de hoje no fuso do aparelho. toISOString() daria o dia em UTC, que no
+// Brasil já é "amanhã" depois das 21h.
+function hojeIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export default function Appointment() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -70,6 +77,9 @@ export default function Appointment() {
   const realizada = consulta.status === 'realizada';
   const anotada = consulta.origem === 'paciente';
   const agendada = consulta.status === 'agendada';
+  // Ninguém foi a uma consulta que ainda não chegou: antes do dia só dá para
+  // dizer que ela foi cancelada. A data vem ISO, então compara como texto.
+  const aindaNaoChegou = Boolean(consulta.data) && consulta.data.slice(0, 10) > hojeIso();
 
   // Só a situação muda; o resto da consulta continua como está.
   const marcar = (status) => {
@@ -175,16 +185,25 @@ export default function Appointment() {
           mas não escrevem resumo nem conduta, que são do profissional. */}
       {agendada && (
         <>
-          <h3 className="section-title">Você foi a esta consulta?</h3>
+          <h3 className="section-title">
+            {aindaNaoChegou ? 'Esta consulta foi desmarcada?' : 'Você foi a esta consulta?'}
+          </h3>
           <div className="card mb-6">
+            {aindaNaoChegou && (
+              <p className="acesso-nota" style={{ marginTop: 0, marginBottom: '12px' }}>
+                <Info size={16} /> No dia da consulta você poderá marcá-la como realizada.
+              </p>
+            )}
             <div className="form-botoes" style={{ marginTop: 0 }}>
-              <button
-                className="btn-primary"
-                onClick={() => marcar('realizada')}
-                disabled={salvando}
-              >
-                <CheckCircle2 size={18} /> Sim, fui
-              </button>
+              {!aindaNaoChegou && (
+                <button
+                  className="btn-primary"
+                  onClick={() => marcar('realizada')}
+                  disabled={salvando}
+                >
+                  <CheckCircle2 size={18} /> Sim, fui
+                </button>
+              )}
               <button
                 className="btn-secondary"
                 onClick={() => marcar('cancelada')}

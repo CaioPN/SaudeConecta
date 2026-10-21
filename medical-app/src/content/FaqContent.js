@@ -85,7 +85,7 @@ export const FAQ = [
       },
       {
         p: 'Como adiciono um dependente?',
-        r: 'Vá em "Minha Saúde" → "Dependentes" e toque no botão de adicionar. Você informa nome, CPF, data de nascimento, gênero e tipo sanguíneo.',
+        r: 'Vá em "Minha Saúde" → "Dependentes" e toque no botão de adicionar. Você informa nome, CPF, data de nascimento, gênero e tipo sanguíneo. A data de nascimento não pode ser posterior a hoje: um bebê que ainda vai nascer é cadastrado depois do nascimento.',
       },
       {
         p: 'Consigo ver os exames e as consultas de um dependente?',
@@ -120,6 +120,18 @@ export const FAQ = [
       {
         p: 'Posso corrigir ou apagar uma consulta que anotei?',
         r: 'Pode. Abra a consulta e use "Corrigir data ou local" ou "Apagar anotação". Isso vale só para o que você anotou: o atendimento registrado pelo profissional faz parte do seu prontuário e não pode ser alterado por aqui — nele o botão que aparece é "Anotar retorno com este profissional", que já vem com o nome e o local preenchidos.',
+      },
+      {
+        p: 'Como digo se fui ou não a uma consulta?',
+        r: 'Abra a consulta agendada: no fim da tela aparecem "Sim, fui" e "Foi cancelada". "Foi cancelada" pode ser usado a qualquer momento, porque é comum desmarcar com antecedência. "Sim, fui" só aparece a partir do dia da consulta — antes disso, ninguém foi a ela ainda. Os botões mudam só a situação; o que aconteceu no atendimento continua sendo registrado pelo profissional.',
+      },
+      {
+        p: 'Posso informar uma alergia ou uma condição de saúde?',
+        r: 'Pode. Em "Minha Saúde" → "Prontuário", toque em "Informar alergia ou condição", escolha o tipo e descreva (para a condição, dá para dizer desde quando). Ela aparece com a etiqueta "informado por você" no prontuário, e como "informada pelo paciente" na ficha de emergência e para o médico — assim quem atende separa o que você declarou do que foi registrado por um profissional. O que você informou, você apaga pelo X; o que o profissional registrou, só ele remove. Medicação fica de fora, porque dose e frequência são prescrição.',
+      },
+      {
+        p: 'Por que o card "Avisos" aparece fechado?',
+        r: 'Para a tela inicial não ficar comprida. Ele mostra quantos avisos há; toque nele para abrir. A bolinha vermelha ao lado do título indica que há aviso que você ainda não viu, e some quando você abre o card. Para lembrar o que já foi visto, o aparelho guarda só uma marca embaralhada de cada aviso, nunca o texto dele.',
       },
       {
         p: 'Onde ficam os meus exames?',
@@ -265,7 +277,7 @@ export const FAQ = [
       },
       {
         p: 'Posso eu mesmo enviar um exame que fiz em outro lugar?',
-        r: 'Não. O aplicativo não recebe arquivos nem fotos: quem registra exame, consulta e prontuário é sempre um profissional, usando um código de acesso que você gera. Se você tem um resultado de fora, leve-o à consulta e peça ao profissional para lançá-lo — ele consegue informar a data original do exame.',
+        r: 'Não. O aplicativo não recebe arquivos nem fotos: quem registra exame e atendimento é sempre um profissional, usando um código de acesso que você gera (você mesmo só informa alergias e condições, que ficam marcadas como informadas por você). Se você tem um resultado de fora, leve-o à consulta e peça ao profissional para lançá-lo — ele consegue informar a data original do exame.',
       },
       {
         p: 'O app me lembra das consultas?',

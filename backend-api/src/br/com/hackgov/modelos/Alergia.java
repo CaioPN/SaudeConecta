@@ -5,6 +5,7 @@ public class Alergia {
     private int idPaciente;
     private int idDependente;
     private String descricao;
+    private String origem;
 
     private Paciente paciente;
 
@@ -48,6 +49,13 @@ public class Alergia {
     public void setPaciente(Paciente paciente) {
         this.paciente = paciente;
     }
+
+    /** Quem informou: "medico" ou "paciente" (ver ProntuarioDAO.ORIGEM_*). */
+    public String getOrigem() {
+        return origem;
+    }
+
+    public void setOrigem(String origem) {
+        this.origem = origem;
+    }
 }
-
-

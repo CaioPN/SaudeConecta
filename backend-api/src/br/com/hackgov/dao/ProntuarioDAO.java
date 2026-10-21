@@ -23,6 +23,11 @@ import java.util.List;
  */
 public class ProntuarioDAO {
 
+    /** Alergia ou condição informada pelo próprio paciente, na tela do prontuário. */
+    public static final String ORIGEM_PACIENTE = "paciente";
+    /** Registrada pelo profissional, no portal do médico. */
+    public static final String ORIGEM_MEDICO = "medico";
+
     /** Cláusula de filtro reutilizada pelas três consultas. */
     private static String filtro(Integer idDependente) {
         return "WHERE paciente_id = ? "
@@ -40,7 +45,7 @@ public class ProntuarioDAO {
 
     /** SELECT — alergias registradas. */
     public List<Alergia> listarAlergias(int idPaciente, Integer idDependente) throws SQLException {
-        String sql = "SELECT id, paciente_id, dependente_id, descricao FROM alergias "
+        String sql = "SELECT id, paciente_id, dependente_id, descricao, origem FROM alergias "
                 + filtro(idDependente) + "ORDER BY descricao";
 
         List<Alergia> lista = new ArrayList<>();
@@ -55,6 +60,7 @@ public class ProntuarioDAO {
                     a.setIdPaciente(rs.getInt("paciente_id"));
                     a.setIdDependente(rs.getInt("dependente_id"));
                     a.setDescricao(rs.getString("descricao"));
+                    a.setOrigem(rs.getString("origem"));
                     lista.add(a);
                 }
             }
@@ -64,7 +70,7 @@ public class ProntuarioDAO {
 
     /** SELECT — condições de saúde acompanhadas (hipertensão, diabetes...). */
     public List<HistoricoMedico> listarCondicoes(int idPaciente, Integer idDependente) throws SQLException {
-        String sql = "SELECT id, paciente_id, dependente_id, descricao, desde FROM condicoes "
+        String sql = "SELECT id, paciente_id, dependente_id, descricao, desde, origem FROM condicoes "
                 + filtro(idDependente) + "ORDER BY descricao";
 
         List<HistoricoMedico> lista = new ArrayList<>();
@@ -81,6 +87,7 @@ public class ProntuarioDAO {
                     h.setDescricao(rs.getString("descricao"));
                     Date desde = rs.getDate("desde");
                     h.setData(desde != null ? desde.toString() : null);
+                    h.setOrigem(rs.getString("origem"));
                     lista.add(h);
                 }
             }
@@ -116,12 +123,13 @@ public class ProntuarioDAO {
         return lista;
     }
 
-    // ===================== ESCRITA (PORTAL DO MÉDICO) =====================
+    // ===================== ESCRITA =====================
     //
-    // Quem chama estes métodos é o médico que entrou com um acesso temporário
-    // de escopo "escrita". O paciente vem sempre do acesso reconferido no
-    // banco, nunca do corpo da requisição, e dependente_id fica NULL porque o
-    // acesso temporário é só do titular da conta.
+    // Quem chama os INSERTs é o médico que entrou com um acesso temporário de
+    // escopo "escrita" (origem "medico") ou, para alergia e condição, o próprio
+    // paciente pela tela do prontuário (origem "paciente"). O paciente vem
+    // sempre do acesso reconferido no banco ou do JWT, nunca do corpo da
+    // requisição; o dependente, quando há, é conferido pela rota antes.
     //
     // Não existe UPDATE aqui de propósito: no prontuário, corrigir é remover o
     // registro errado e lançar o certo, e as duas operações ficam separadas na
@@ -140,24 +148,26 @@ public class ProntuarioDAO {
      * temporário, nunca do corpo da requisição: é o código que o paciente
      * gerou que decide de quem é o prontuário aberto.
      */
-    public int inserirAlergia(int idPaciente, Integer idDependente, String descricao) throws SQLException {
-        String sql = "INSERT INTO alergias (paciente_id, dependente_id, descricao) VALUES (?, ?, ?)";
+    public int inserirAlergia(int idPaciente, Integer idDependente, String descricao, String origem)
+            throws SQLException {
+        String sql = "INSERT INTO alergias (paciente_id, dependente_id, descricao, origem) VALUES (?, ?, ?, ?)";
         try (Connection con = Conexao.abrir();
              PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             ps.setInt(1, idPaciente);
             aplicarDependente(ps, 2, idDependente);
             ps.setString(3, descricao);
+            ps.setString(4, origem);
             ps.executeUpdate();
             return idGerado(ps);
         }
     }
 
     /** INSERT — registra uma condição acompanhada; `desde` aceita null. */
-    public int inserirCondicao(int idPaciente, Integer idDependente, String descricao, String desde)
-            throws SQLException {
-        String sql = "INSERT INTO condicoes (paciente_id, dependente_id, descricao, desde) "
-                + "VALUES (?, ?, ?, ?)";
+    public int inserirCondicao(int idPaciente, Integer idDependente, String descricao, String desde,
+                               String origem) throws SQLException {
+        String sql = "INSERT INTO condicoes (paciente_id, dependente_id, descricao, desde, origem) "
+                + "VALUES (?, ?, ?, ?, ?)";
         try (Connection con = Conexao.abrir();
              PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
@@ -165,6 +175,7 @@ public class ProntuarioDAO {
             aplicarDependente(ps, 2, idDependente);
             ps.setString(3, descricao);
             aplicarData(ps, 4, desde);
+            ps.setString(5, origem);
             ps.executeUpdate();
             return idGerado(ps);
         }
@@ -216,6 +227,47 @@ public class ProntuarioDAO {
             ps.setInt(1, id);
             ps.setInt(2, idPaciente);
             return ps.executeUpdate() > 0;
+        }
+    }
+
+    /**
+     * DELETE — o paciente apaga uma alergia ou condição que ELE informou.
+     *
+     * O `origem = 'paciente'` no WHERE é a trava, como nas consultas
+     * anotadas: o que o profissional registrou é prontuário, e o paciente não
+     * apaga prontuário. Mandar o id de uma alergia lançada pelo médico devolve
+     * false (404 na rota) em vez de sumir com ela. A tabela vem de uma das
+     * constantes, escolhida pela rota.
+     */
+    public boolean excluirDoPaciente(String tabela, int id, int idPaciente) throws SQLException {
+        String sql = "DELETE FROM " + tabela + " WHERE id = ? AND paciente_id = ? "
+                + "AND origem = '" + ORIGEM_PACIENTE + "'";
+        try (Connection con = Conexao.abrir();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, id);
+            ps.setInt(2, idPaciente);
+            return ps.executeUpdate() > 0;
+        }
+    }
+
+    /**
+     * De quem é o item: o id do dependente, ou null quando é do titular (ou
+     * quando o item não existe). Serve à trilha de auditoria, que diz de quem
+     * era o dado apagado. A tabela vem de uma das constantes, nunca do cliente.
+     */
+    public Integer dependenteDe(String tabela, int id, int idPaciente) throws SQLException {
+        String sql = "SELECT dependente_id FROM " + tabela + " WHERE id = ? AND paciente_id = ?";
+        try (Connection con = Conexao.abrir();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, id);
+            ps.setInt(2, idPaciente);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return null;
+                int dep = rs.getInt("dependente_id");
+                return rs.wasNull() ? null : dep;
+            }
         }
     }
 

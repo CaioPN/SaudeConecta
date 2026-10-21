@@ -150,6 +150,9 @@ CREATE TABLE IF NOT EXISTS alergias (
   paciente_id      INT           NOT NULL,
   dependente_id    INT           NULL,
   descricao        VARCHAR(160)  NOT NULL,
+  -- Quem informou: 'medico' (portal do médico) ou 'paciente' (o próprio
+  -- titular, na tela do prontuário). O paciente só apaga o que ele informou.
+  origem           VARCHAR(20)   NOT NULL DEFAULT 'medico',
   CONSTRAINT fk_alergia_paciente
     FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE,
   CONSTRAINT fk_alergia_dependente
@@ -163,6 +166,7 @@ CREATE TABLE IF NOT EXISTS condicoes (
   dependente_id    INT           NULL,
   descricao        VARCHAR(160)  NOT NULL,
   desde            DATE          NULL,
+  origem           VARCHAR(20)   NOT NULL DEFAULT 'medico',
   CONSTRAINT fk_condicao_paciente
     FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE,
   CONSTRAINT fk_condicao_dependente
@@ -480,6 +484,8 @@ CALL sc_adicionar_coluna('unidades_saude', 'servicos_em', 'DATETIME NULL');
 CALL sc_adicionar_coluna('consultas', 'profissional', 'VARCHAR(120) NULL');
 CALL sc_adicionar_coluna('consultas', 'especialidade', 'VARCHAR(80) NULL');
 CALL sc_adicionar_coluna('consultas', 'origem', "VARCHAR(20) NOT NULL DEFAULT 'medico'");
+CALL sc_adicionar_coluna('alergias', 'origem', "VARCHAR(20) NOT NULL DEFAULT 'medico'");
+CALL sc_adicionar_coluna('condicoes', 'origem', "VARCHAR(20) NOT NULL DEFAULT 'medico'");
 
 DROP PROCEDURE IF EXISTS sc_adicionar_coluna;
 

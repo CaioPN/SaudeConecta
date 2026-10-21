@@ -103,7 +103,29 @@ const BASE_CONHECIMENTO = [
         chaves: ['prontuário', 'prontuario', 'histórico', 'historico', 'alergia', 'condição', 'condicao'],
         resposta:
             'No seu prontuário ("Minha Saúde" → "Prontuário") você encontra alergias, condições de saúde e os registros ' +
-            'recentes das suas consultas.',
+            'recentes das suas consultas. Para contar uma alergia ou condição que você já sabe que tem, use ' +
+            '"Informar alergia ou condição": ela fica marcada como "informado por você", e só você a apaga.',
+    },
+    {
+        chaves: ['informar alergia', 'adicionar alergia', 'cadastrar alergia', 'informar condição',
+                 'informar condicao', 'adicionar condição', 'adicionar condicao'],
+        resposta:
+            'Em "Minha Saúde" → "Prontuário", toque em "Informar alergia ou condição". Ela aparece como ' +
+            '"informado por você" no prontuário e como "informada pelo paciente" na ficha de emergência e para o ' +
+            'médico. Medicação não dá para informar por aqui: dose e frequência são prescrição do profissional.',
+    },
+    {
+        chaves: ['fui à consulta', 'fui a consulta', 'consulta realizada', 'marcar como realizada',
+                 'consulta cancelada', 'desmarquei', 'sim, fui'],
+        resposta:
+            'Abra a consulta agendada e use "Sim, fui" ou "Foi cancelada". "Foi cancelada" vale a qualquer momento; ' +
+            '"Sim, fui" só aparece a partir do dia da consulta.',
+    },
+    {
+        chaves: ['avisos fechado', 'card avisos', 'bolinha vermelha', 'abrir avisos', 'ver avisos'],
+        resposta:
+            'O card "Avisos" da tela inicial começa fechado e mostra quantos avisos há; toque nele para abrir. ' +
+            'A bolinha vermelha indica aviso que você ainda não viu e some quando você abre o card.',
     },
     {
         chaves: ['editar perfil', 'corrigir', 'mudar telefone', 'trocar endereço', 'trocar endereco',
