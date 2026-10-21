@@ -164,6 +164,11 @@ public class ApiServer {
     private static final int TENTATIVAS_MAXIMAS = 10;
     private static final long JANELA_TENTATIVAS_MS = 10L * 60 * 1000;
     private static final Map<String, long[]> tentativasPorIp = new HashMap<>();
+    /**
+     * Senha errada no login tem contagem própria: dividir o mapa com o portal
+     * faria quem erra a senha na rede da feira bloquear o médico ao lado.
+     */
+    private static final Map<String, long[]> tentativasLoginPorIp = new HashMap<>();
 
     /** Tamanho máximo do nome de exame/vacina aceito pelo glossário. */
     private static final int LIMITE_TERMO = 120;
@@ -174,7 +179,10 @@ public class ApiServer {
     private static final Map<Integer, long[]> perguntasPorPaciente = new HashMap<>();
 
     public static void main(String[] args) throws IOException {
-        HttpServer server = HttpServer.create(new InetSocketAddress(PORTA), 0);
+        // Só o loopback: o front chama http://localhost:3001, e escutar em todas
+        // as interfaces abria a API para qualquer aparelho do Wi-Fi da feira.
+        HttpServer server = HttpServer.create(
+                new InetSocketAddress(java.net.InetAddress.getLoopbackAddress(), PORTA), 0);
 
         server.createContext("/api/auth/register", comCors(ApiServer::registrar));
         server.createContext("/api/auth/login", comCors(ApiServer::login));
@@ -334,8 +342,18 @@ public class ApiServer {
                 return;
             }
 
+            // Sem este limite, o login era o único lugar onde dava para testar
+            // senhas sem parar. Conta por IP, e não por e-mail, para que ninguém
+            // tranque a conta de outra pessoa errando a senha dela de propósito.
+            String ip = ipDe(ex);
+            if (excedeuTentativas(tentativasLoginPorIp, ip)) {
+                enviarErro(ex, 429, "Muitas tentativas. Aguarde alguns minutos e tente de novo.");
+                return;
+            }
+
             Paciente p = pacienteDAO.buscarPorEmail(email);
             if (p == null || !SenhaUtil.verificar(senha, p.getSenhaHash())) {
+                registrarTentativa(tentativasLoginPorIp, ip);
                 // Senha errada em conta que existe é evento de segurança: entra na
                 // trilha para o titular enxergar que tentaram entrar. E-mail que
                 // não existe não gera registro — não há dono a quem mostrar.
@@ -2906,22 +2924,30 @@ public class ApiServer {
      * Controle simples de força bruta na troca do código, por IP: no máximo
      * TENTATIVAS_MAXIMAS erros dentro da janela.
      */
-    private static synchronized boolean excedeuTentativas(String ip) {
+    private static boolean excedeuTentativas(String ip) {
+        return excedeuTentativas(tentativasPorIp, ip);
+    }
+
+    private static synchronized boolean excedeuTentativas(Map<String, long[]> mapa, String ip) {
         long agora = System.currentTimeMillis();
-        long[] registro = tentativasPorIp.get(ip);
+        long[] registro = mapa.get(ip);
         if (registro == null) return false;
         if (agora - registro[1] > JANELA_TENTATIVAS_MS) {
-            tentativasPorIp.remove(ip);
+            mapa.remove(ip);
             return false;
         }
         return registro[0] >= TENTATIVAS_MAXIMAS;
     }
 
-    private static synchronized void registrarTentativa(String ip) {
+    private static void registrarTentativa(String ip) {
+        registrarTentativa(tentativasPorIp, ip);
+    }
+
+    private static synchronized void registrarTentativa(Map<String, long[]> mapa, String ip) {
         long agora = System.currentTimeMillis();
-        long[] registro = tentativasPorIp.get(ip);
+        long[] registro = mapa.get(ip);
         if (registro == null || agora - registro[1] > JANELA_TENTATIVAS_MS) {
-            tentativasPorIp.put(ip, new long[] { 1, agora });
+            mapa.put(ip, new long[] { 1, agora });
         } else {
             registro[0]++;
         }
@@ -3183,6 +3209,10 @@ public class ApiServer {
             h.set("Access-Control-Allow-Origin", "*");
             h.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
             h.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+            // Resposta com prontuário não fica no cache do navegador (aparelho
+            // compartilhado), e o navegador não tenta "adivinhar" o tipo dela.
+            h.set("Cache-Control", "no-store");
+            h.set("X-Content-Type-Options", "nosniff");
             if ("OPTIONS".equals(ex.getRequestMethod())) {
                 ex.sendResponseHeaders(204, -1);
                 ex.close();
@@ -3190,6 +3220,12 @@ public class ApiServer {
             }
             try {
                 interno.handle(ex);
+            } catch (IllegalArgumentException e) {
+                // JSON malformado ou corpo grande demais numa rota que não trata
+                // o caso: é erro de quem chamou, não do servidor.
+                try {
+                    enviarErro(ex, 400, "Corpo da requisição inválido.");
+                } catch (IOException ignored) { }
             } catch (Exception e) {
                 System.out.println("[ERRO interno] " + e);
                 try {
@@ -3201,11 +3237,23 @@ public class ApiServer {
         };
     }
 
-    /** Lê o corpo da requisição como JSON e devolve o objeto (Map). */
+    /**
+     * Maior corpo aceito por lerCorpo, que lê a requisição como JSON e devolve
+     * o objeto (Map). O maior texto legítimo é um laudo digitado pelo
+     * médico; sem teto, readAllBytes guardaria na memória o que viesse, e um
+     * POST de alguns gigabytes derrubaria a API.
+     */
+    private static final int LIMITE_CORPO_BYTES = 64 * 1024;
+
     private static Map<String, Object> lerCorpo(HttpExchange ex) throws IOException {
         String texto;
         try (InputStream in = ex.getRequestBody()) {
-            texto = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            byte[] bytes = in.readNBytes(LIMITE_CORPO_BYTES + 1);
+            if (bytes.length > LIMITE_CORPO_BYTES) {
+                // Cai no mesmo 400 de "corpo inválido" que as rotas já tratam.
+                throw new IllegalArgumentException("Corpo da requisição grande demais.");
+            }
+            texto = new String(bytes, StandardCharsets.UTF_8);
         }
         if (texto == null || texto.trim().isEmpty()) {
             return new LinkedHashMap<>();

@@ -56,3 +56,24 @@ gemini.modelo=gemini-3.5-flash-lite
 ia.reserva.url=
 ia.reserva.modelo=
 ia.reserva.key=
+
+# ------------------------------------------------------------------
+# Banco de dados e assinatura do login — OBRIGATÓRIOS
+#
+# Sem db.usuario/db.senha a API sobe, mas toda rota que lê o banco falha.
+# Use uma conta só para a API, presa ao localhost e sem permissão de mudar
+# tabelas (o schema.sql continua sendo aplicado com o root, à mão):
+#
+#   CREATE USER 'saudeconecta_api'@'localhost' IDENTIFIED BY '<senha sorteada>';
+#   GRANT SELECT, INSERT, UPDATE, DELETE ON saudeconecta.* TO 'saudeconecta_api'@'localhost';
+#
+# jwt.segredo assina o token de login: 32 caracteres ou mais, sorteados.
+# Quem o conhece entra na conta de qualquer paciente — por isso ele não
+# pode ficar no código. Para sortear um:
+#   node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+# Sem ele, a API sorteia um a cada subida (os logins caem ao reiniciar).
+#
+# Variáveis de ambiente equivalentes: DB_USUARIO, DB_SENHA, JWT_SEGREDO.
+db.usuario=
+db.senha=
+jwt.segredo=

@@ -13,15 +13,38 @@ import javax.crypto.spec.SecretKeySpec;
  * (HMAC-SHA256), usando apenas a biblioteca padrão do Java.
  *
  * O token é assinado e validado por este mesmo backend, então o segredo só
- * precisa ser consistente. Em produção, mova-o para uma variável de ambiente.
+ * precisa ser consistente — e secreto. Ele estava escrito aqui, num
+ * repositório público: com ele, qualquer um assinava um token com o id de
+ * qualquer paciente e lia o prontuário. Agora vem de jwt.segredo no
+ * config.properties (ou JWT_SEGREDO).
  */
 public final class Jwt {
 
     private Jwt() { }
 
-    /** Segredo de assinatura. (Equivale ao JWT_SECRET do backend Node.) */
-    private static final String SEGREDO =
-        "saudeconecta-segredo-super-secreto-troque-em-producao";
+    /** Abaixo disso o HMAC fica mais fraco que a própria assinatura. */
+    private static final int TAMANHO_MINIMO_SEGREDO = 32;
+
+    /**
+     * Segredo de assinatura. Sem configuração, sorteia um a cada subida: o app
+     * funciona, mas os logins caem quando a API reinicia — melhor que voltar a
+     * um segredo conhecido.
+     */
+    private static final String SEGREDO = carregarSegredo();
+
+    private static String carregarSegredo() {
+        String configurado = Config.ler("jwt.segredo");
+        if (configurado != null && configurado.length() >= TAMANHO_MINIMO_SEGREDO) {
+            return configurado;
+        }
+        System.out.println("[AVISO jwt] jwt.segredo ausente ou curto no config.properties; "
+                + "usando um segredo temporário (os logins caem ao reiniciar a API).");
+        byte[] aleatorio = new byte[48];
+        new java.security.SecureRandom().nextBytes(aleatorio);
+        // Encoder criado aqui, e não a constante B64 abaixo: os campos estáticos
+        // são iniciados na ordem do arquivo, e ela ainda seria null.
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(aleatorio);
+    }
 
     /** Validade padrão do token: 7 dias (em segundos). */
     private static final long EXPIRACAO_SEGUNDOS = 7L * 24 * 60 * 60;
@@ -72,12 +95,12 @@ public final class Jwt {
         try {
             String payloadJson = new String(B64DEC.decode(partes[1]), StandardCharsets.UTF_8);
             Map<String, Object> claims = Json.parseObjeto(payloadJson);
+            // Todo token que este backend gera tem exp; um sem ele valeria para
+            // sempre, então é recusado em vez de aceito.
             Object exp = claims.get("exp");
-            if (exp instanceof Number) {
-                long expSeg = ((Number) exp).longValue();
-                long agora = System.currentTimeMillis() / 1000L;
-                if (agora >= expSeg) return null; // expirado
-            }
+            if (!(exp instanceof Number)) return null;
+            long agora = System.currentTimeMillis() / 1000L;
+            if (agora >= ((Number) exp).longValue()) return null; // expirado
             return claims;
         } catch (RuntimeException e) {
             return null;
