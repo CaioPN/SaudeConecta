@@ -1,7 +1,7 @@
 import React from 'react';
 import useVoltar from '../hooks/useVoltar';
 import { ChevronLeft, Lock, ShieldCheck } from 'lucide-react';
-import { PrivacyContent } from '../content/LegalContent';
+import { PrivacyContent, DATA_TERMOS } from '../content/LegalContent';
 
 export default function Privacy() {
   const voltar = useVoltar('/');
@@ -19,7 +19,7 @@ export default function Privacy() {
         </div>
         <h2 className="header-title">Portal de Privacidade</h2>
       </div>
-      <p className="header-subtitle mb-6">Em conformidade com a LGPD (Lei nº 13.709/2018)</p>
+      <p className="header-subtitle mb-6">Em conformidade com a LGPD (Lei nº 13.709/2018) · versão de {DATA_TERMOS}</p>
       </div>
 
       <div className="tela-lista">

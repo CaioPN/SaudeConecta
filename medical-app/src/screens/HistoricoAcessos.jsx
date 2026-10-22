@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { usePrivacidade } from '../context/PrivacidadeContext';
 import BotaoPrivacidade from '../components/BotaoPrivacidade';
+import EstadoErro from '../components/EstadoErro';
 import { mascararTexto } from '../utils/privacidade';
 import { ICONES } from '../utils/icones';
 import { listarAuditoria } from '../services/auditoria';
@@ -55,6 +56,7 @@ const ACOES = {
   cadastrou_condicao: { texto: 'Você informou uma condição de saúde', icone: ICONES.prontuario, cor: 'consulta' },
   excluiu_condicao: { texto: 'Você apagou uma condição que tinha informado', icone: ICONES.prontuario, cor: 'revogado' },
   exportou_exames: { texto: 'Você baixou o PDF de exames', icone: Download, cor: 'exame' },
+  exportou_vacinas: { texto: 'Você baixou o PDF da carteira de vacinação', icone: Download, cor: 'exame' },
   cadastrou_dependente: { texto: 'Você cadastrou um dependente', icone: ICONES.dependentes, cor: 'consulta' },
   excluiu_dependente: { texto: 'Você excluiu um dependente', icone: ICONES.dependentes, cor: 'revogado' },
   cadastrou_contato: { texto: 'Você cadastrou um contato de emergência', icone: HeartHandshake, cor: 'consulta' },
@@ -62,6 +64,10 @@ const ACOES = {
   gerou_codigo: { texto: 'Você gerou um código de acesso', icone: ICONES.acessoMedico, cor: 'consulta' },
   consultou_vacinas: { texto: 'Você abriu a carteira de vacinação', icone: ICONES.vacinas, cor: 'consulta' },
   atualizou_perfil: { texto: 'Você alterou dados do cadastro', icone: User, cor: 'consulta' },
+  aceitou_termos: { texto: 'Você aceitou os Termos de Uso e a Política de Privacidade', icone: ICONES.termos, cor: 'consulta' },
+  exportou_dados: { texto: 'Você baixou uma cópia de todos os seus dados', icone: Download, cor: 'exame' },
+  // A exclusão que deu certo não aparece aqui: a trilha some junto com a conta.
+  exclusao_recusada: { texto: 'Tentativa de excluir a conta com a senha errada', icone: ShieldAlert, cor: 'revogado' },
   solicitou_senha: { texto: 'Você pediu a recuperação da senha', icone: ShieldCheck, cor: 'consulta' },
   redefiniu_senha: { texto: 'Você trocou a senha', icone: ShieldCheck, cor: 'revogado' },
   definiu_referencia: { texto: 'Você escolheu sua unidade de referência', icone: ShieldCheck, cor: 'consulta' },
@@ -94,20 +100,23 @@ export default function HistoricoAcessos() {
   // Segundo filtro, por pessoa: quem cuida de dois dependentes quer poder
   // perguntar "o que andaram fazendo com os dados do meu filho".
   const [pessoa, setPessoa] = useState('todas');
+  const [tentativa, setTentativa] = useState(0);
 
   useEffect(() => {
     let ativo = true;
+    setErro(null);
+    setRegistros(null);
     listarAuditoria()
       .then((lista) => {
         if (ativo) setRegistros(lista);
       })
-      .catch(() => {
-        if (ativo) setErro('Não foi possível carregar o histórico de acessos.');
+      .catch((falha) => {
+        if (ativo) setErro(falha);
       });
     return () => {
       ativo = false;
     };
-  }, []);
+  }, [tentativa]);
 
   // Pessoas que aparecem na trilha, para o segundo filtro. Sai dos próprios
   // registros, e não da lista de dependentes: um dependente já excluído
@@ -188,7 +197,9 @@ export default function HistoricoAcessos() {
       </div>
 
       <div className="tela-lista">
-      {erro && <p className="empty-state">{erro}</p>}
+      {erro && (
+        <EstadoErro erro={erro} oQue="o histórico de acessos" onTentarDeNovo={() => setTentativa((t) => t + 1)} />
+      )}
       {!erro && registros === null && <p className="empty-state">Carregando histórico…</p>}
       {!erro && registros !== null && visiveis.length === 0 && (
         <p className="empty-state">

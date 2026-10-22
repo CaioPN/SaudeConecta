@@ -1,7 +1,7 @@
 import React from 'react';
 import useVoltar from '../hooks/useVoltar';
 import { ChevronLeft, FileText } from 'lucide-react';
-import { TermsContent } from '../content/LegalContent';
+import { TermsContent, DATA_TERMOS } from '../content/LegalContent';
 
 export default function Terms() {
   const voltar = useVoltar('/');
@@ -19,7 +19,7 @@ export default function Terms() {
         </div>
         <h2 className="header-title">Termos de Uso</h2>
       </div>
-      <p className="header-subtitle mb-6">Última atualização: 09 de junho de 2026</p>
+      <p className="header-subtitle mb-6">Versão de {DATA_TERMOS} · o aceite fica em Mais › Meus dados</p>
       </div>
 
       <div className="tela-lista">

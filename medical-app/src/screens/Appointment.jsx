@@ -7,6 +7,8 @@ import { buscarDetalhesUnidade } from '../services/redeSaude';
 import { useNavigate, useParams } from 'react-router-dom';
 import useVoltar from '../hooks/useVoltar';
 import InfoField from '../components/InfoField';
+import EstadoErro from '../components/EstadoErro';
+import { tipoDaFalha, mensagemDaAcao } from '../utils/falhas';
 import StatusBadge from '../components/StatusBadge';
 import BotaoPrivacidade from '../components/BotaoPrivacidade';
 import Modal from '../components/Modal';
@@ -40,12 +42,20 @@ export default function Appointment() {
   // segunda chamada porque a consulta guarda só o código do CNES — o endereço
   // e a coordenada moram no espelho da Rede de Saúde.
   const [unidade, setUnidade] = useState(null);
+  const [erroCarga, setErroCarga] = useState(null);
 
   const recarregar = useCallback(() => {
     setCarregando(true);
+    setErroCarga(null);
     return buscarConsulta(id)
       .then(setConsulta)
-      .catch(() => setConsulta(null))
+      // "Consulta não encontrada" só quando o servidor disse 404. Sem
+      // conexão, a tela dizia isso também — e o paciente achava que a
+      // anotação tinha sumido.
+      .catch((falha) => {
+        setConsulta(null);
+        if (tipoDaFalha(falha) !== 'nao_encontrado') setErroCarga(falha);
+      })
       .finally(() => setCarregando(false));
   }, [id]);
 
@@ -71,9 +81,13 @@ export default function Appointment() {
         <button onClick={() => voltar()} className="back-btn">
           <ChevronLeft size={20} /> Voltar
         </button>
-        <p className="empty-state">
-          {carregando ? 'Carregando consulta…' : 'Consulta não encontrada.'}
-        </p>
+        {carregando ? (
+          <p className="empty-state">Carregando consulta…</p>
+        ) : erroCarga ? (
+          <EstadoErro erro={erroCarga} oQue="esta consulta" onTentarDeNovo={recarregar} />
+        ) : (
+          <p className="empty-state">Consulta não encontrada.</p>
+        )}
       </div>
     );
   }
@@ -90,7 +104,7 @@ export default function Appointment() {
     setSalvando(true);
     definirSituacao(consulta.id, status)
       .then(recarregar)
-      .catch((err) => setErroAcao(err.response?.data?.erro || 'Não foi possível mudar a situação.'))
+      .catch((err) => setErroAcao(mensagemDaAcao(err, 'Não foi possível mudar a situação.')))
       .finally(() => setSalvando(false));
   };
 
@@ -100,7 +114,7 @@ export default function Appointment() {
     // guarda que a exclusão aconteceu.
     excluirConsulta(consulta.id)
       .then(() => voltar())
-      .catch(() => setErroAcao('Não foi possível apagar esta anotação.'));
+      .catch((err) => setErroAcao(mensagemDaAcao(err, 'Não foi possível apagar esta anotação.')));
   };
 
   return (

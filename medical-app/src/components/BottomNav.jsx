@@ -99,6 +99,10 @@ export default function BottomNav() {
             <ICONES.historicoAcessos size={20} />
             <span>Histórico de acessos</span>
           </button>
+          <button onClick={() => irPara('/meus-dados')} className="more-menu-item">
+            <ICONES.meusDados size={20} />
+            <span>Meus dados</span>
+          </button>
           <button onClick={() => irPara('/privacy')} className="more-menu-item">
             <ICONES.privacidade size={20} />
             <span>Portal de Privacidade</span>

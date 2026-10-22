@@ -26,6 +26,8 @@ import Terms from './screens/Terms';
 import Privacy from './screens/Privacy';
 import Faq from './screens/Faq';
 import FichaEmergencia from './screens/FichaEmergencia';
+import MeusDados from './screens/MeusDados';
+import PortaoTermos from './components/PortaoTermos';
 import './app.css';
 
 // Só a demonstração tem a avaliação da feira. Com o import dinâmico dentro do
@@ -56,6 +58,9 @@ export default function App() {
       <div className="app-container">
         {MODO_DEMO && <div className="demo-selo">Demonstração</div>}
         <div className="app-content">
+          {/* Com termos novos pendentes, o portão mostra o texto no lugar da
+              tela pedida (exceto nas que abrem sem aceite). */}
+          <PortaoTermos>
           <Routes>
             <Route path="/" element={<Login />} />
             <Route path="/cadastro" element={<Cadastro />} />
@@ -73,6 +78,7 @@ export default function App() {
             <Route path="/rede-saude" element={<RedeSaude />} />
             <Route path="/acesso-medico" element={<AcessoMedico />} />
             <Route path="/acessos-log" element={<HistoricoAcessos />} />
+            <Route path="/meus-dados" element={<MeusDados />} />
             {/* Rota usada pelo profissional de saúde, fora do app do paciente. */}
             <Route path="/medico" element={<PortalMedico />} />
             <Route path="/terms" element={<Terms />} />
@@ -85,6 +91,7 @@ export default function App() {
               />
             )}
           </Routes>
+          </PortaoTermos>
         </div>
         <BottomNav />
         <MedicalChatbot />

@@ -295,6 +295,8 @@ button, input, select, textarea {
 .gap-4 { gap: 16px; }
 .mb-6 { margin-bottom: 24px; }
 .mb-2 { margin-bottom: 8px; }
+.mb-4 { margin-bottom: 16px; }
+.mt-4 { margin-top: 16px; }
 
 /* Bottom Nav */
 .bottom-nav {
@@ -952,6 +954,56 @@ button, input, select, textarea {
   color: var(--text-gray);
 }
 
+/* Estado de erro único (components/EstadoErro.jsx, critério INT03): toda tela
+   que não conseguiu carregar mostra este bloco no lugar da lista — nunca a
+   lista vazia, que diria "não há nada" sem o app saber. Borda contínua, e não
+   tracejada como a do .empty-state, para não ser lido como "lista vazia". */
+.estado-erro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  background-color: var(--superficie);
+  border: 1px solid var(--borda-cinza);
+  border-radius: var(--border-radius);
+  padding: 20px;
+  text-align: center;
+  color: var(--text-dark);
+}
+.estado-erro-icone { color: var(--text-gray); }
+.estado-erro-texto strong {
+  display: block;
+  font-size: calc(15px * var(--escala-fonte));
+  margin-bottom: 4px;
+}
+.estado-erro-texto p {
+  font-size: calc(13px * var(--escala-fonte));
+  color: var(--text-gray);
+  margin: 0;
+}
+.estado-erro-botao {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--primary-blue);
+  background-color: var(--superficie);
+  color: var(--primary-blue);
+  font-weight: 600;
+  font-size: calc(13px * var(--escala-fonte));
+  cursor: pointer;
+}
+/* Dentro de um card (avisos do Início, contatos do Perfil): em linha. */
+.estado-erro.compacto {
+  flex-direction: row;
+  text-align: left;
+  padding: 12px;
+  border: none;
+  background-color: transparent;
+}
+.estado-erro.compacto .estado-erro-texto { flex: 1; }
+
 .bg-red-500 { background-color: #ef4444; }
 .bg-blue-500 { background-color: #3b82f6; }
 .bg-yellow-500 { background-color: #eab308; }
@@ -1189,14 +1241,16 @@ button.record-card:hover { border-color: var(--primary-blue); }
   align-items: flex-start;
 }
 
+/* 44px: menor que os 56 de antes (o botão competia com o conteúdo), mas não
+   menos que isso — é o alvo de toque mínimo recomendado para acessibilidade. */
 .chatbot-fab {
-  width: 56px;
-  height: 56px;
+  width: 44px;
+  height: 44px;
   background-color: var(--primary-blue);
   color: var(--texto-sobre-cor);
   border-radius: 50%;
   border: none;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+  box-shadow: 0 3px 8px rgba(37, 99, 235, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1512,6 +1566,26 @@ button.record-card:hover { border-color: var(--primary-blue); }
   align-items: center;
   gap: 16px;
 }
+/* O resumo fica no topo fixo, então é uma faixa baixa: o .card padrão (24px
+   de preenchimento e de margem) comia o espaço da lista que rola embaixo. */
+.vacina-resumo-card {
+  padding: 12px 16px;
+  margin-bottom: 8px;
+}
+.vacina-resumo-card .vacina-resumo { gap: 12px; }
+.icon-box.icon-box-sm {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+/* Notas do começo da lista da carteira: saem de cena ao rolar. */
+.vacina-notas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.vacina-notas .pdf-nota { margin: 0; }
 .vacina-progress-bg {
   width: 100%;
   height: 8px;
@@ -2981,3 +3055,30 @@ body[data-contraste="escuro"] .app-container::before {
   font-weight: 600;
   cursor: pointer;
 }
+
+/* ============================================================
+   Meus dados (screens/MeusDados.jsx) — termos aceitos, cópia dos
+   dados e exclusão da conta. O vermelho é só da exclusão: é a
+   única ação sem volta do app inteiro.
+   ============================================================ */
+.meus-dados-linha {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.meus-dados-linha svg { flex-shrink: 0; margin-top: 1px; }
+.meus-dados-ok { color: var(--status-ok); }
+.meus-dados-resumo {
+  margin: 0 0 16px 18px;
+  padding: 0;
+  font-size: calc(13px * var(--escala-fonte));
+  color: var(--text-dark);
+  line-height: 1.6;
+}
+.btn-perigo {
+  border-color: var(--status-bad);
+  color: var(--status-bad);
+}
+.form-botoes .btn-excluir { flex: 1; margin: 0; }
+.form-botoes .btn-excluir:disabled { opacity: 0.6; cursor: default; }

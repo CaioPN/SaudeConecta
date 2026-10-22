@@ -40,7 +40,9 @@ export function AuthProvider({ children }) {
       .catch((err) => {
         // Token vencido (7 dias) ou assinado com um segredo que mudou: sem
         // isto o app abria com cara de logado e toda tela falhava calada.
-        if (err.response?.status === 401) sair();
+        // 404 é a conta que não existe mais: excluída em outro aparelho, com
+        // este ainda logado. O token continua assinado, mas não há dono.
+        if (err.response?.status === 401 || err.response?.status === 404) sair();
       });
   }, []);
 

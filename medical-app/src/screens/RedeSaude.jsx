@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import useVoltar from '../hooks/useVoltar';
+import EstadoErro from '../components/EstadoErro';
+import { mensagemDaAcao } from '../utils/falhas';
 import {
   ChevronLeft, MapPin, Phone, Navigation, Hospital, Ambulance, HeartPulse,
   Clock, Search, X, Star, Info,
@@ -48,13 +50,17 @@ function UnidadeItem({ unidade, municipioAtual, ehReferencia, aoMarcarReferencia
   // estabelecimento — por isso só é buscado quando o paciente abre esta.
   const [servicos, setServicos] = useState(null);
   const [buscandoServicos, setBuscandoServicos] = useState(false);
+  // Na falha, "O CNES não informa os serviços" seria falso: o CNES nem foi
+  // consultado. Os serviços ficam null, e tocar de novo refaz a busca.
+  const [erroServicos, setErroServicos] = useState(null);
 
   const verServicos = () => {
     if (servicos || buscandoServicos) return;
     setBuscandoServicos(true);
+    setErroServicos(null);
     buscarDetalhesUnidade(unidade.codigo_cnes)
       .then((u) => setServicos(u?.servicos?.length ? u.servicos : []))
-      .catch(() => setServicos([]))
+      .catch(setErroServicos)
       .finally(() => setBuscandoServicos(false));
   };
 
@@ -102,6 +108,9 @@ function UnidadeItem({ unidade, municipioAtual, ehReferencia, aoMarcarReferencia
         {servicos && servicos.length === 0 && (
           <span className="unidade-meta">O CNES não informa os serviços desta unidade.</span>
         )}
+        {erroServicos && (
+          <EstadoErro compacto erro={erroServicos} oQue="o que a unidade oferece" onTentarDeNovo={verServicos} />
+        )}
 
         <div className="unidade-acoes">
           <a
@@ -143,6 +152,10 @@ export default function RedeSaude() {
   const [filtro, setFiltro] = useState('todas');
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
+  const [tentativa, setTentativa] = useState(0);
+  // Falha ao salvar a UBS de referência: é de uma ação, não da lista, e não
+  // pode esconder as unidades que já estão na tela.
+  const [erroReferencia, setErroReferencia] = useState(null);
   // Cidade pesquisada na tela; vazio significa "a do meu cadastro".
   const [cepBusca, setCepBusca] = useState('');
   const [buscaAberta, setBuscaAberta] = useState(false);
@@ -176,7 +189,7 @@ export default function RedeSaude() {
       .catch((err) => {
         if (!ativo) return;
         setUnidades([]);
-        setErro(err?.response?.data?.erro || 'Não foi possível carregar a rede de saúde.');
+        setErro(err);
       })
       .finally(() => {
         if (ativo) setCarregando(false);
@@ -185,7 +198,7 @@ export default function RedeSaude() {
     return () => {
       ativo = false;
     };
-  }, [cepBusca]);
+  }, [cepBusca, tentativa]);
 
   const pesquisarCidade = (evento) => {
     evento.preventDefault();
@@ -214,9 +227,11 @@ export default function RedeSaude() {
   // A UBS de referência é a resposta para "qual é o meu posto": o Dashboard
   // mostra o telefone e o endereço dela sem obrigar a procurar de novo.
   const marcarReferencia = (codigoCnes) => {
+    setErroReferencia(null);
     definirUnidadeReferencia(codigoCnes)
       .then(setReferencia)
-      .catch(() => setErro('Não foi possível salvar a sua unidade de referência.'));
+      .catch((falha) => setErroReferencia(
+        mensagemDaAcao(falha, 'Não foi possível salvar a sua unidade de referência.')));
   };
 
   // De onde as distâncias foram medidas — o paciente precisa saber, senão um
@@ -292,6 +307,8 @@ export default function RedeSaude() {
         </div>
       )}
 
+      {erroReferencia && <p className="form-erro" role="alert">{erroReferencia}</p>}
+
       {!carregando && !erro && unidades.length > 0 && (
         <div className="rede-filtros">
           {FILTROS.map((f) => (
@@ -309,7 +326,15 @@ export default function RedeSaude() {
 
       <div className="tela-lista">
       {carregando && <p className="empty-state">Buscando unidades perto de você…</p>}
-      {erro && !carregando && <p className="empty-state">{erro}</p>}
+      {/* 4xx com texto ("CEP não encontrado") é o servidor respondendo: o texto
+          dele vale. Sem resposta, ou com erro do servidor, é o bloco padrão. */}
+      {erro && !carregando && (
+        erro.response?.status < 500 && erro.response?.data?.erro ? (
+          <p className="empty-state">{erro.response.data.erro}</p>
+        ) : (
+          <EstadoErro erro={erro} oQue="a rede de saúde" onTentarDeNovo={() => setTentativa((t) => t + 1)} />
+        )
+      )}
 
       {!carregando && !erro && (
         lista.length === 0 ? (

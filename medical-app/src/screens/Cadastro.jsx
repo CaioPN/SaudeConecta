@@ -7,7 +7,7 @@ import useVoltar from '../hooks/useVoltar';
 import { ChevronLeft } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Modal from '../components/Modal';
-import { TermsContent, PrivacyContent } from '../content/LegalContent';
+import { TermsContent, PrivacyContent, VERSAO_TERMOS } from '../content/LegalContent';
 
 const TIPOS_SANGUINEOS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -65,7 +65,9 @@ export default function Cadastro() {
         // Os consentimentos não vão para a API — apenas validam o formulário.
         const { confirmarSenha, aceitarTermos, aceitarDados, ...payload } = dados;
         try {
-            await cadastrar(payload);
+            // A versão aceita vai para o servidor, que registra o aceite com a
+            // data — antes a caixa marcada morria aqui na tela.
+            await cadastrar({ ...payload, versaoTermos: VERSAO_TERMOS });
             navigate('/dashboard');
         } catch (err) {
             setErroApi(err?.response?.data?.erro || 'Não foi possível concluir o cadastro.');

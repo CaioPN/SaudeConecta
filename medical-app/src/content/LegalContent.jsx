@@ -1,5 +1,8 @@
 import React from 'react';
 
+// A versão deste texto mora em versaoTermos.js (ver lá por quê).
+export { VERSAO_TERMOS, DATA_TERMOS } from './versaoTermos';
+
 // Conteúdo textual dos Termos de Uso. Usado tanto na tela cheia (/terms)
 // quanto na janelinha (modal) exibida no Cadastro.
 export function TermsContent() {
@@ -52,9 +55,10 @@ export function TermsContent() {
 
       <h3 className="section-title">7. Alterações nos Termos</h3>
       <p className="text-sm text-muted mb-6">
-        Estes Termos podem ser atualizados periodicamente. Alterações relevantes serão
-        comunicadas dentro do aplicativo. O uso continuado após as mudanças representa a
-        concordância com a versão vigente.
+        Estes Termos podem ser atualizados. Cada versão tem uma data, e quando o texto
+        muda o aplicativo pede que você leia e aceite a versão nova antes de continuar —
+        o simples uso do app não conta como concordância. O aceite fica registrado com a
+        data, e você pode conferir qual versão aceitou em Mais › Meus dados.
       </p>
 
       <h3 className="section-title">8. Contato</h3>
@@ -101,8 +105,9 @@ export function PrivacyContent() {
       <h3 className="section-title">4. Seus Direitos (LGPD)</h3>
       <p className="text-sm text-muted mb-6">
         Você tem direito de acessar, corrigir, atualizar e solicitar a exclusão dos seus
-        dados pessoais, bem como revogar consentimentos a qualquer momento. Para exercer
-        esses direitos, utilize as opções do app ou entre em contato com nosso
+        dados pessoais, bem como revogar consentimentos a qualquer momento. Em Mais › Meus
+        dados você baixa uma cópia de tudo o que o app guarda sobre você (em JSON) e pode
+        excluir a sua conta. Para os demais pedidos, entre em contato com nosso
         Encarregado de Dados (DPO).
       </p>
 

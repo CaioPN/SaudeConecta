@@ -4,6 +4,7 @@ import { ChevronLeft, AlertCircle, Heart, Pill, Phone, Droplet } from 'lucide-re
 import { useAuth } from '../context/AuthContext';
 import { usePessoas } from '../context/PessoasContext';
 import SeletorPessoa from '../components/SeletorPessoa';
+import EstadoErro from '../components/EstadoErro';
 import { ICONES } from '../utils/icones';
 import { buscarProntuario } from '../services/prontuario';
 import { listarFamiliares } from '../services/familiares';
@@ -67,6 +68,8 @@ export default function FichaEmergencia() {
   const [contatos, setContatos] = useState([]);
   const [mostrarContatos, setMostrarContatos] = useState(lerMostrarContatos);
   const [erro, setErro] = useState(null);
+  const [erroContatos, setErroContatos] = useState(null);
+  const [tentativa, setTentativa] = useState(0);
 
   useEffect(() => {
     let ativo = true;
@@ -74,9 +77,9 @@ export default function FichaEmergencia() {
     setErro(null);
     buscarProntuario(dependenteId)
       .then((dados) => { if (ativo) setProntuario(dados); })
-      .catch(() => { if (ativo) setErro('Não foi possível carregar a ficha. Verifique a conexão.'); });
+      .catch((falha) => { if (ativo) setErro(falha); });
     return () => { ativo = false; };
-  }, [dependenteId]);
+  }, [dependenteId, tentativa]);
 
   // Os contatos só são buscados se a opção estiver ligada: o que não vai ser
   // mostrado não precisa nem sair do servidor.
@@ -86,11 +89,14 @@ export default function FichaEmergencia() {
       return undefined;
     }
     let ativo = true;
+    setErroContatos(null);
     listarFamiliares()
       .then((lista) => { if (ativo) setContatos(lista); })
-      .catch(() => { if (ativo) setContatos([]); });
+      // Numa ficha de emergência, "Nenhum contato cadastrado" na falha seria
+      // o pior engano: o socorrista desistiria de procurar a família.
+      .catch((falha) => { if (ativo) { setContatos([]); setErroContatos(falha); } });
     return () => { ativo = false; };
-  }, [mostrarContatos]);
+  }, [mostrarContatos, tentativa]);
 
   const alternarContatos = () => {
     const novo = !mostrarContatos;
@@ -128,7 +134,9 @@ export default function FichaEmergencia() {
         </div>
 
         {!prontuario && !erro && <p className="empty-state">Carregando a ficha…</p>}
-        {erro && <p className="empty-state">{erro}</p>}
+        {erro && (
+          <EstadoErro erro={erro} oQue="a ficha de emergência" onTentarDeNovo={() => setTentativa((t) => t + 1)} />
+        )}
 
         {prontuario && (
           <>
@@ -195,7 +203,10 @@ export default function FichaEmergencia() {
         {mostrarContatos && (
           <div className="ficha-bloco">
             <h3 className="ficha-bloco-titulo"><Phone size={20} /> Contatos de emergência</h3>
-            {contatos.length === 0 ? (
+            {erroContatos ? (
+              <EstadoErro compacto erro={erroContatos} oQue="os contatos"
+                onTentarDeNovo={() => setTentativa((t) => t + 1)} />
+            ) : contatos.length === 0 ? (
               <p className="ficha-vazio">Nenhum contato cadastrado. Cadastre no seu perfil.</p>
             ) : (
               contatos.map((c) => (

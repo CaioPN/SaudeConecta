@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import useVoltar from '../hooks/useVoltar';
 import { ChevronLeft, Image as ImageIcon, Droplet, Download, Calendar, Building2, Stethoscope, AlertTriangle, Lock } from 'lucide-react';
-import { jsPDF } from 'jspdf';
+import { senhaDoPaciente, novoRelatorio, fecharRelatorio, nomeDeArquivo } from '../utils/pdf';
 import { useAuth } from '../context/AuthContext';
 import { usePessoas } from '../context/PessoasContext';
 import { usePrivacidade } from '../context/PrivacidadeContext';
@@ -13,20 +13,13 @@ import BotaoExplicacao from '../components/BotaoExplicacao';
 import InfoField from '../components/InfoField';
 import StatusBadge from '../components/StatusBadge';
 import Modal from '../components/Modal';
+import EstadoErro from '../components/EstadoErro';
 import GraficoEvolucao from '../components/GraficoEvolucao';
 import { buscarExames } from '../services/exames';
 import { registrarExportacao } from '../services/auditoria';
 import {
   situacaoItem, textoReferencia, formatarData, totalAlterados, seriesPorItem, chaveDoItem,
 } from '../utils/exames';
-
-// Senha do PDF: os 4 primeiros dígitos do CPF do paciente. Devolve null quando
-// o cadastro não tem CPF válido — nesse caso o arquivo sai sem proteção e a
-// tela avisa, em vez de gerar um PDF com senha que o paciente não conhece.
-function senhaDoPaciente(paciente) {
-  const digitos = String(paciente?.cpf || '').replace(/\D/g, '');
-  return digitos.length >= 4 ? digitos.slice(0, 4) : null;
-}
 
 export default function Exams() {
   const voltar = useVoltar('/patient');
@@ -38,6 +31,8 @@ export default function Exams() {
   const [imagem, setImagem] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
+  // Sobe a cada "Tentar de novo" para refazer a busca do efeito abaixo.
+  const [tentativa, setTentativa] = useState(0);
   // Item cujo gráfico de evolução está aberto ({ nome, chave }), ou null.
   const [evolucao, setEvolucao] = useState(null);
 
@@ -55,14 +50,18 @@ export default function Exams() {
     let ativo = true;
     setCarregando(true);
     setErro(null);
+    // Sem limpar, uma falha deixaria as coletas de quem estava selecionado
+    // antes — e o "Baixar PDF" as exportaria com o nome da pessoa nova.
+    setColetas([]);
+    setImagem([]);
     buscarExames(dependenteId)
       .then(({ coletas: c, imagem: i }) => {
         if (!ativo) return;
         setColetas(c);
         setImagem(i);
       })
-      .catch(() => {
-        if (ativo) setErro('Não foi possível carregar os exames.');
+      .catch((falha) => {
+        if (ativo) setErro(falha);
       })
       .finally(() => {
         if (ativo) setCarregando(false);
@@ -70,126 +69,73 @@ export default function Exams() {
     return () => {
       ativo = false;
     };
-  }, [dependenteId]);
+  }, [dependenteId, tentativa]);
 
   // Gera e baixa um PDF com o histórico de exames do paciente.
   const baixarPDF = () => {
     const senha = senhaDoPaciente(paciente);
-
-    // Sendo dado de saúde, o arquivo sai criptografado: sem a senha o leitor de
-    // PDF nem abre o documento. A senha do dono vai igual à do paciente porque,
-    // em branco, ela abriria o arquivo sozinha e a proteção não valeria nada.
-    const doc = new jsPDF(
-      senha
-        ? {
-            encryption: {
-              userPassword: senha,
-              ownerPassword: senha,
-              userPermissions: ['print', 'copy'],
-            },
-          }
-        : {}
-    );
-
-    // O relatório é de quem está selecionado no topo, mas a senha continua
-    // sendo o CPF do titular: a conta é dele, e o dependente não tem login.
     const nome = pessoa.nome || paciente?.nome || 'Paciente';
-    const hoje = new Date().toLocaleDateString('pt-BR');
-    let y = 20;
-
-    // Quebra de página quando o conteúdo chega perto do rodapé.
-    const espaco = (altura) => {
-      if (y + altura > 275) {
-        doc.addPage();
-        y = 20;
-      }
-    };
-
-    // Cabeçalho
-    doc.setFontSize(18);
-    doc.setTextColor(37, 99, 235);
-    doc.text('Saúde Conecta', 14, y);
-    doc.setFontSize(13);
-    doc.setTextColor(60, 60, 60);
-    y += 8;
-    doc.text('Histórico de Exames', 14, y);
-
-    doc.setFontSize(10);
-    doc.setTextColor(110, 110, 110);
-    y += 8;
-    doc.text(`Paciente: ${nome}`, 14, y);
-    y += 5;
-    doc.text(`Emitido em: ${hoje}`, 14, y);
-
-    doc.setDrawColor(220, 220, 220);
-    y += 4;
-    doc.line(14, y, 196, y);
+    const { doc, pagina, espaco } = novoRelatorio({ senha, titulo: 'Histórico de Exames', nome });
 
     // Seção: Exames de Sangue — uma tabela por coleta.
     coletas.forEach((coleta) => {
       espaco(50);
-      y += 10;
+      pagina.y += 10;
       doc.setFontSize(12);
       doc.setTextColor(30, 30, 30);
-      doc.text(`Coleta de ${formatarData(coleta.data)}`, 14, y);
+      doc.text(`Coleta de ${formatarData(coleta.data)}`, 14, pagina.y);
 
-      y += 5;
+      pagina.y += 5;
       doc.setFontSize(9);
       doc.setTextColor(110, 110, 110);
       const origem = [coleta.local, coleta.solicitante && `Solicitado por ${coleta.solicitante}`]
         .filter(Boolean)
         .join(' · ');
-      doc.text(origem, 14, y);
+      doc.text(origem, 14, pagina.y);
 
       // Cabeçalho da tabela
-      y += 8;
-      doc.text('Exame', 14, y);
-      doc.text('Resultado', 80, y);
-      doc.text('Referência', 120, y);
-      doc.text('Situação', 170, y);
+      pagina.y += 8;
+      doc.text('Exame', 14, pagina.y);
+      doc.text('Resultado', 80, pagina.y);
+      doc.text('Referência', 120, pagina.y);
+      doc.text('Situação', 170, pagina.y);
 
       doc.setFontSize(10);
       coleta.itens.forEach((item) => {
         espaco(10);
-        y += 7;
+        pagina.y += 7;
         const situacao = situacaoItem(item);
         doc.setTextColor(30, 30, 30);
-        doc.text(String(item.nome), 14, y);
-        doc.text(`${item.valor} ${item.unidade}`, 80, y);
-        doc.text(textoReferencia(item), 120, y);
+        doc.text(String(item.nome), 14, pagina.y);
+        doc.text(`${item.valor} ${item.unidade}`, 80, pagina.y);
+        doc.text(textoReferencia(item), 120, pagina.y);
 
         if (situacao === 'alterado') doc.setTextColor(220, 38, 38);
         else if (situacao === 'limite') doc.setTextColor(202, 138, 4);
         else doc.setTextColor(22, 163, 74);
-        doc.text(situacao === 'normal' ? 'Normal' : situacao === 'limite' ? 'Limite' : 'Alterado', 170, y);
+        doc.text(situacao === 'normal' ? 'Normal' : situacao === 'limite' ? 'Limite' : 'Alterado', 170, pagina.y);
         doc.setTextColor(30, 30, 30);
       });
     });
 
     // Seção: Exames de Imagem
     espaco(30);
-    y += 14;
+    pagina.y += 14;
     doc.setFontSize(12);
-    doc.text('Exames de Imagem', 14, y);
+    doc.text('Exames de Imagem', 14, pagina.y);
     doc.setFontSize(10);
     doc.setTextColor(60, 60, 60);
     imagem.forEach((e) => {
       espaco(10);
-      y += 7;
-      doc.text(`• ${e.nome} — ${formatarData(e.data)} · ${e.local}`, 14, y);
+      pagina.y += 7;
+      doc.text(`• ${e.nome} — ${formatarData(e.data)} · ${e.local}`, 14, pagina.y);
     });
 
-    // Rodapé
-    doc.setFontSize(8);
-    doc.setTextColor(150, 150, 150);
-    doc.text(
+    fecharRelatorio(
+      doc,
       'Documento gerado automaticamente pelo Saúde Conecta. Não substitui laudo médico oficial.',
-      14,
-      287
+      nomeDeArquivo('exames', nome),
     );
-
-    const nomeArquivo = `exames-${nome.toLowerCase().replace(/\s+/g, '-')}.pdf`;
-    doc.save(nomeArquivo);
 
     // Exportar dado de saúde é operação auditável, e o arquivo nasce aqui no
     // navegador: sem este aviso a API não teria como saber que ele existiu.
@@ -251,7 +197,9 @@ export default function Exams() {
 
       <div className="tela-lista">
       {carregando && <p className="empty-state">Carregando exames…</p>}
-      {erro && !carregando && <p className="empty-state">{erro}</p>}
+      {erro && !carregando && (
+        <EstadoErro erro={erro} oQue="os exames" onTentarDeNovo={() => setTentativa((t) => t + 1)} />
+      )}
 
       {!carregando && !erro && tab === 'sangue' && (
         coletas.length === 0 ? (

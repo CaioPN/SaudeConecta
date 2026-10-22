@@ -15,6 +15,7 @@
 
 import { AxiosError } from 'axios';
 import { criarEstado, calendario } from './dados';
+import { VERSAO_TERMOS } from '../content/versaoTermos';
 import { GLOSSARIO } from './glossario';
 import {
   MUNICIPIO_SAO_PAULO, MUNICIPIO_GUARULHOS, UNIDADES_SAO_PAULO, UNIDADES_GUARULHOS,
@@ -65,6 +66,15 @@ function agoraIso(somarMinutos = 0) {
   return `${d.getFullYear()}-${DOIS(d.getMonth() + 1)}-${DOIS(d.getDate())}T`
     + `${DOIS(d.getHours())}:${DOIS(d.getMinutes())}:${DOIS(d.getSeconds())}`;
 }
+
+// A conta da demonstração já chega com os termos vigentes aceitos: quem vem
+// pelo QR Code da feira não deveria esbarrar no portão antes de ver o app.
+// (Aqui, e não logo depois do criarEstado: agoraIso usa DOIS, que só existe
+// a partir daqui.)
+function aceiteInicial() {
+  return [{ versao: VERSAO_TERMOS, aceito_em: agoraIso(-60 * 24 * 7) }];
+}
+estado.aceites = aceiteInicial();
 
 /** Dias de `a` até `b` (datas ISO), como o DATEDIFF do MySQL. */
 function diasEntre(a, b) {
@@ -135,6 +145,36 @@ function auditar(acao, recurso, detalhe = null, depId = null, leitura = false) {
   estado.auditoria.unshift({
     id: novoId(), acao, recurso, detalhe, dependente_id: depId, criado_em: agoraIso(), origem_ip: null,
   });
+}
+
+function situacaoTermos() {
+  const aceite = estado.aceites.find((a) => a.versao === VERSAO_TERMOS);
+  return { versao_vigente: VERSAO_TERMOS, aceito: Boolean(aceite), aceito_em: aceite?.aceito_em || null };
+}
+
+/**
+ * As doses registradas como linhas, igual à tabela vacinas_aplicadas. Aqui
+ * elas moram num objeto por pessoa ('titular' ou id do dependente).
+ */
+function dosesAplicadas() {
+  return Object.entries(estado.vacinas).flatMap(([pessoa, doses]) =>
+    Object.entries(doses || {}).map(([doseId, aplicadaEm]) => ({
+      dependente_id: pessoa === 'titular' ? null : Number(pessoa),
+      dose_id: doseId,
+      aplicada_em: aplicadaEm,
+    })));
+}
+
+/** As mesmas contagens do ContaDAO.contar. */
+function totaisDaConta() {
+  return {
+    dependentes: estado.dependentes.length,
+    consultas: estado.consultas.length,
+    exames: estado.exames.length,
+    vacinas: dosesAplicadas().length,
+    itens_prontuario: estado.alergias.length + estado.condicoes.length + estado.medicacoes.length,
+    contatos: estado.familiares.length,
+  };
 }
 
 function alvoDaLeitura(depId) {
@@ -398,6 +438,10 @@ const ROTAS = [
   ['post', '/auth/register', ({ corpo }) => {
     const obrig = ['nome', 'email', 'senha', 'telefone', 'cpf', 'genero', 'tipoSanguineo', 'dataNascimento'];
     if (obrig.some((c) => !campo(corpo, c))) falhar(400, 'Preencha todos os dados pessoais obrigatórios.');
+    if (campo(corpo, 'versaoTermos') !== VERSAO_TERMOS) {
+      falhar(409, 'Os Termos de Uso foram atualizados. Recarregue a página e leia a versão nova.');
+    }
+    estado.aceites = [{ versao: VERSAO_TERMOS, aceito_em: agoraIso() }];
     if (!/^\d{11}$/.test(campo(corpo, 'cpf'))) falhar(400, 'O CPF deve ter exatamente 11 dígitos numéricos.');
     if (apenasDigitos(corpo.telefone).length < 10) falhar(400, 'Informe um telefone válido (com DDD).');
     // A conta nova fica com o histórico de demonstração: sem ele, quem se
@@ -412,6 +456,59 @@ const ROTAS = [
     return [201, { paciente: { ...estado.paciente }, token: 'demo-paciente' }];
   }],
   ['get', '/auth/me', () => ({ paciente: { ...estado.paciente } })],
+
+  // --- termos e "Meus dados" (LGPD) — mesmo JSON do ApiServer ---
+  ['get', '/termos', () => situacaoTermos()],
+  ['post', '/termos/aceite', ({ corpo }) => {
+    if (campo(corpo, 'versao') !== VERSAO_TERMOS) {
+      falhar(409, 'Os Termos de Uso foram atualizados. Recarregue a página e leia a versão nova.');
+    }
+    if (!estado.aceites.some((a) => a.versao === VERSAO_TERMOS)) {
+      estado.aceites.push({ versao: VERSAO_TERMOS, aceito_em: agoraIso() });
+      auditar('aceitou_termos', 'conta', `Versão ${VERSAO_TERMOS}`);
+    }
+    return situacaoTermos();
+  }],
+  ['get', '/conta/resumo', () => ({ totais: totaisDaConta() })],
+  ['get', '/conta/exportacao', () => {
+    // As mesmas chaves do ContaDAO. A demonstração não tem as tabelas, então
+    // monta a partir do estado da página — que é tudo o que existe aqui.
+    const dados = {
+      cadastro: [{ ...estado.paciente }],
+      dependentes: estado.dependentes.map((d) => ({ ...d })),
+      contatos_emergencia: estado.familiares.map((f) => ({ ...f })),
+      consultas: estado.consultas.map((c) => ({ ...c })),
+      exames: estado.exames.map((e) => ({ ...e })),
+      alergias: estado.alergias.map((a) => ({ ...a })),
+      condicoes: estado.condicoes.map((c) => ({ ...c })),
+      medicacoes: estado.medicacoes.map((m) => ({ ...m })),
+      vacinas_aplicadas: dosesAplicadas(),
+      notificacoes: estado.notificacoes.map((n) => ({ ...n })),
+      acessos_concedidos: estado.acessos.map(({ codigo, ...a }) => ({ ...a })),
+      acessos_trilha: estado.logMedico.map((l) => ({ ...l })),
+      auditoria: estado.auditoria.map((r) => ({ ...r })),
+      aceites_termos: estado.aceites.map((a) => ({ ...a })),
+    };
+    const total = Object.values(dados).reduce((soma, lista) => soma + lista.length, 0);
+    auditar('exportou_dados', 'conta', `${total} registro(s) em JSON`);
+    return {
+      formato: 'saudeconecta-exportacao',
+      versao_formato: 1,
+      gerado_em: agoraIso(),
+      observacao: 'Cópia dos dados da conta de demonstração (dados fictícios).',
+      dados,
+    };
+  }],
+  ['delete', '/conta', ({ corpo }) => {
+    // Como no login da demonstração, qualquer senha confere — mas ela é
+    // exigida, para a tela se comportar como a de verdade.
+    if (!campo(corpo, 'senha')) falhar(401, 'Senha incorreta. A conta não foi excluída.');
+    // O estande costuma ter um aparelho só: excluir devolve a demonstração ao
+    // começo, para o próximo visitante encontrar a conta inteira.
+    Object.assign(estado, criarEstado());
+    estado.aceites = aceiteInicial();
+    return { sucesso: true };
+  }],
   ['put', '/auth/me', ({ corpo }) => {
     const p = estado.paciente;
     const telefone = campo(corpo, 'telefone') || p.telefone;
@@ -581,6 +678,15 @@ const ROTAS = [
     auditar('exportou_exames', 'exames',
       `PDF de exames · ${alvo || 'titular'} · ${Number(corpo.coletas) || 0} coleta(s) e `
       + `${Number(corpo.imagens) || 0} exame(s) de imagem · ${corpo.protegido ? 'protegido por senha' : 'sem senha'}`,
+      depId);
+    return [201, { sucesso: true }];
+  }],
+  ['post', '/vacinas/exportacao', ({ corpo }) => {
+    const depId = typeof corpo.dependenteId === 'number' ? corpo.dependenteId : null;
+    const alvo = alvoDaLeitura(depId);
+    auditar('exportou_vacinas', 'vacinas',
+      `PDF da carteira · ${alvo || 'titular'} · ${Number(corpo.aplicadas) || 0} dose(s) registrada(s), `
+      + `${Number(corpo.atrasadas) || 0} em atraso · ${corpo.protegido ? 'protegido por senha' : 'sem senha'}`,
       depId);
     return [201, { sucesso: true }];
   }],

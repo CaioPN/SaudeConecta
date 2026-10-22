@@ -25,6 +25,7 @@ import com.sun.net.httpserver.HttpServer;
 import br.com.hackgov.dao.AcessoDAO;
 import br.com.hackgov.dao.AuditoriaDAO;
 import br.com.hackgov.dao.AvisoDAO;
+import br.com.hackgov.dao.ContaDAO;
 import br.com.hackgov.dao.ConsultaDAO;
 import br.com.hackgov.dao.DependenteDAO;
 import br.com.hackgov.dao.ExameDAO;
@@ -37,6 +38,7 @@ import br.com.hackgov.dao.PacienteDAO;
 import br.com.hackgov.dao.ProntuarioDAO;
 import br.com.hackgov.dao.UnidadeSaudeDAO;
 import br.com.hackgov.modelos.AcessoLog;
+import br.com.hackgov.modelos.AceiteTermos;
 import br.com.hackgov.modelos.AcessoTemporario;
 import br.com.hackgov.modelos.Alergia;
 import br.com.hackgov.modelos.Aviso;
@@ -96,6 +98,12 @@ import br.com.hackgov.util.SenhaUtil;
  *                                 (só leitura: quem registra dose é o médico,
  *                                  por /api/medico/vacinas)
  *   POST   /api/exames/exportacao registra na auditoria o download do PDF
+ *   POST   /api/vacinas/exportacao idem, para o PDF da carteira de vacinação
+ *   GET    /api/conta/exportacao  todos os dados da conta em JSON (LGPD, portabilidade)
+ *   GET    /api/conta/resumo      quanto a conta tem, para a tela de exclusão
+ *   DELETE /api/conta             exclui a conta (pede a senha de novo)
+ *   GET    /api/termos            versão vigente dos termos e se a pessoa já a aceitou
+ *   POST   /api/termos/aceite     registra o aceite da versão vigente
  *   GET    /api/auditoria         trilha de auditoria (médico + próprio paciente)
  *   GET    /api/familiares        contatos de emergência
  *   POST   /api/familiares        cadastra um contato
@@ -131,6 +139,17 @@ public class ApiServer {
     private static final FamiliarDAO familiarDAO = new FamiliarDAO();
     private static final NotificacaoDAO notificacaoDAO = new NotificacaoDAO();
     private static final VacinaDAO vacinaDAO = new VacinaDAO();
+    private static final ContaDAO contaDAO = new ContaDAO();
+
+    /**
+     * Versão vigente dos Termos de Uso e da Política de Privacidade — a data
+     * em que o texto mudou. É a mesma constante VERSAO_TERMOS de
+     * content/versaoTermos.js: mudou o texto, mude as duas, e todo mundo é
+     * convidado a aceitar de novo no próximo acesso. O servidor recusa
+     * aceitar qualquer outra versão, então um front desatualizado não
+     * registra o aceite de um texto que já não vale.
+     */
+    private static final String VERSAO_TERMOS = "2026-10-21";
 
     /** Validade padrão do código/token do médico, em minutos. */
     private static final int VALIDADE_ACESSO_MINUTOS = 30;
@@ -191,6 +210,8 @@ public class ApiServer {
         server.createContext("/api/auth/recuperar", comCors(ApiServer::recuperarSenha));
         server.createContext("/api/auth/redefinir", comCors(ApiServer::redefinirSenha));
         server.createContext("/api/auth/me", comCors(ApiServer::me));
+        server.createContext("/api/conta", comCors(ApiServer::conta));
+        server.createContext("/api/termos", comCors(ApiServer::termos));
         server.createContext("/api/dependentes", comCors(ApiServer::dependentes));
         server.createContext("/api/familiares", comCors(ApiServer::familiares));
         server.createContext("/api/notificacoes", comCors(ApiServer::notificacoes));
@@ -294,6 +315,12 @@ public class ApiServer {
                 enviarErro(ex, 400, erroSenha);
                 return;
             }
+            // O aceite precisa chegar ao servidor, e da versão que vale hoje: era
+            // só uma caixa marcada na tela, e nada ficava registrado.
+            if (!VERSAO_TERMOS.equals(campo(body, "versaoTermos"))) {
+                enviarErro(ex, 409, "Os Termos de Uso foram atualizados. Recarregue a página e leia a versão nova.");
+                return;
+            }
             if (pacienteDAO.existeEmailOuCpf(email, cpf)) {
                 enviarErro(ex, 409, "Já existe um paciente com este email ou CPF.");
                 return;
@@ -317,6 +344,14 @@ public class ApiServer {
 
             int id = pacienteDAO.inserir(p);
             Paciente salvo = pacienteDAO.buscarPorId(id);
+            try {
+                contaDAO.registrarAceite(id, VERSAO_TERMOS, ipDe(ex));
+                auditar(ex, id, "aceitou_termos", "conta", "Versão " + VERSAO_TERMOS);
+            } catch (SQLException e) {
+                // A conta já existe; sem o registro, o próximo acesso pede o
+                // aceite de novo (GET /api/termos diz que falta).
+                System.out.println("[ERRO aceite no cadastro] " + e.getMessage());
+            }
 
             Map<String, Object> resp = new LinkedHashMap<>();
             resp.put("paciente", pacienteJson(salvo));
@@ -992,6 +1027,8 @@ public class ApiServer {
         try {
             if ("GET".equals(metodo) && "/api/vacinas".equals(path)) {
                 listarVacinas(ex, userId);
+            } else if ("POST".equals(metodo) && "/api/vacinas/exportacao".equals(path)) {
+                registrarExportacaoVacinas(ex, userId);
             } else {
                 enviarErro(ex, 405, "Método não permitido.");
             }
@@ -1001,6 +1038,31 @@ public class ApiServer {
             System.out.println("[ERRO vacinas] " + e.getMessage());
             enviarErro(ex, 500, "Erro ao carregar a carteira de vacinação.");
         }
+    }
+
+    /**
+     * POST /api/vacinas/exportacao — o front avisa que o PDF da carteira foi
+     * baixado. Mesmo desenho da exportação de exames: o arquivo nasce no
+     * navegador, a ação é fixada aqui e do cliente vem só a contagem.
+     */
+    private static void registrarExportacaoVacinas(HttpExchange ex, int userId) throws IOException {
+        Map<String, Object> body = lerCorpo(ex);
+        int aplicadas = inteiro(body.get("aplicadas"));
+        int atrasadas = inteiro(body.get("atrasadas"));
+        boolean protegido = Boolean.TRUE.equals(body.get("protegido"));
+        Integer dependenteId = body.get("dependenteId") instanceof Number
+                ? ((Number) body.get("dependenteId")).intValue()
+                : null;
+        String alvo = alvoDaLeitura(userId, dependenteId);
+
+        String detalhe = "PDF da carteira · " + (alvo == null ? "titular" : alvo) + " · "
+                + aplicadas + " dose(s) registrada(s), " + atrasadas + " em atraso · "
+                + (protegido ? "protegido por senha" : "sem senha");
+        auditar(ex, userId, "exportou_vacinas", "vacinas", detalhe, dependenteId);
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("sucesso", Boolean.TRUE);
+        enviarJson(ex, 201, resp);
     }
 
     private static void listarVacinas(HttpExchange ex, int userId) throws IOException, SQLException {
@@ -2336,7 +2398,29 @@ public class ApiServer {
      */
     private static void auditar(HttpExchange ex, int userId, String acao, String recurso,
                                 String detalhe, Integer idDependente) {
-        auditoriaDAO.registrar(userId, idDependente, acao, recurso, detalhe, ipDe(ex), false);
+        auditoriaDAO.registrar(userId, dependenteDoTitular(userId, idDependente),
+                acao, recurso, detalhe, ipDe(ex), false);
+    }
+
+    /**
+     * O id do dependente só entra na trilha se ele for deste titular.
+     *
+     * Algumas rotas (a exportação do PDF, por exemplo) recebem o id do
+     * cliente e só o usam para a trilha. Sem esta conferência, mandar o id do
+     * filho de OUTRA família gravava esse id aqui, e a listagem da trilha (que
+     * faz LEFT JOIN em dependentes) devolvia o nome da criança — com ids
+     * sequenciais, dava para levantar o primeiro nome de todos os dependentes.
+     * Fica no auditar, e não em cada rota, para valer também nas que vierem.
+     */
+    private static Integer dependenteDoTitular(int userId, Integer idDependente) {
+        if (idDependente == null || idDependente <= 0) return null;
+        try {
+            return dependenteDAO.nomeDoPaciente(idDependente, userId) != null ? idDependente : null;
+        } catch (SQLException e) {
+            // Na dúvida, a linha fica sem dependente: melhor que gravar um id
+            // que talvez não seja desta conta.
+            return null;
+        }
     }
 
     /**
@@ -2353,7 +2437,8 @@ public class ApiServer {
 
     private static void auditarLeitura(HttpExchange ex, int userId, String acao,
                                        String recurso, String detalhe, Integer idDependente) {
-        auditoriaDAO.registrar(userId, idDependente, acao, recurso, detalhe, ipDe(ex), true);
+        auditoriaDAO.registrar(userId, dependenteDoTitular(userId, idDependente),
+                acao, recurso, detalhe, ipDe(ex), true);
     }
 
     /**
@@ -3351,6 +3436,161 @@ public class ApiServer {
         m.put("tipo_sanguineo", d.getTipoSanguineo());
         m.put("data_nascimento", d.getDataNascimento());
         return m;
+    }
+
+    // ===================== DIREITOS DO TITULAR (LGPD) =====================
+
+    /**
+     * /api/conta — o que a LGPD (art. 18) garante ao titular sobre a conta
+     * inteira: receber uma cópia de tudo (portabilidade) e excluir a conta.
+     */
+    private static void conta(HttpExchange ex) throws IOException {
+        Integer userId = autenticar(ex);
+        if (userId == null) return;
+        String metodo = ex.getRequestMethod();
+        String path = ex.getRequestURI().getPath();
+
+        try {
+            if ("GET".equals(metodo) && "/api/conta/exportacao".equals(path)) {
+                exportarConta(ex, userId);
+            } else if ("GET".equals(metodo) && "/api/conta/resumo".equals(path)) {
+                Map<String, Object> resp = new LinkedHashMap<>();
+                resp.put("totais", new LinkedHashMap<String, Object>(contaDAO.contar(userId)));
+                enviarJson(ex, 200, resp);
+            } else if ("DELETE".equals(metodo) && "/api/conta".equals(path)) {
+                excluirConta(ex, userId);
+            } else {
+                enviarErro(ex, 405, "Método não permitido.");
+            }
+        } catch (IllegalArgumentException e) {
+            enviarErro(ex, 400, "Corpo da requisição inválido (JSON).");
+        } catch (SQLException e) {
+            System.out.println("[ERRO conta] " + e.getMessage());
+            enviarErro(ex, 500, "Não foi possível concluir. Nada foi alterado na sua conta.");
+        }
+    }
+
+    /**
+     * GET /api/conta/exportacao — cópia de todos os dados da conta em JSON.
+     *
+     * É um arquivo, e não uma tela: portabilidade é poder levar os dados para
+     * outro lugar. Vem com CPF, endereço e o prontuário inteiro — é o dono
+     * pedindo o que é dele —, então a tela avisa que o arquivo não tem senha.
+     * Auditado aqui, no servidor, que é quem entrega o arquivo.
+     */
+    private static void exportarConta(HttpExchange ex, int userId) throws IOException, SQLException {
+        Map<String, Object> dados = contaDAO.exportar(userId);
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("formato", "saudeconecta-exportacao");
+        resp.put("versao_formato", 1);
+        resp.put("gerado_em", java.time.LocalDateTime.now().withNano(0).toString());
+        resp.put("observacao", "Cópia dos dados da sua conta no Saúde Conecta (LGPD, art. 18, V). "
+                + "Ficam de fora apenas o hash da senha e o dos códigos de acesso, que não são dado seu.");
+        resp.put("dados", dados);
+
+        int total = 0;
+        for (Object v : dados.values()) {
+            if (v instanceof List) total += ((List<?>) v).size();
+        }
+        auditar(ex, userId, "exportou_dados", "conta", total + " registro(s) em JSON");
+        enviarJson(ex, 200, resp);
+    }
+
+    /**
+     * DELETE /api/conta — exclui a conta e tudo o que pende dela.
+     *
+     * Pede a senha de novo: um token esquecido num aparelho compartilhado não
+     * pode bastar para apagar o prontuário de alguém, e não há desfazer. As
+     * tentativas erradas contam no mesmo limite do login, senão esta rota
+     * viraria um jeito de testar senhas.
+     *
+     * O registro da exclusão vai para contas_excluidas, e não para a tabela
+     * auditoria: a auditoria do paciente é apagada em cascata junto com ele.
+     */
+    private static void excluirConta(HttpExchange ex, int userId) throws IOException, SQLException {
+        String ip = ipDe(ex);
+        if (excedeuTentativas(tentativasLoginPorIp, ip)) {
+            enviarErro(ex, 429, "Muitas tentativas. Aguarde alguns minutos e tente de novo.");
+            return;
+        }
+
+        String senha = campo(lerCorpo(ex), "senha");
+        Paciente p = pacienteDAO.buscarPorId(userId);
+        if (p == null) {
+            enviarErro(ex, 404, "Conta não encontrada.");
+            return;
+        }
+        // O hash vem pela busca do login, a mesma que o login usa para conferir.
+        Paciente comHash = pacienteDAO.buscarPorEmail(p.getEmail());
+        if (senha == null || comHash == null || !SenhaUtil.verificar(senha, comHash.getSenhaHash())) {
+            registrarTentativa(tentativasLoginPorIp, ip);
+            auditar(ex, userId, "exclusao_recusada", "conta", "Senha incorreta.");
+            enviarErro(ex, 401, "Senha incorreta. A conta não foi excluída.");
+            return;
+        }
+
+        // Só contagens: o resumo fica guardado depois que a conta some, e não
+        // pode carregar nada que identifique a pessoa.
+        Map<String, Integer> totais = contaDAO.contar(userId);
+        StringBuilder resumo = new StringBuilder();
+        for (Map.Entry<String, Integer> t : totais.entrySet()) {
+            if (resumo.length() > 0) resumo.append(", ");
+            resumo.append(t.getKey()).append('=').append(t.getValue());
+        }
+
+        if (!contaDAO.excluirConta(userId, ip, resumo.toString())) {
+            enviarErro(ex, 404, "Conta não encontrada.");
+            return;
+        }
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("sucesso", Boolean.TRUE);
+        enviarJson(ex, 200, resp);
+    }
+
+    /**
+     * /api/termos — GET diz qual é a versão vigente e se a pessoa já a aceitou;
+     * POST /api/termos/aceite registra o aceite.
+     */
+    private static void termos(HttpExchange ex) throws IOException {
+        Integer userId = autenticar(ex);
+        if (userId == null) return;
+        String metodo = ex.getRequestMethod();
+        String path = ex.getRequestURI().getPath();
+
+        try {
+            if ("GET".equals(metodo) && "/api/termos".equals(path)) {
+                enviarJson(ex, 200, situacaoTermos(userId));
+            } else if ("POST".equals(metodo) && "/api/termos/aceite".equals(path)) {
+                String versao = campo(lerCorpo(ex), "versao");
+                if (!VERSAO_TERMOS.equals(versao)) {
+                    enviarErro(ex, 409, "Os Termos de Uso foram atualizados. Recarregue a página e leia a versão nova.");
+                    return;
+                }
+                boolean jaAceito = contaDAO.buscarAceite(userId, VERSAO_TERMOS) != null;
+                contaDAO.registrarAceite(userId, VERSAO_TERMOS, ipDe(ex));
+                if (!jaAceito) auditar(ex, userId, "aceitou_termos", "conta", "Versão " + VERSAO_TERMOS);
+                enviarJson(ex, 200, situacaoTermos(userId));
+            } else {
+                enviarErro(ex, 405, "Método não permitido.");
+            }
+        } catch (IllegalArgumentException e) {
+            enviarErro(ex, 400, "Corpo da requisição inválido (JSON).");
+        } catch (SQLException e) {
+            System.out.println("[ERRO termos] " + e.getMessage());
+            enviarErro(ex, 500, "Não foi possível consultar os termos.");
+        }
+    }
+
+    /** Versão vigente e o aceite dela por esta pessoa (null = ainda não aceitou). */
+    private static Map<String, Object> situacaoTermos(int userId) throws SQLException {
+        AceiteTermos aceite = contaDAO.buscarAceite(userId, VERSAO_TERMOS);
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("versao_vigente", VERSAO_TERMOS);
+        resp.put("aceito", aceite != null);
+        resp.put("aceito_em", aceite == null ? null : aceite.getAceitoEm());
+        return resp;
     }
 
     // ===================== INFRAESTRUTURA HTTP =====================

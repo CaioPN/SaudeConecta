@@ -1,13 +1,17 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import useVoltar from '../hooks/useVoltar';
-import { ChevronLeft, Check, Clock, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { ChevronLeft, Check, Clock, AlertTriangle, ShieldCheck, Download, Lock } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { usePessoas } from '../context/PessoasContext';
 import { usePrivacidade } from '../context/PrivacidadeContext';
 import BotaoPrivacidade from '../components/BotaoPrivacidade';
 import SeletorPessoa from '../components/SeletorPessoa';
+import EstadoErro from '../components/EstadoErro';
 import BotaoExplicacao from '../components/BotaoExplicacao';
 import { mascarar } from '../utils/privacidade';
-import { buscarCarteira } from '../services/vacinas';
+import { buscarCarteira, registrarExportacaoCarteira } from '../services/vacinas';
+import { senhaDoPaciente } from '../utils/pdf';
+import { textoDaData, gerarPdfCarteira } from '../utils/pdfCarteira';
 
 // Calcula a idade (anos completos) a partir de uma data ISO (YYYY-MM-DD).
 function calcularIdade(dataIso) {
@@ -21,13 +25,6 @@ function calcularIdade(dataIso) {
   return idade;
 }
 
-// "2026-04-12" -> "12/04/2026". Sem new Date() de propósito: a data vem do
-// banco sem fuso, e o construtor a interpretaria como UTC, o que muda o dia.
-function formatarDataIso(iso) {
-  if (!iso || iso.length < 10) return iso || '';
-  return `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
-}
-
 const ICONE = {
   aplicada: <Check size={16} />,
   atrasada: <AlertTriangle size={16} />,
@@ -38,14 +35,7 @@ function VacinaItem({ v, oculto }) {
   // O olhinho esconde as DATAS, não a lista de vacinas: os nomes e os períodos
   // saem do calendário do PNI, que é público e igual para todo mundo da mesma
   // idade. A data em que a pessoa tomou (ou deveria ter tomado) é que é dela.
-  let quando;
-  if (v.status === 'aplicada') {
-    quando = v.aplicadaEm ? `Aplicada em ${formatarDataIso(v.aplicadaEm)}` : 'Aplicada';
-  } else if (v.status === 'atrasada') {
-    quando = v.prevista ? `Era para ter sido tomada em ${formatarDataIso(v.prevista)}` : 'Em atraso';
-  } else {
-    quando = v.prevista ? `Prevista para ${formatarDataIso(v.prevista)}` : v.periodo;
-  }
+  const quando = textoDaData(v);
 
   return (
     <div className={`vacina-item ${v.status}`}>
@@ -71,6 +61,7 @@ function VacinaItem({ v, oculto }) {
 
 export default function Vacinas() {
   const voltar = useVoltar('/patient');
+  const { paciente } = useAuth();
   const { pessoa, dependenteId } = usePessoas();
   const { oculto } = usePrivacidade();
 
@@ -81,13 +72,18 @@ export default function Vacinas() {
 
   const carregar = useCallback(() => {
     setCarregando(true);
+    setErro(null);
+    // Limpa antes de buscar: se a busca de outra pessoa falhar, as doses de
+    // quem estava selecionado antes não podem continuar na tela.
+    setDoses([]);
+    setResumo({ total: 0, aplicadas: 0, atrasadas: 0 });
     return buscarCarteira(dependenteId)
       .then(({ doses: lista, resumo: r }) => {
         setDoses(lista);
         setResumo(r);
         setErro(null);
       })
-      .catch(() => setErro('Não foi possível carregar a carteira de vacinação.'))
+      .catch(setErro)
       .finally(() => setCarregando(false));
   }, [dependenteId]);
 
@@ -100,6 +96,21 @@ export default function Vacinas() {
   const previstas = doses.filter((v) => v.status === 'prevista');
   const aplicadas = doses.filter((v) => v.status === 'aplicada');
   const percentual = resumo.total ? Math.round((resumo.aplicadas / resumo.total) * 100) : 0;
+  const senha = senhaDoPaciente(paciente);
+  // Só com a carteira carregada de verdade: na falha, um PDF vazio seria um
+  // documento afirmando que a pessoa não tem dose nenhuma.
+  const podeBaixar = !carregando && !erro && doses.length > 0;
+
+  const baixarPdf = () => {
+    const nome = pessoa.nome || paciente?.nome || 'Paciente';
+    gerarPdfCarteira({ senha, nome, rotuloIdade, atrasadas, previstas, aplicadas });
+    registrarExportacaoCarteira({
+      aplicadas: aplicadas.length,
+      atrasadas: atrasadas.length,
+      protegido: senha !== null,
+      dependenteId,
+    });
+  };
 
   return (
     <div className="screen-container tela-rolagem">
@@ -110,20 +121,29 @@ export default function Vacinas() {
         </button>
 
         <div className="section-header">
-          <div>
-            <h2 className="header-title mb-2">Carteira de Vacinação</h2>
-            <p className="text-sm text-muted">Calendário Nacional de Vacinação (SUS)</p>
+          <h2 className="header-title">Carteira de Vacinação</h2>
+          <div className="flex items-center gap-4">
+            <BotaoPrivacidade rotulo="datas" />
+            {podeBaixar && (
+              <button onClick={baixarPdf} className="pdf-download-btn">
+                <Download size={18} />
+                <span>Baixar PDF</span>
+              </button>
+            )}
           </div>
-          <BotaoPrivacidade rotulo="datas" />
         </div>
 
         {/* Seletor de pessoa (titular + dependentes) */}
         <SeletorPessoa />
 
-        {/* Resumo / progresso */}
-        <div className="card">
+        {/* Resumo / progresso, numa faixa baixa: é a única coisa do topo que
+            se consulta enquanto a lista rola. Some na falha: "0 de 0
+            registradas" seria uma afirmação sobre a carteira que o app não
+            conseguiu ler. */}
+        {!erro && (
+        <div className="card vacina-resumo-card">
           <div className="vacina-resumo">
-            <div className="icon-box"><ShieldCheck size={26} /></div>
+            <div className="icon-box icon-box-sm"><ShieldCheck size={20} /></div>
             <div style={{ flex: 1 }}>
               <div className="flex justify-between items-center mb-2">
                 <span className={`font-bold ${oculto ? 'valor-oculto' : ''}`}>
@@ -139,21 +159,37 @@ export default function Vacinas() {
             </div>
           </div>
         </div>
+        )}
 
-        {/* A carteira aqui é só de leitura: quem confirma a dose é o
-            profissional, pelo código de acesso. Sem essa linha o paciente
-            procuraria um botão que não existe. */}
-        <p className="text-xs text-muted">
-          O registro das doses é feito pelo profissional de saúde, com o código
-          de acesso que você gera em Mais › Acesso do médico.
-        </p>
-
-        {erro && <p className="text-sm text-red">{erro}</p>}
       </div>
 
-      {/* Única área rolável da tela */}
+      {/* Única área rolável da tela. As notas abrem a lista, e não o topo
+          fixo: lidas uma vez, saem de cena ao rolar e deixam o espaço para
+          as doses. */}
       <div className="tela-lista">
+        <div className="vacina-notas">
+          {/* A carteira aqui é só de leitura: quem confirma a dose é o
+              profissional, pelo código de acesso. Sem essa linha o paciente
+              procuraria um botão que não existe. */}
+          <p className="text-xs text-muted">
+            Calendário Nacional de Vacinação (SUS). O registro das doses é feito
+            pelo profissional de saúde, com o código de acesso que você gera em
+            Mais › Acesso do médico.
+          </p>
+          {podeBaixar && (
+            <p className="pdf-nota">
+              <Lock size={13} />
+              {senha
+                ? 'O PDF baixado abre com senha: os 4 primeiros dígitos do seu CPF.'
+                : 'Sem CPF no cadastro, o PDF é baixado sem senha de proteção.'}
+            </p>
+          )}
+        </div>
+
         {carregando && <p className="text-sm text-muted">Carregando a carteira…</p>}
+        {erro && !carregando && (
+          <EstadoErro erro={erro} oQue="a carteira de vacinação" onTentarDeNovo={carregar} />
+        )}
 
         {!carregando && atrasadas.length > 0 && (
           <>

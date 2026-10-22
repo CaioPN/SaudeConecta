@@ -49,3 +49,18 @@ export async function buscarCarteira(dependenteId) {
 // Não há aqui como registrar nem desmarcar dose de propósito: a carteira é
 // escrita pelo profissional, pelo acesso temporário (services/medico.js). Do
 // lado do paciente ela é só leitura.
+
+/**
+ * POST /api/vacinas/exportacao — avisa a API que o PDF da carteira foi
+ * baixado, como a exportação de exames (ver services/auditoria.js): o arquivo
+ * nasce no navegador, e do cliente vai só a contagem.
+ *
+ * Falha em silêncio de propósito: o paciente já tem o arquivo na mão.
+ */
+export async function registrarExportacaoCarteira({ aplicadas = 0, atrasadas = 0, protegido = false, dependenteId }) {
+  try {
+    await api.post('/vacinas/exportacao', { aplicadas, atrasadas, protegido, dependenteId });
+  } catch {
+    // silêncio proposital (ver acima)
+  }
+}

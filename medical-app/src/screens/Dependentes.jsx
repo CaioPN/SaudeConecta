@@ -5,6 +5,8 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { ChevronLeft, Trash2, Users } from 'lucide-react';
 import BotaoPrivacidade from '../components/BotaoPrivacidade';
+import EstadoErro from '../components/EstadoErro';
+import { mensagemDaAcao } from '../utils/falhas';
 import ConfirmarExclusao from '../components/ConfirmarExclusao';
 import { usePessoas } from '../context/PessoasContext';
 import { usePrivacidade } from '../context/PrivacidadeContext';
@@ -60,15 +62,19 @@ export default function Dependentes() {
     const [dependentes, setDependentes] = useState([]);
     const [erro, setErro] = useState('');
     const [carregando, setCarregando] = useState(true);
+    // Falha ao ler a lista; sem ela a tela dizia "Nenhum dependente cadastrado".
+    const [erroLista, setErroLista] = useState(null);
     // Dependente cuja exclusão espera confirmação; null = janela fechada.
     const [aExcluir, setAExcluir] = useState(null);
 
     async function carregarDependentes() {
+        setCarregando(true);
+        setErroLista(null);
         try {
             const { data } = await api.get('/dependentes');
             setDependentes(data.dependentes);
         } catch (err) {
-            setErro(err?.response?.data?.erro || 'Erro ao carregar dependentes.');
+            setErroLista(err);
         } finally {
             setCarregando(false);
         }
@@ -86,7 +92,7 @@ export default function Dependentes() {
             recarregar();
             reset();
         } catch (err) {
-            setErro(err?.response?.data?.erro || 'Não foi possível cadastrar o dependente.');
+            setErro(mensagemDaAcao(err, 'Não foi possível cadastrar o dependente.'));
         }
     }
 
@@ -96,7 +102,7 @@ export default function Dependentes() {
             setDependentes((atual) => atual.filter((d) => d.id !== id));
             recarregar();
         } catch (err) {
-            setErro(err?.response?.data?.erro || 'Não foi possível remover o dependente.');
+            setErro(mensagemDaAcao(err, 'Não foi possível remover o dependente.'));
         } finally {
             setAExcluir(null);
         }
@@ -179,6 +185,8 @@ export default function Dependentes() {
             <h3 className="section-title">Meus Dependentes</h3>
             {carregando ? (
                 <p className="text-sm text-muted">Carregando...</p>
+            ) : erroLista ? (
+                <EstadoErro erro={erroLista} oQue="os seus dependentes" onTentarDeNovo={carregarDependentes} />
             ) : dependentes.length === 0 ? (
                 <div className="card card-sm" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div className="icon-box icon-box-gray"><Users size={22} /></div>

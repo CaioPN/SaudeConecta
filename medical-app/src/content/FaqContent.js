@@ -173,6 +173,14 @@ export const FAQ = [
         p: 'O PDF dos exames tem senha?',
         r: 'Tem. Para abrir o arquivo, digite os 4 primeiros dígitos do seu CPF. Como o PDF sai do aplicativo e pode acabar no WhatsApp ou no e-mail, ele vai protegido para que só você (e quem você autorizar) consiga ler. Se o seu cadastro estiver sem CPF, o arquivo é gerado sem senha e a tela avisa.',
       },
+      {
+        p: 'Dá para baixar a carteira de vacinação em PDF?',
+        r: 'Dá. Na Carteira de Vacinação, toque em "Baixar PDF". O arquivo traz as doses em atraso, as próximas e as registradas, com a mesma senha do PDF de exames (os 4 primeiros dígitos do seu CPF). Ele lista o que os profissionais registraram no app, então não substitui a caderneta oficial: uma dose sem registro aqui não quer dizer que ela não foi tomada.',
+      },
+      {
+        p: 'O que acontece se eu estiver sem internet?',
+        r: 'A tela mostra "Sem conexão" e um botão "Tentar de novo" no lugar das informações. Ela nunca mostra uma lista vazia nesse caso: "nenhum aviso" ou "nenhum exame" sem conseguir falar com o servidor seria dizer algo que o app não sabe. Se você tentar salvar alguma coisa sem internet, o aviso diz que nada foi salvo.',
+      },
     ],
   },
   {
@@ -318,8 +326,20 @@ export const FAQ = [
         r: 'Sim. O botão do olhinho, no topo do perfil, do prontuário, dos exames e dos avisos, troca os dados sensíveis por bolinhas — útil quando alguém está olhando por cima do seu ombro. Os dados aparecem normalmente ao abrir o app; um toque esconde, outro mostra de novo.',
       },
       {
-        p: 'Como peço a correção ou a exclusão dos meus dados?',
-        r: 'A LGPD garante esse direito. Escreva para privacidade@saudeconecta.com.br pedindo o acesso, a correção ou a exclusão. O "Portal de Privacidade", no menu "Mais", detalha todos os seus direitos.',
+        p: 'Como baixo todos os meus dados?',
+        r: 'Em "Mais" → "Meus dados", toque em "Baixar meus dados (JSON)". O arquivo traz tudo o que o app guarda sobre você e os seus dependentes: cadastro, consultas, exames, prontuário, vacinas, contatos, os acessos que você concedeu e o histórico de acessos. É o direito de portabilidade da LGPD. O arquivo não tem senha e traz o seu CPF, então guarde-o em lugar seguro.',
+      },
+      {
+        p: 'Como excluo a minha conta?',
+        r: 'Em "Mais" → "Meus dados", toque em "Quero excluir minha conta". A tela mostra o que vai ser apagado (dependentes, consultas, exames, prontuário, vacinas e contatos), pede a sua senha e a confirmação de que você entende que não dá para desfazer. A exclusão apaga tudo, inclusive o histórico de acessos; fica guardado só o registro de que uma conta foi excluída, com a data, sem o seu nome, e-mail ou CPF. Se quiser uma cópia, baixe os seus dados antes.',
+      },
+      {
+        p: 'Por que o app pediu para eu aceitar os termos de novo?',
+        r: 'Porque o texto dos Termos de Uso ou da Política de Privacidade mudou. Cada versão tem uma data, e o app registra qual versão você aceitou e quando — o simples uso do app não conta como concordância. Em "Mais" → "Meus dados" você vê a versão que aceitou. Se não quiser aceitar a nova, ainda pode baixar os seus dados ou excluir a conta.',
+      },
+      {
+        p: 'Como corrijo os meus dados?',
+        r: 'Telefone e endereço você corrige no Perfil. Nome, CPF, data de nascimento, gênero e tipo sanguíneo não são editáveis pela tela, porque identificam você no atendimento; para corrigi-los, escreva para privacidade@saudeconecta.com.br. O "Portal de Privacidade", no menu "Mais", detalha todos os seus direitos.',
       },
     ],
   },

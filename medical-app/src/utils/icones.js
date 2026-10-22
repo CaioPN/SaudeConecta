@@ -8,7 +8,7 @@
 //
 // Só a escolha do ícone mora aqui; o tamanho e a cor ficam com quem usa.
 import {
-  Home, HeartPulse, MapPin, Menu,
+  Home, HeartPulse, MapPin, Menu, FolderDown,
   FileText, Activity, Syringe, Users, Calendar,
   KeyRound, History, ShieldCheck,
   User, HelpCircle, ScrollText, Lock, LogOut,
@@ -39,6 +39,8 @@ export const ICONES = {
   historicoAcessos: History,
   privacidade: Lock,
   seguranca: ShieldCheck,
+  // Meus dados (LGPD): baixar a cópia de tudo e excluir a conta.
+  meusDados: FolderDown,
 
   // Conta e apoio
   perfil: User,

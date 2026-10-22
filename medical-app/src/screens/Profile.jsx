@@ -8,6 +8,8 @@ import { useAuth } from '../context/AuthContext';
 import { usePrivacidade } from '../context/PrivacidadeContext';
 import { useAcessibilidade, TAMANHOS, CONTRASTES } from '../context/AcessibilidadeContext';
 import BotaoPrivacidade from '../components/BotaoPrivacidade';
+import EstadoErro from '../components/EstadoErro';
+import { mensagemDaAcao } from '../utils/falhas';
 import ConfirmarExclusao from '../components/ConfirmarExclusao';
 import { mascarar } from '../utils/privacidade';
 import { listarFamiliares, cadastrarFamiliar, removerFamiliar } from '../services/familiares';
@@ -107,15 +109,21 @@ function ContatosEmergencia() {
   const [carregando, setCarregando] = useState(true);
   // Contato cuja exclusão espera confirmação; null = janela fechada.
   const [aExcluir, setAExcluir] = useState(null);
+  // Falha ao ler a lista — separada do erro de uma ação, senão a tela dizia
+  // "Nenhum contato cadastrado" para quem tem contatos e está sem internet.
+  const [erroLista, setErroLista] = useState(null);
+  const [tentativa, setTentativa] = useState(0);
 
   useEffect(() => {
     let ativo = true;
+    setCarregando(true);
+    setErroLista(null);
     listarFamiliares()
       .then((lista) => {
         if (ativo) setContatos(lista);
       })
-      .catch(() => {
-        if (ativo) setErro('Não foi possível carregar os contatos.');
+      .catch((falha) => {
+        if (ativo) setErroLista(falha);
       })
       .finally(() => {
         if (ativo) setCarregando(false);
@@ -123,7 +131,7 @@ function ContatosEmergencia() {
     return () => {
       ativo = false;
     };
-  }, []);
+  }, [tentativa]);
 
   const alterar = (campo) => (e) => {
     setForm({ ...form, [campo]: e.target.value });
@@ -138,7 +146,7 @@ function ContatosEmergencia() {
       setForm(CONTATO_VAZIO);
       setAbrindo(false);
     } catch (err) {
-      setErro(err?.response?.data?.erro || 'Não foi possível cadastrar o contato.');
+      setErro(mensagemDaAcao(err, 'Não foi possível cadastrar o contato.'));
     }
   };
 
@@ -147,7 +155,7 @@ function ContatosEmergencia() {
       await removerFamiliar(id);
       setContatos((atual) => atual.filter((c) => c.id !== id));
     } catch (err) {
-      setErro(err?.response?.data?.erro || 'Não foi possível remover o contato.');
+      setErro(mensagemDaAcao(err, 'Não foi possível remover o contato.'));
     } finally {
       setAExcluir(null);
     }
@@ -160,7 +168,12 @@ function ContatosEmergencia() {
       <div className="card">
         {carregando && <p className="text-sm text-muted">Carregando…</p>}
 
-        {!carregando && contatos.length === 0 && !abrindo && (
+        {!carregando && erroLista && (
+          <EstadoErro compacto erro={erroLista} oQue="os seus contatos de emergência"
+            onTentarDeNovo={() => setTentativa((t) => t + 1)} />
+        )}
+
+        {!carregando && !erroLista && contatos.length === 0 && !abrindo && (
           <p className="text-sm text-muted">
             Nenhum contato cadastrado. Cadastre quem deve ser avisado em uma
             emergência.
@@ -277,7 +290,7 @@ function EditarContato({ paciente, aoSalvar, aoFechar }) {
     setErro('');
     atualizarPerfil(form)
       .then((novo) => aoSalvar(novo))
-      .catch((err) => setErro(err?.response?.data?.erro || 'Não foi possível salvar.'))
+      .catch((err) => setErro(mensagemDaAcao(err, 'Não foi possível salvar.')))
       .finally(() => setSalvando(false));
   };
 

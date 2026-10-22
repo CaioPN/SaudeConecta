@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Activity, Fingerprint, Eye, EyeOff, Info } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
 import { MODO_DEMO } from '../demo/modo';
@@ -8,6 +8,9 @@ import { MODO_DEMO } from '../demo/modo';
 export default function Login() {
   const navigate = useNavigate();
   const { entrar } = useAuth();
+  // Recado de quem mandou para cá — hoje, só a exclusão da conta. Vem pelo
+  // state da navegação, e não pela URL, e some ao recarregar.
+  const aviso = useLocation().state?.aviso;
   // Na demonstração o formulário já vem preenchido: quem chega pelo QR Code
   // da feira entra com um toque, sem ter de inventar uma conta.
   const [email, setEmail] = useState(MODO_DEMO ? 'gabriel@example.com' : '');
@@ -104,6 +107,7 @@ export default function Login() {
             </button>
           </div>
         </div>
+        {aviso && !error && <p className="form-ok" role="status">{aviso}</p>}
         {error && <p className="form-erro">{error}</p>}
         <button onClick={handleLogin} className="btn-primary" disabled={loading}>
           {loading ? 'ENTRANDO...' : 'ACESSAR CONTA'}

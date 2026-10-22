@@ -57,8 +57,9 @@ const BASE_CONHECIMENTO = [
     {
         chaves: ['pdf', 'baixar pdf', 'relatorio', 'relatório', 'senha do pdf', 'arquivo'],
         resposta:
-            'O botão "Baixar PDF", na tela de Exames, gera um relatório com todas as coletas e os exames de imagem. ' +
-            'O arquivo é protegido: para abri-lo, digite os 4 primeiros dígitos do seu CPF.',
+            'O botão "Baixar PDF", na tela de Exames, gera um relatório com todas as coletas e os exames de imagem; ' +
+            'na Carteira de Vacinação, o mesmo botão gera o PDF das doses. ' +
+            'Os dois são protegidos: para abri-los, digite os 4 primeiros dígitos do seu CPF.',
     },
     {
         chaves: ['ocultar', 'esconder', 'olhinho', 'olho', 'mascarar', 'bolinhas', 'por cima do ombro'],
@@ -129,7 +130,7 @@ const BASE_CONHECIMENTO = [
     },
     {
         chaves: ['editar perfil', 'corrigir', 'mudar telefone', 'trocar endereço', 'trocar endereco',
-                 'atualizar cadastro', 'meus dados'],
+                 'atualizar cadastro'],
         resposta:
             'Telefone e endereço você mesmo corrige: abra "Perfil" e toque em "Editar". Nome, CPF, data de ' +
             'nascimento, gênero e tipo sanguíneo não são editáveis pela tela, porque identificam você no ' +
@@ -188,8 +189,34 @@ const BASE_CONHECIMENTO = [
     {
         chaves: ['privacidade', 'dados', 'lgpd', 'termo', 'termos'],
         resposta:
-            'No menu "Mais" você encontra os "Termos de Utilização" e o "Portal de Privacidade", ' +
-            'com tudo sobre como tratamos e protegemos os seus dados (LGPD).',
+            'No menu "Mais" você encontra os "Termos de Uso" e o "Portal de Privacidade", ' +
+            'com tudo sobre como tratamos e protegemos os seus dados (LGPD). Em "Meus dados" você vê ' +
+            'qual versão dos termos aceitou, baixa uma cópia de tudo e pode excluir a conta.',
+    },
+    {
+        chaves: ['meus dados', 'baixar meus dados', 'portabilidade', 'json', 'copia dos dados', 'cópia dos dados'],
+        resposta:
+            'Em "Mais" → "Meus dados", toque em "Baixar meus dados (JSON)": o arquivo traz tudo o que o app ' +
+            'guarda sobre você e os seus dependentes. Ele não tem senha e traz o seu CPF, então guarde-o bem.',
+    },
+    {
+        chaves: ['excluir conta', 'excluir minha conta', 'apagar conta', 'apagar minha conta', 'deletar conta',
+                 'encerrar conta', 'cancelar conta'],
+        resposta:
+            'Em "Mais" → "Meus dados", toque em "Quero excluir minha conta". O app mostra o que vai ser apagado, ' +
+            'pede a sua senha e a confirmação. Não dá para desfazer — se quiser uma cópia, baixe os dados antes.',
+    },
+    {
+        chaves: ['sem internet', 'sem conexao', 'sem conexão', 'offline', 'nao carrega', 'não carrega', 'tentar de novo'],
+        resposta:
+            'Sem internet, a tela mostra "Sem conexão" e o botão "Tentar de novo" — nunca uma lista vazia, que ' +
+            'pareceria "está tudo em dia". Confira a conexão e toque em "Tentar de novo".',
+    },
+    {
+        chaves: ['carteira em pdf', 'pdf da carteira', 'pdf das vacinas', 'imprimir carteira'],
+        resposta:
+            'Na Carteira de Vacinação, toque em "Baixar PDF". O arquivo abre com os 4 primeiros dígitos do seu CPF ' +
+            'e lista o que os profissionais registraram no app — não substitui a caderneta oficial.',
     },
     {
         chaves: ['faq', 'duvidas frequentes', 'dúvidas frequentes', 'perguntas frequentes', 'ajuda', 'tutorial'],
@@ -421,8 +448,9 @@ export default function MedicalChatbot() {
             <button
                 onClick={() => setIsOpen(!isOpen)}
                 className="chatbot-fab"
+                aria-label={isOpen ? "Fechar o assistente" : "Abrir o assistente virtual"}
             >
-                {isOpen ? <X size={26} /> : <MessageCircle size={26} />}
+                {isOpen ? <X size={20} /> : <MessageCircle size={20} />}
             </button>
         </div>
     );

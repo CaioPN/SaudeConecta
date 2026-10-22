@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import EstadoErro from '../components/EstadoErro';
+import { tipoDaFalha } from '../utils/falhas';
 import {
   Stethoscope, ShieldCheck, Clock, LogOut, AlertCircle, Heart, Pill,
   Droplet, Plus, Trash2, Check, FileText, PhoneCall, Image as ImageIcon, Syringe,
@@ -590,6 +592,10 @@ export default function PortalMedico() {
   const [agora, setAgora] = useState(new Date());
   const [expirado, setExpirado] = useState(false);
   const [verVacinas, setVerVacinas] = useState(false);
+  // Falha que NÃO é fim do acesso (sem conexão, erro do servidor). Antes toda
+  // falha virava "expirou ou foi revogado pelo paciente" — sem internet, o
+  // médico leria que o paciente tinha retirado a permissão.
+  const [erroCarga, setErroCarga] = useState(null);
 
   useEffect(() => {
     const id = setInterval(() => setAgora(new Date()), 1000);
@@ -597,9 +603,13 @@ export default function PortalMedico() {
   }, []);
 
   const carregarPaciente = (token) => {
+    setErroCarga(null);
     buscarPacienteDoAcesso(token)
       .then(setDados)
-      .catch(() => setExpirado(true));
+      .catch((falha) => {
+        if (tipoDaFalha(falha) === 'sessao') setExpirado(true);
+        else setErroCarga(falha);
+      });
   };
 
   const entrar = (novaSessao) => {
@@ -642,6 +652,11 @@ export default function PortalMedico() {
           <p className="empty-state">Este acesso terminou (expirou ou foi revogado pelo paciente).</p>
           <button className="btn-primary" onClick={sair}>Entrar com outro código</button>
         </div>
+      )}
+
+      {sessao && !expirado && restante && erroCarga && (
+        <EstadoErro erro={erroCarga} oQue="o resumo do paciente"
+          onTentarDeNovo={() => carregarPaciente(sessao.token)} />
       )}
 
       {sessao && !expirado && restante && (

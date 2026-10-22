@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Calendar, MapPin, Plus } from 'lucide-react'
 import { useNavigate } from 'react-router-dom';
 import useVoltar from '../hooks/useVoltar';
 import StatusBadge from '../components/StatusBadge';
+import EstadoErro from '../components/EstadoErro';
 import BotaoPrivacidade from '../components/BotaoPrivacidade';
 import SeletorPessoa from '../components/SeletorPessoa';
 import Modal from '../components/Modal';
@@ -77,7 +78,7 @@ export default function Appointments() {
     setErro(null);
     return listarConsultas(dependenteId)
       .then(setConsultas)
-      .catch(() => setErro('Não foi possível carregar as consultas.'))
+      .catch(setErro)
       .finally(() => setCarregando(false));
   }, [dependenteId]);
 
@@ -125,7 +126,9 @@ export default function Appointments() {
 
       <div className="tela-lista">
       {carregando && <p className="empty-state">Carregando consultas…</p>}
-      {erro && !carregando && <p className="empty-state">{erro}</p>}
+      {erro && !carregando && (
+        <EstadoErro erro={erro} oQue="as consultas" onTentarDeNovo={carregar} />
+      )}
 
       {!carregando && !erro && (
         <>

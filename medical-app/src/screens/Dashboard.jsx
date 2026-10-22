@@ -6,6 +6,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { usePrivacidade } from '../context/PrivacidadeContext';
 import BotaoPrivacidade from '../components/BotaoPrivacidade';
+import EstadoErro from '../components/EstadoErro';
+import { mensagemDaAcao } from '../utils/falhas';
 import { mascararTexto } from '../utils/privacidade';
 import { ICONES } from '../utils/icones';
 import { MODO_DEMO } from '../demo/modo';
@@ -81,36 +83,45 @@ const ICONES_NOTIFICACAO = {
  * vem primeiro, com a etiqueta "Novo", e o "Marcar como lidas" só aparece
  * quando há alguma: assim continua claro o que some sozinho e o que não.
  */
-function useNotificacoes() {
+function useNotificacoes(tentativa) {
   const [lista, setLista] = useState([]);
+  // Falha ao buscar: o card continua mostrando os avisos, mas diz que as
+  // novidades não vieram — senão a ausência delas pareceria "nada de novo".
+  const [erro, setErro] = useState(null);
+  const [erroLimpar, setErroLimpar] = useState(null);
 
   useEffect(() => {
     let ativo = true;
+    setErro(null);
     listarNotificacoes()
       .then(({ notificacoes }) => {
         if (ativo) setLista(notificacoes.filter((n) => !n.lida));
       })
-      .catch(() => {
-        // Notificação é conveniência: se a busca falhar, o card mostra só os
-        // avisos e o resto do Dashboard segue normal.
-        if (ativo) setLista([]);
+      .catch((falha) => {
+        if (ativo) {
+          setLista([]);
+          setErro(falha);
+        }
       });
     return () => {
       ativo = false;
     };
-  }, []);
+  }, [tentativa]);
 
+  // A lista só some DEPOIS que o servidor confirma. Antes ela era limpa na
+  // hora e o erro engolido: sem internet, a tela mostrava as notificações
+  // como lidas, e elas voltavam na próxima visita.
   const limpar = async () => {
-    setLista([]);
+    setErroLimpar(null);
     try {
       await marcarTodasLidas();
-    } catch {
-      // Silêncio proposital: a tela já foi limpa, e insistir num erro de rede
-      // aqui atrapalharia mais do que ajudaria.
+      setLista([]);
+    } catch (falha) {
+      setErroLimpar(mensagemDaAcao(falha, 'Não foi possível marcar como lidas.'));
     }
   };
 
-  return { novidades: lista, limpar };
+  return { novidades: lista, limpar, erroNovidades: erro, erroLimpar };
 }
 
 function NovidadeItem({ notificacao, oculto }) {
@@ -136,7 +147,11 @@ export default function Dashboard() {
   const { oculto } = usePrivacidade();
   const [totalDependentes, setTotalDependentes] = useState(null);
   const [avisos, setAvisos] = useState(null);
-  const { novidades, limpar } = useNotificacoes();
+  const [erroAvisos, setErroAvisos] = useState(null);
+  // Um "Tentar de novo" refaz avisos e novidades juntos: os dois moram no
+  // mesmo card, e a falha de rede costuma derrubar os dois.
+  const [tentativa, setTentativa] = useState(0);
+  const { novidades, limpar, erroNovidades, erroLimpar } = useNotificacoes(tentativa);
   // O card começa recolhido a cada visita (de propósito não é gravado): o
   // Início fica limpo, e a bolinha vermelha diz quando vale a pena abrir.
   const [avisosAbertos, setAvisosAbertos] = useState(false);
@@ -166,8 +181,9 @@ export default function Dashboard() {
       .then(({ data }) => {
         if (ativo) setTotalDependentes(data.dependentes?.length ?? 0);
       })
+      // Fica em "—": "0 Ativos" seria afirmar que não há dependente.
       .catch(() => {
-        if (ativo) setTotalDependentes(0);
+        if (ativo) setTotalDependentes(null);
       });
     return () => {
       ativo = false;
@@ -177,17 +193,21 @@ export default function Dashboard() {
   // Avisos calculados pela API a partir dos exames, consultas e campanhas.
   useEffect(() => {
     let ativo = true;
+    setAvisos(null);
+    setErroAvisos(null);
     buscarAvisos()
       .then((lista) => {
         if (ativo) setAvisos(lista);
       })
-      .catch(() => {
-        if (ativo) setAvisos([]);
+      // Antes virava lista vazia, e o card dizia "Não há avisos no momento"
+      // para quem estava sem internet — o pior lugar para um falso "tudo bem".
+      .catch((falha) => {
+        if (ativo) setErroAvisos(falha);
       });
     return () => {
       ativo = false;
     };
-  }, []);
+  }, [tentativa]);
 
   return (
     <div className="screen-container tela-rolagem">
@@ -245,7 +265,12 @@ export default function Dashboard() {
           <BotaoPrivacidade rotulo="avisos" />
         </div>
       </div>
-      {!avisosAbertos ? (
+      {erroLimpar && <p className="form-erro" role="alert">{erroLimpar}</p>}
+      {erroAvisos ? (
+        <div className="card">
+          <EstadoErro compacto erro={erroAvisos} oQue="os avisos" onTentarDeNovo={() => setTentativa((t) => t + 1)} />
+        </div>
+      ) : !avisosAbertos ? (
         <button
           type="button"
           className="card avisos-recolhido"
@@ -255,17 +280,19 @@ export default function Dashboard() {
           <span>
             {avisos === null
               ? 'Carregando avisos...'
-              : totalAvisos === 0
+              : totalAvisos === 0 && !erroNovidades
                 ? 'Não há avisos no momento.'
+                : totalAvisos === 0
+                  ? 'Não foi possível carregar as novidades. Toque para ver.'
                 : `${totalAvisos} ${totalAvisos === 1 ? 'aviso' : 'avisos'}. Clique aqui para ver.`}
           </span>
-          {totalAvisos > 0 && <ChevronDown size={18} />}
+          {(totalAvisos > 0 || erroNovidades) && <ChevronDown size={18} />}
         </button>
       ) : (
       <div className="card">
         {avisos === null ? (
           <p className="text-sm text-muted">Carregando avisos...</p>
-        ) : avisos.length === 0 && novidades.length === 0 ? (
+        ) : avisos.length === 0 && novidades.length === 0 && !erroNovidades ? (
           <p className="text-sm text-muted">Não há avisos no momento.</p>
         ) : (
           <>
@@ -276,6 +303,10 @@ export default function Dashboard() {
               <AvisoItem key={`${aviso.tipo}-${i}`} aviso={aviso} />
             ))}
           </>
+        )}
+        {erroNovidades && (
+          <EstadoErro compacto erro={erroNovidades} oQue="as novidades da sua conta"
+            onTentarDeNovo={() => setTentativa((t) => t + 1)} />
         )}
         <button
           type="button"

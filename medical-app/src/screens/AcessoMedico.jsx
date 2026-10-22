@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import useVoltar from '../hooks/useVoltar';
 import { ChevronLeft, KeyRound, ShieldCheck, BookOpen, PenLine, Ban, Clock, Copy, Check } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
+import EstadoErro from '../components/EstadoErro';
+import { mensagemDaAcao } from '../utils/falhas';
 import SeletorPessoa from '../components/SeletorPessoa';
 import { usePessoas } from '../context/PessoasContext';
 import { gerarAcesso, listarAcessos, revogarAcesso, situacaoAcesso } from '../services/acessos';
@@ -46,12 +48,17 @@ export default function AcessoMedico() {
   const [carregando, setCarregando] = useState(true);
   const [gerando, setGerando] = useState(false);
   const [erro, setErro] = useState(null);
+  // Falha ao LER a lista, separada da falha de uma ação: sem isso a tela
+  // dizia "Você ainda não concedeu nenhum acesso" — justo aqui, onde o
+  // paciente confere se há algum código aberto.
+  const [erroLista, setErroLista] = useState(null);
   const [copiado, setCopiado] = useState(false);
 
   const recarregar = useCallback(() => {
+    setErroLista(null);
     return listarAcessos()
       .then(setAcessos)
-      .catch(() => setErro('Não foi possível carregar seus acessos.'))
+      .catch(setErroLista)
       .finally(() => setCarregando(false));
   }, []);
 
@@ -79,8 +86,8 @@ export default function AcessoMedico() {
         expiraEm,
       });
       await recarregar();
-    } catch {
-      setErro('Não foi possível gerar o código. Tente de novo.');
+    } catch (falha) {
+      setErro(mensagemDaAcao(falha, 'Não foi possível gerar o código. Tente de novo.'));
     } finally {
       setGerando(false);
     }
@@ -91,8 +98,8 @@ export default function AcessoMedico() {
       await revogarAcesso(id);
       if (novo) setNovo(null);
       await recarregar();
-    } catch {
-      setErro('Não foi possível revogar este acesso.');
+    } catch (falha) {
+      setErro(mensagemDaAcao(falha, 'Não foi possível revogar este acesso.'));
     }
   };
 
@@ -125,7 +132,7 @@ export default function AcessoMedico() {
 
       <div className="tela-lista">
 
-      {erro && <p className="empty-state mb-6">{erro}</p>}
+      {erro && <p className="form-erro mb-6" role="alert">{erro}</p>}
 
       {/* Código recém-gerado: aparece uma única vez */}
       {novo && restante && (
@@ -205,6 +212,8 @@ export default function AcessoMedico() {
       <h3 className="section-title" style={{ marginTop: '24px' }}>Acessos concedidos</h3>
       {carregando ? (
         <p className="empty-state">Carregando…</p>
+      ) : erroLista ? (
+        <EstadoErro erro={erroLista} oQue="os acessos que você concedeu" onTentarDeNovo={recarregar} />
       ) : acessos.length === 0 ? (
         <p className="empty-state">Você ainda não concedeu nenhum acesso.</p>
       ) : (

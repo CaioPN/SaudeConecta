@@ -605,6 +605,43 @@ CREATE TABLE IF NOT EXISTS explicacoes_reportes (
   FOREIGN KEY (paciente_id)   REFERENCES pacientes(id)      ON DELETE CASCADE
 );
 
+-- ============================================================
+--  Aceite dos Termos de Uso e da Política de Privacidade, por versão
+--  (LGPD, art. 8º: o consentimento precisa poder ser demonstrado).
+--  Antes o aceite era só uma caixa marcada na tela do cadastro: nada
+--  chegava ao servidor, e não havia como dizer QUAL texto a pessoa
+--  aceitou. Uma linha por versão aceita — quando o texto muda, a
+--  versão nova pede um aceite novo, e o antigo continua registrado.
+--  A versão vigente é a constante VERSAO_TERMOS do ApiServer.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS aceites_termos (
+  id           INT AUTO_INCREMENT PRIMARY KEY,
+  paciente_id  INT          NOT NULL,
+  versao       VARCHAR(20)  NOT NULL,
+  aceito_em    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  origem_ip    VARCHAR(45)  NULL,
+  UNIQUE KEY uk_aceite_versao (paciente_id, versao),
+  FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE
+);
+
+-- ============================================================
+--  Contas excluídas pelo próprio titular (LGPD, art. 18, VI).
+--  É o registro de que a exclusão aconteceu — e por isso NÃO tem FK
+--  para pacientes: tudo o que aponta para pacientes some em cascata,
+--  inclusive a tabela auditoria, então uma linha lá apagaria a si
+--  mesma. Guarda o mínimo para responder "quando e de onde esta conta
+--  foi excluída": nada de nome, e-mail ou CPF, senão a exclusão não
+--  excluiria. `paciente_id` é só o número antigo (liga a linha ao log
+--  do servidor), e `resumo` é a contagem do que foi apagado.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS contas_excluidas (
+  id           INT AUTO_INCREMENT PRIMARY KEY,
+  paciente_id  INT          NOT NULL,
+  excluida_em  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  origem_ip    VARCHAR(45)  NULL,
+  resumo       VARCHAR(500) NULL
+);
+
 -- Migração do glossário. Fica aqui, e não no bloco de migração do meio
 -- do arquivo, porque a tabela explicacoes_ia só é criada neste ponto.
 DROP PROCEDURE IF EXISTS sc_adicionar_coluna;

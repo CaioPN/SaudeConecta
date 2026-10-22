@@ -5,6 +5,8 @@ import useVoltar from '../hooks/useVoltar';
 import { usePessoas } from '../context/PessoasContext';
 import { usePrivacidade } from '../context/PrivacidadeContext';
 import BotaoPrivacidade from '../components/BotaoPrivacidade';
+import EstadoErro from '../components/EstadoErro';
+import { mensagemDaAcao } from '../utils/falhas';
 import SeletorPessoa from '../components/SeletorPessoa';
 import Modal from '../components/Modal';
 import ConfirmarExclusao from '../components/ConfirmarExclusao';
@@ -67,6 +69,7 @@ export default function MedicalRecord() {
   // Item cuja exclusão espera confirmação; null = janela fechada.
   const [aApagar, setAApagar] = useState(null);
   const [erroAcao, setErroAcao] = useState('');
+  const [tentativa, setTentativa] = useState(0);
 
   // Refaz tudo ao trocar de pessoa: as três origens precisam ser da mesma
   // pessoa, senão a linha do tempo misturaria consultas de um com exames de outro.
@@ -86,8 +89,8 @@ export default function MedicalRecord() {
         setProntuario(dados);
         setEventos(montarLinhaDoTempo(consultas, coletas, imagem));
       })
-      .catch(() => {
-        if (ativo) setErro('Não foi possível carregar o prontuário.');
+      .catch((falha) => {
+        if (ativo) setErro(falha);
       })
       .finally(() => {
         if (ativo) setCarregando(false);
@@ -95,13 +98,15 @@ export default function MedicalRecord() {
     return () => {
       ativo = false;
     };
-  }, [dependenteId]);
+  }, [dependenteId, tentativa]);
 
   const { alergias, condicoes, medicacoes } = prontuario;
 
   // Só as listas fixas são relidas: a linha do tempo não muda com uma alergia.
   const recarregarProntuario = () =>
-    buscarProntuario(dependenteId).then(setProntuario).catch(() => {});
+    // Falhar aqui deixaria na tela a lista de antes da mudança — o item recém
+    // salvo não apareceria, e o paciente o salvaria de novo. Melhor admitir.
+    buscarProntuario(dependenteId).then(setProntuario).catch(setErro);
 
   const abrirFormulario = () => {
     setForm(ITEM_VAZIO);
@@ -127,7 +132,7 @@ export default function MedicalRecord() {
       setFormAberto(false);
       await recarregarProntuario();
     } catch (err) {
-      setErroForm(err?.response?.data?.erro || 'Não foi possível salvar. Tente de novo.');
+      setErroForm(mensagemDaAcao(err, 'Não foi possível salvar. Tente de novo.'));
     } finally {
       setSalvando(false);
     }
@@ -139,7 +144,7 @@ export default function MedicalRecord() {
       await apagarItemInformado(aApagar.tipo, aApagar.id);
       await recarregarProntuario();
     } catch (err) {
-      setErroAcao(err?.response?.data?.erro || 'Não foi possível apagar.');
+      setErroAcao(mensagemDaAcao(err, 'Não foi possível apagar.'));
     } finally {
       setAApagar(null);
     }
@@ -166,7 +171,9 @@ export default function MedicalRecord() {
 
       <div className="tela-lista">
       {carregando && <p className="empty-state">Carregando prontuário…</p>}
-      {erro && !carregando && <p className="empty-state">{erro}</p>}
+      {erro && !carregando && (
+        <EstadoErro erro={erro} oQue="o prontuário" onTentarDeNovo={() => setTentativa((t) => t + 1)} />
+      )}
 
       {!carregando && !erro && (
         <>

@@ -34,13 +34,14 @@ backend-api/          API Java (pacote br.com.hackgov)
     api/ApiServer       servidor HTTP + rotas
     dao/                acesso ao banco — Paciente, Dependente, Consulta,
                         Exame, Prontuario, Acesso, Medico, Aviso, Auditoria,
-                        UnidadeSaude, Notificacao, Familiar, Vacina, Explicacao
+                        UnidadeSaude, Notificacao, Familiar, Vacina, Explicacao,
+                        Conta (exportação, exclusão e aceite dos termos)
     db/Conexao          conexão JDBC com o MySQL
     modelos/            POJOs — Paciente, Dependente, Familiar, Medico,
                         Consulta, Prontuario, HistoricoMedico, Medicacao,
                         Alergia, Notificacao, Exame, ItemExame,
                         AcessoTemporario, AcessoLog, RegistroAuditoria, Aviso,
-                        UnidadeSaude, DoseVacina, Explicacao
+                        UnidadeSaude, DoseVacina, Explicacao, AceiteTermos
     principal/Principal menu de console antigo (não serve o front)
     util/               Json (parser próprio), Jwt, SenhaUtil,
                         CodigoAcesso, ChatIA (Gemini), IaReserva (2ª IA),
@@ -69,7 +70,9 @@ medical-app/          front-end React + Vite
       BotaoExplicacao.jsx  o "?" que explica um exame ou uma vacina
       InfoField.jsx, StatusBadge.jsx, ResultRow.jsx  (exibição compartilhada)
       GraficoEvolucao.jsx  gráfico SVG de um item de exame entre as coletas
-    content/          textos estáticos (LegalContent, FaqContent)
+      EstadoErro.jsx    o bloco único de "não carregou" (critério INT03)
+      PortaoTermos.jsx  pede o aceite da versão nova dos termos
+    content/          textos estáticos (LegalContent, FaqContent) e versaoTermos.js
     context/
       AuthContext.jsx   estado de autenticação global
       PrivacidadeContext.jsx  estado do "olhinho" (global, não persistido)
@@ -79,6 +82,8 @@ medical-app/          front-end React + Vite
                       seed; o app lê o calendário do banco (calendario_vacinal)
     hooks/            useVoltar.js — o "Voltar" do topo de toda tela
     utils/            regras puras (faixa de referência, datas, linha do tempo)
+                      falhas.js — classifica o erro (sem conexão, sessão, 404…)
+                      pdf.js, pdfCarteira.js — os relatórios em PDF (jsPDF)
                       icones.js — um ícone por assunto, usado por todas as telas
                       privacidade.js — máscaras do "olhinho"
     screens/          uma tela por rota
@@ -90,11 +95,13 @@ medical-app/          front-end React + Vite
       HistoricoAcessos.jsx  (trilha do médico + a do próprio paciente)
       PortalMedico.jsx  (médico usa o código — fora do app do paciente)
       FichaEmergencia.jsx  (o que mostrar ao socorrista)
+      MeusDados.jsx  (LGPD: termos aceitos, cópia dos dados, excluir conta)
       Privacy.jsx, Terms.jsx, Faq.jsx
     services/         chamadas HTTP para a API (uma por assunto) — api (axios
                       com o JWT), avisos, consultas, exames, prontuario,
                       vacinas, familiares, notificacoes, acessos, auditoria,
-                      medico, redeSaude, senha, perfil, chatbot, explicacoes
+                      medico, redeSaude, senha, perfil, chatbot, explicacoes,
+                      conta, termos
     demo/             modo demonstração: modo.js (MODO_DEMO e o adapter),
                       servidor.js (rotas falsas, mesmo JSON do ApiServer),
                       dados.js, glossario.js, unidades.js (CNES real)
@@ -133,7 +140,10 @@ sem lógica de banco).
 - Vacinas (`Vacinas.jsx`): carteira montada pela API a partir do calendário do
   PNI e da data de nascimento, com seletor de pessoa (titular + dependentes) e
   registro das doses aplicadas (ver o bloco da carteira mais abaixo). Só a
-  lista de doses rola — cabeçalho, seletor e resumo ficam fixos —, e o ícone do
+  lista de doses rola — cabeçalho, seletor e resumo (uma faixa baixa,
+  `.vacina-resumo-card`) ficam fixos; as notas de texto (quem registra as
+  doses, senha do PDF) abrem a lista e saem de cena ao rolar, senão o topo
+  fixo comia o espaço das doses —, e o ícone do
   dependente é azul para meninos e rosa para meninas (neutro quando o gênero é
   "Outro" ou "Prefiro não informar").
 - Tipo sanguíneo
@@ -299,7 +309,7 @@ sem lógica de banco).
       "O QUE O APP NÃO FAZ". Ao mudar um fluxo, esse bloco entra na mesma
       revisão do FAQ e da base de regras.
 - **Dúvidas frequentes** (`Faq.jsx`, rota `/faq`, texto em
-  `content/FaqContent.js`): sanfona com 67 perguntas em oito categorias — o item
+  `content/FaqContent.js`): sanfona com 72 perguntas em oito categorias — o item
   "Dúvidas frequentes" do menu "Mais" apontava para uma rota que não existia.
   As respostas descrevem o que o app faz **hoje** (dizem, por exemplo, que
   anotar uma consulta não a marca na unidade, e explicam a conferência de três
@@ -1031,9 +1041,118 @@ sem lógica de banco).
     comparação em tempo constante e tipos de token que não se confundem.
 - Dependente: a data de nascimento não aceita dia futuro — `max` no campo,
   teste no yup e 400 no `ApiServer.criarDependente`.
+- **Estado de erro único — "sem conexão" (critério INT03 do backlog)**
+  (`components/EstadoErro.jsx`, `utils/falhas.js`, bloco `.estado-erro` no
+  `app.css`): toda tela que não consegue carregar mostra o mesmo bloco —
+  "Sem conexão" / "Não foi possível carregar" / "Sua sessão terminou" — com
+  "Tentar de novo". A regra que ele existe para garantir: **na falha, a tela
+  não afirma nada sobre os dados.**
+  - O que estava errado, e por isso a regra: várias telas trocavam a falha
+    por lista vazia. Sem internet, o Início dizia **"Não há avisos no
+    momento"**, a ficha de emergência dizia **"Nenhum contato cadastrado"**
+    (o socorrista desistiria de procurar a família), o Acesso do médico dizia
+    "Você ainda não concedeu nenhum acesso", o detalhe da consulta dizia
+    "Consulta não encontrada", a Rede dizia "O CNES não informa os serviços",
+    a carteira mostrava "0 de 0 registradas" e o portal do médico dizia que o
+    paciente tinha **revogado o acesso**. "Marcar como lidas" limpava a tela
+    antes da resposta e engolia o erro.
+  - `tipoDaFalha`: sem `response` = `sem_conexao`; 401 = `sessao`; 404 =
+    `nao_encontrado` (o único caso em que dá para afirmar algo — cada tela
+    decide o que ele quer dizer); o resto = `servidor`. `mensagemDaAcao` é a
+    versão das ações: sem conexão, diz que **nada foi salvo**.
+  - Erro de carga e erro de ação ficam em estados separados (`erroLista` /
+    `erro`): falhar ao salvar a UBS de referência não pode esconder a lista.
+  - Trocar de pessoa limpa os dados ANTES de buscar: senão uma falha deixava
+    na tela os exames de quem estava selecionado antes — e o "Baixar PDF" os
+    exportava com o nome da pessoa nova.
+  - Ao criar tela nova: `.catch(setErro)` guardando o objeto do erro, e
+    `<EstadoErro erro={erro} oQue="…" onTentarDeNovo={…} />` no lugar da lista.
+- **Carteira de vacinação em PDF** (`utils/pdfCarteira.js`, botão "Baixar PDF"
+  na `Vacinas.jsx`, `POST /api/vacinas/exportacao`): as três seções da tela
+  (em atraso, próximas, registradas), com a mesma senha do PDF de exames.
+  - O que os dois relatórios têm em comum saiu de `Exams.jsx` para
+    `utils/pdf.js` (`senhaDoPaciente`, `novoRelatorio`, `fecharRelatorio`,
+    `nomeDeArquivo`): um segundo relatório não pode nascer com outra regra de
+    senha. O rodapé agora vai em todas as páginas.
+  - O PDF diz que a carteira é **declaratória** ("uma dose sem registro aqui
+    não quer dizer que ela não foi tomada"): sem isso ele viraria um
+    comprovante que não é.
+  - O botão só aparece com a carteira carregada: na falha, um PDF vazio seria
+    um documento afirmando que a pessoa não tem dose nenhuma.
+  - `textoDaData` é o mesmo na tela e no PDF.
+- **Trilha não guarda dependente de outra família** (`ApiServer
+  .dependenteDoTitular`, chamado pelos dois `auditar`): a exportação de PDF
+  recebe o `dependenteId` do cliente só para a trilha, e gravava o id mesmo
+  quando o dependente era de outra conta. Como a listagem da trilha faz
+  `LEFT JOIN dependentes`, ela devolvia o **nome da criança de outra
+  família** — e com ids sequenciais dava para levantar o primeiro nome de
+  todos os dependentes do banco. A conferência fica no `auditar`, e não em
+  cada rota, para valer nas que vierem. Testado com `curl`.
+- **Direitos do titular (LGPD, art. 18)** — tela `MeusDados.jsx` (rota
+  `/meus-dados`, "Mais" › Privacidade › Meus dados), `ContaDAO`,
+  `services/conta.js`:
+  - **Portabilidade** (`GET /api/conta/exportacao`): um JSON com tudo o que
+    a conta tem. O `ContaDAO` lê as tabelas com `ResultSetMetaData` a partir
+    de uma lista fixa (`CONSULTAS_EXPORTACAO`), então **coluna nova entra no
+    arquivo sozinha**; **tabela nova com `paciente_id` precisa entrar na
+    lista** (e no `contar`, se fizer sentido). Ficam de fora só
+    `senha_hash` e `codigo_hash`. Vai junto quem atendeu (nome,
+    especialidade e CRM do `medicos` citado nas consultas, exames e
+    acessos). Auditado como `exportou_dados` no servidor, que é quem entrega.
+  - **Exclusão** (`DELETE /api/conta`, `GET /api/conta/resumo`): pede a
+    **senha de novo** (um token esquecido num aparelho compartilhado não pode
+    bastar), e os erros contam no limite do login (senão viraria um jeito de
+    testar senhas). A tela mostra o que vai junto antes de confirmar.
+  - **O registro da exclusão mora em `contas_excluidas`, sem FK**: tudo o
+    que aponta para `pacientes` some em cascata — inclusive a `auditoria` —,
+    então uma linha lá apagaria a si mesma. Guarda só o id antigo, a data, o
+    IP e a contagem do que foi apagado; nada de nome, e-mail ou CPF, senão a
+    exclusão não excluiria. Registro e DELETE vão na mesma transação.
+  - Exercitado de ponta a ponta numa conta de teste (cadastro, aceite,
+    exportação, senha errada = 401, exclusão, cascata conferida no banco).
+    O token de uma conta excluída continua assinado e recebe 404 em
+    `/auth/me`: o `AuthContext` encerra a sessão nesse caso também, para o
+    outro aparelho logado na mesma conta não ficar "logado" no vazio.
+  - O `count` de "?" das consultas é feito no texto (`marcadores`), não pelo
+    `getParameterMetaData`, que o Connector/J recusa com o prepared
+    statement do lado do cliente.
+- **Termos com versão** (tabela `aceites_termos`, `VERSAO_TERMOS` no
+  `ApiServer` e em `content/versaoTermos.js`, `GET /api/termos`,
+  `POST /api/termos/aceite`, `components/PortaoTermos.jsx`): o aceite era só
+  uma caixa marcada no cadastro — nada chegava ao servidor.
+  - O cadastro manda `versaoTermos`; o servidor recusa (409) qualquer versão
+    que não seja a vigente e grava o aceite com data e IP.
+  - **Mudou o texto do `LegalContent.jsx`? Mude a versão nos dois lugares.**
+    No próximo acesso, o `PortaoTermos` mostra o texto e pede o aceite antes
+    de qualquer tela. Ele só bloqueia quando o servidor RESPONDE que falta o
+    aceite: se a consulta falhar, o app segue (trancar alguém fora dos
+    próprios dados porque a rede caiu seria pior).
+  - Quem recusa continua podendo abrir **Meus dados** — recusar os termos não
+    pode prender o prontuário aqui.
+  - O texto dos termos dizia que "o uso continuado representa a
+    concordância". Não vale como consentimento (menos ainda para dado de
+    saúde) e contradizia o aceite por versão — foi reescrito, e essa é a
+    versão `2026-10-21`.
+  - Na demonstração, a conta já chega com a versão vigente aceita (o
+    visitante da feira não esbarra no portão), e excluir a conta devolve a
+    demo ao começo.
 
 ## O que falta
 
+- O **arquivo da portabilidade não tem senha**: traz CPF, endereço e o
+  prontuário inteiro, em texto. A tela avisa; cifrar exigiria biblioteca nova
+  (o jsPDF só cifra PDF).
+- A **versão dos termos existe em dois lugares** (`ApiServer` e
+  `versaoTermos.js`). O servidor recusa aceitar uma versão diferente, então
+  o descuido aparece como erro no cadastro, e não como aceite errado — mas
+  nada confere os dois no build, como o calendário tem.
+- Excluir a conta com registros da trilha ainda na **fila da auditoria**: a
+  thread tenta gravar linhas de um paciente que não existe mais, e o banco
+  recusa pela FK (só aparece no log).
+- Duas buscas de conveniência continuam caindo em silêncio, de propósito:
+  as **sugestões do formulário de consulta** e a **lista de dependentes do
+  seletor de pessoa**. Nenhuma das duas afirma nada — o campo só não sugere,
+  e o seletor só não aparece —, mas também não avisam que falharam.
 - **A senha antiga do root continua no histórico do GitHub** (commit
   `db67bcb` em diante), e o segredo antigo do JWT também. O segredo já não
   vale nada (o novo é outro), mas a senha do root vale até ser trocada no
