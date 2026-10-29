@@ -23,6 +23,9 @@ function normalizarExame(exame) {
     consultaId: exame.consulta_id,
     solicitante: exame.solicitante?.nome || null,
     crm: exame.solicitante?.crm ? `CRM ${exame.solicitante.crm}` : null,
+    // 'paciente' = importado pelo próprio paciente de um PDF de outro lugar.
+    origem: exame.origem || 'medico',
+    temDocumento: Boolean(exame.tem_documento),
     itens: (exame.itens || []).map(normalizarItem),
   };
 }
@@ -41,4 +44,30 @@ export async function buscarExames(dependenteId) {
     coletas: (data.coletas || []).map(normalizarExame),
     imagem: (data.imagem || []).map(normalizarExame),
   };
+}
+
+/**
+ * POST /api/exames — o paciente importa um exame feito em outro lugar.
+ *
+ * @param {object} exame  `{ tipo, data, local, itens | nome+laudo, dependenteId }`
+ * @param {{ nome: string, conteudo: string }} [documento]  O PDF original em base64.
+ */
+export async function importarExame(exame, documento) {
+  const { data } = await api.post('/exames', { ...exame, documento });
+  return data;
+}
+
+/**
+ * GET /api/exames/{id}/documento — o PDF original, como Blob. Vem pelo axios
+ * (e não por um link direto) porque a rota exige o token no cabeçalho.
+ */
+export async function buscarDocumento(id) {
+  const { data } = await api.get(`/exames/${id}/documento`, { responseType: 'blob' });
+  return data;
+}
+
+/** DELETE /api/exames/{id} — apaga um exame que o próprio paciente importou. */
+export async function excluirExameImportado(id) {
+  const { data } = await api.delete(`/exames/${id}`);
+  return data;
 }

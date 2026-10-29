@@ -119,6 +119,7 @@ CREATE TABLE IF NOT EXISTS exames (
   nome             VARCHAR(160)  NULL,          -- só para exames de imagem
   laudo            TEXT          NULL,          -- só para exames de imagem
   acesso_id        INT           NULL,          -- autoria (ver comentário em consultas)
+  origem           VARCHAR(20)   NOT NULL DEFAULT 'medico',  -- 'medico' | 'paciente' (importado)
   criado_em        TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_exame_paciente
     FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE,
@@ -141,6 +142,21 @@ CREATE TABLE IF NOT EXISTS exame_itens (
   ref_max          DECIMAL(10,2) NOT NULL,
   ordem            INT           NOT NULL DEFAULT 0,
   CONSTRAINT fk_item_exame
+    FOREIGN KEY (exame_id) REFERENCES exames(id) ON DELETE CASCADE
+);
+
+-- PDF original de um exame trazido de outro lugar (o paciente importou).
+--  Tabela à parte, e não uma coluna em exames, para a lista de exames não
+--  carregar megabytes de arquivo a cada abertura da tela: o PDF só é lido
+--  quando alguém toca em "Ver documento original". Um documento por exame.
+CREATE TABLE IF NOT EXISTS exames_documentos (
+  id               INT AUTO_INCREMENT PRIMARY KEY,
+  exame_id         INT           NOT NULL UNIQUE,
+  nome_arquivo     VARCHAR(120)  NOT NULL,
+  tamanho          INT           NOT NULL,      -- em bytes
+  conteudo         MEDIUMBLOB    NOT NULL,      -- até 16 MB; a API aceita 5 MB
+  criado_em        TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_documento_exame
     FOREIGN KEY (exame_id) REFERENCES exames(id) ON DELETE CASCADE
 );
 
@@ -486,6 +502,7 @@ CALL sc_adicionar_coluna('consultas', 'especialidade', 'VARCHAR(80) NULL');
 CALL sc_adicionar_coluna('consultas', 'origem', "VARCHAR(20) NOT NULL DEFAULT 'medico'");
 CALL sc_adicionar_coluna('alergias', 'origem', "VARCHAR(20) NOT NULL DEFAULT 'medico'");
 CALL sc_adicionar_coluna('condicoes', 'origem', "VARCHAR(20) NOT NULL DEFAULT 'medico'");
+CALL sc_adicionar_coluna('exames', 'origem', "VARCHAR(20) NOT NULL DEFAULT 'medico'");
 
 DROP PROCEDURE IF EXISTS sc_adicionar_coluna;
 

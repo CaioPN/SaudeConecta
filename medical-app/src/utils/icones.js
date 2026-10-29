@@ -12,7 +12,7 @@ import {
   FileText, Activity, Syringe, Users, Calendar,
   KeyRound, History, ShieldCheck,
   User, HelpCircle, ScrollText, Lock, LogOut,
-  Siren, ChartLine, Star,
+  Siren, ChartLine, Star, FileUp, FileSearch,
 } from 'lucide-react';
 
 export const ICONES = {
@@ -33,6 +33,9 @@ export const ICONES = {
   emergencia: Siren,
   // Evolução de um item de exame ao longo das coletas.
   evolucao: ChartLine,
+  // Trazer o PDF de um exame feito em outro lugar, e abrir esse PDF depois.
+  importarExame: FileUp,
+  documentoOriginal: FileSearch,
 
   // Privacidade
   acessoMedico: KeyRound,

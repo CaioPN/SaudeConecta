@@ -41,7 +41,8 @@ backend-api/          API Java (pacote br.com.hackgov)
                         Consulta, Prontuario, HistoricoMedico, Medicacao,
                         Alergia, Notificacao, Exame, ItemExame,
                         AcessoTemporario, AcessoLog, RegistroAuditoria, Aviso,
-                        UnidadeSaude, DoseVacina, Explicacao, AceiteTermos
+                        UnidadeSaude, DoseVacina, Explicacao, AceiteTermos,
+                        DocumentoExame
     principal/Principal menu de console antigo (não serve o front)
     util/               Json (parser próprio), Jwt, SenhaUtil,
                         CodigoAcesso, ChatIA (Gemini), IaReserva (2ª IA),
@@ -51,8 +52,16 @@ database/             scripts SQL (schema com migração no fim, seeds)
   gerar-calendario.mjs  reescreve o calendário do PNI no seed a partir do JS
                         (--conferir só compara; roda no prebuild do front)
   revisar-glossario.sql consultas de revisão dos verbetes relatados (manual)
+  backup.bat, restaurar.bat, agendar-backup.bat  backup do MySQL (mysqldump);
+                      a lógica toda fica em backup.ps1
+backups/              os .sql do backup (GERADO, no .gitignore — tem CPF e
+                      prontuário de todo mundo)
 docs/                 documentação do trabalho
   evolucao-do-projeto.md  registro detalhado da evolução (para a entrega)
+  simulacao-de-ataque-e-resiliencia.md  invasão e perda de dados, com os
+                      códigos HTTP medidos por simulacao/ataque.sh (cria e
+                      apaga duas contas de teste; deixa o login bloqueado
+                      por 10 min — reinicie a API depois)
 demo/                 build de demonstração (GERADO por `npm run build:demo`,
                       não editar à mão) — publicado no GitHub Pages
 medical-app/          front-end React + Vite
@@ -70,6 +79,7 @@ medical-app/          front-end React + Vite
       BotaoExplicacao.jsx  o "?" que explica um exame ou uma vacina
       InfoField.jsx, StatusBadge.jsx, ResultRow.jsx  (exibição compartilhada)
       GraficoEvolucao.jsx  gráfico SVG de um item de exame entre as coletas
+      ImportarExame.jsx  o paciente traz o PDF de um exame de outro lugar
       EstadoErro.jsx    o bloco único de "não carregou" (critério INT03)
       PortaoTermos.jsx  pede o aceite da versão nova dos termos
     content/          textos estáticos (LegalContent, FaqContent) e versaoTermos.js
@@ -84,6 +94,7 @@ medical-app/          front-end React + Vite
     utils/            regras puras (faixa de referência, datas, linha do tempo)
                       falhas.js — classifica o erro (sem conexão, sessão, 404…)
                       pdf.js, pdfCarteira.js — os relatórios em PDF (jsPDF)
+                      leitorLaudo.js — lê o PDF de um exame (pdf.js) e o interpreta
                       icones.js — um ícone por assunto, usado por todas as telas
                       privacidade.js — máscaras do "olhinho"
     screens/          uma tela por rota
@@ -309,7 +320,7 @@ sem lógica de banco).
       "O QUE O APP NÃO FAZ". Ao mudar um fluxo, esse bloco entra na mesma
       revisão do FAQ e da base de regras.
 - **Dúvidas frequentes** (`Faq.jsx`, rota `/faq`, texto em
-  `content/FaqContent.js`): sanfona com 72 perguntas em oito categorias — o item
+  `content/FaqContent.js`): sanfona com 75 perguntas em oito categorias — o item
   "Dúvidas frequentes" do menu "Mais" apontava para uma rota que não existia.
   As respostas descrevem o que o app faz **hoje** (dizem, por exemplo, que
   anotar uma consulta não a marca na unidade, e explicam a conferência de três
@@ -1137,7 +1148,119 @@ sem lógica de banco).
     visitante da feira não esbarra no portão), e excluir a conta devolve a
     demo ao começo.
 
+- **Importar exame de outro lugar** (`components/ImportarExame.jsx`,
+  `utils/leitorLaudo.js`, `POST /api/exames`, `GET /api/exames/{id}/documento`,
+  `DELETE /api/exames/{id}`, coluna `exames.origem`, tabela
+  `exames_documentos`, modelo `DocumentoExame`): o exame feito em outro
+  hospital só entrava no app se um médico o digitasse pelo portal. Agora o
+  paciente escolhe o PDF do resultado em "Exames" › "Importar exame de outro
+  hospital ou laboratório".
+  - **Quem lê o PDF é o navegador**, com o **`pdfjs-dist`** (Mozilla, o mesmo
+    leitor do Firefox) — a única biblioteca nova, aprovada para isto. Mandar o
+    laudo para o Gemini ler estava fora de questão: é resultado de exame num
+    modelo de nível gratuito, que pode treinar com ele (a mesma regra que
+    impede o chatbot de ler o prontuário). Nada sai do aparelho antes do
+    "Salvar exame". O pdf.js é import dinâmico: ~430 KB mais o worker de
+    1,2 MB, baixados só por quem importa.
+  - `leitorLaudo.js` tem duas metades: `lerPdf`/`linhasDoPdf` remontam as
+    linhas pela posição do texto (vão grande vira três espaços, para as
+    colunas continuarem separáveis), e `interpretarLaudo` é **função pura**
+    sobre as linhas — nome, primeiro número depois de espaço (para "Vitamina
+    B12" ficar inteiro), unidade, e a referência na mesma linha ou na de baixo
+    ("VR: 0,60 a 1,10"). Lê "12,0 a 16,0", "até 200" (vira mínimo 0, que o app
+    já mostra como "até") e "superior a 40" (sem teto: o paciente completa). A
+    lista `NAO_E_RESULTADO` tira cabeçalho, dados do paciente e faixas por
+    idade ("Adultos: 70 a 99"). Exame de imagem: o nome pelo tipo
+    (ultrassonografia, tomografia…) e a conclusão. Testado com o pdf.js de
+    verdade no Node, em três laudos fictícios gerados pelo jsPDF (colunas,
+    referência embaixo e imagem), e de ponta a ponta na demo no Chrome.
+  - **Nada é salvo sem conferência**: a tela marca a linha incompleta e não
+    deixa salvar até ela ser ajustada ou removida. Os campos têm rótulo
+    visível (preenchidos pela leitura, perdiam o placeholder) e mostram
+    vírgula decimal, como no papel.
+  - PDF sem texto (foto, papel escaneado) ou com senha: a tela avisa e o
+    paciente preenche à mão — o arquivo vai anexado igual.
+  - O exame nasce com `origem = 'paciente'` e a tela mostra "informado por
+    você", como alergia e consulta anotada. O paciente apaga só o que
+    importou (`origem` no `WHERE` do `ExameDAO.excluirImportado`).
+  - **O PDF fica no banco**, em tabela à parte (`MEDIUMBLOB`), para a lista de
+    exames não carregar arquivo: o `SELECT` só pergunta `EXISTS`. Exame e
+    documento são gravados na mesma transação. O backup leva os PDFs junto
+    (`--hex-blob`), e a portabilidade também (base64 no JSON; o
+    `valorExportavel` passou a tratar `byte[]`).
+  - Travas do servidor: só esta rota lê corpo maior que 64 KB
+    (`LIMITE_CORPO_IMPORTACAO`, o PDF de 5 MB em base64); o arquivo precisa
+    **começar com `%PDF-`** (nome e tipo são o que o cliente quiser); até 80
+    resultados, mínimo ≤ máximo e valores que cabem no `DECIMAL(10,2)`; o
+    nome do arquivo é limpo antes de voltar no `Content-Disposition`. O PDF
+    é devolvido com `Content-Security-Policy: sandbox`: veio de fora e pode
+    trazer script.
+  - "Ver documento original" busca o arquivo pelo axios (a rota exige o
+    token) e abre como `blob:`. A janela abre **antes** do `await`, senão o
+    navegador a trata como pop-up.
+  - Trilha: `importou_exame` (contagem e se veio o PDF, nunca o nome do
+    exame), `abriu_documento_exame` (leitura agrupada) e `excluiu_exame`.
+  - A demo tem as três rotas, com o PDF na memória da página; o adapter
+    passou a deixar `Blob` passar sem a cópia por JSON.
+- **Backup do banco** (`database/backup.ps1`, chamado por `backup.bat`,
+  `restaurar.bat` e `agendar-backup.bat`; seção de backup no
+  `config.properties.example`): até 29/10/2026 o projeto não tinha backup
+  nenhum, e perder o banco era perder os dados de todos os pacientes (foi a
+  lacuna principal da simulação de ataque, `docs/simulacao-de-ataque-e-resiliencia.md`).
+  - É o `mysqldump` que vem com o MySQL, chamado por PowerShell — nada de
+    biblioteca nova. O backup entra com a **conta da API**
+    (`--single-transaction --no-tablespaces`: cópia consistente sem travar a
+    API e sem pedir o privilégio PROCESS). Os procedimentos de migração ficam
+    de fora: quem os cria é o `schema.sql`, que a restauração roda no fim.
+  - A senha vai num **arquivo de opções temporário** (`--defaults-extra-file`,
+    apagado no `finally`), nunca em `-p<senha>`, que apareceria na lista de
+    processos. O `--result-file` substitui o `>` porque o PowerShell 5 gravaria
+    em UTF-16; pelo mesmo motivo a carga usa `source`, e não um pipe.
+  - Um dump sem a linha `Dump completed` no fim é **descartado** na hora, e a
+    restauração confere a mesma coisa **antes** de apagar o banco.
+  - Ficam os 14 mais recentes (`backup.manter`). `backup.copia` grava uma
+    segunda via em outra pasta (pendrive, HD externo).
+  - **Restaurar** pede o root (apaga e recria o banco), exige digitar
+    `RESTAURAR` e, antes de apagar, guarda o estado atual como
+    `antes-de-restaurar-*.sql`, que o rodízio nunca apaga: uma restauração
+    errada também é perda de dados. É `DROP` + `CREATE` e não carga por cima,
+    para tabela nova não ficar apontando para linha que voltou no tempo; os
+    `GRANT` da conta da API moram no banco `mysql` e sobrevivem.
+  - **`restaurar.bat --teste`**: faz um backup novo, carrega num banco à parte
+    (`saudeconecta_teste_restauracao`), compara `COUNT(*)` tabela a tabela com
+    o banco real e apaga o de teste. Com a API no ar, uma gravação no meio
+    aparece como diferença.
+  - Medido: o backup sai com as 23 tabelas, acentos intactos e ~208 KB; o
+    rodízio guarda 14 e preserva o `antes-de-restaurar`; um arquivo vazio é
+    recusado sem tocar o banco. **A restauração e o `--teste` ainda não foram
+    rodados**, porque pedem a senha do root.
+
 ## O que falta
+
+- **Exame importado:**
+  - O **portal do médico não mostra exames** — nem os registrados por ele,
+    nem os importados, nem o PDF original. O médico só confere o documento
+    se o paciente mostrar a tela.
+  - A leitura do PDF é **heurística**: acerta o laudo em colunas e o de
+    referência na linha de baixo, mas um layout diferente pode sair errado ou
+    vazio — por isso a conferência é obrigatória. Resultado qualitativo
+    ("não reagente") não entra: `exame_itens.valor` é número.
+  - **Faixa só com mínimo** ("HDL superior a 40") não tem como ser gravada:
+    `ref_max` é NOT NULL, e o paciente precisa inventar um teto ou remover a
+    linha. Resolver exige aceitar `ref_max` nulo no banco, na régua e no
+    `situacaoItem`.
+  - Número como "1.010" (densidade urinária) é lido como milhar (1010).
+  - O PDF fica **sem cifra** no banco e no backup, como o resto do prontuário,
+    e 5 MB por exame fazem o banco crescer bem mais rápido que antes.
+  - Os **seeds não têm exame importado**: o caminho só existe depois que alguém
+    importa. E as rotas novas ainda **não foram exercitadas contra o MySQL**
+    (a demo exercitou a tela e as regras; o `schema.sql` precisa ser
+    aplicado com o root).
+- O **backup fica no mesmo disco** a menos que `backup.copia` aponte para
+  outro lugar, e sai **em texto**: o arquivo tem CPF, endereço e prontuário de
+  todos. O Windows Home não tem EFS (`cipher /e`) e cifrar com outra
+  ferramenta seria dependência nova. Também não é contínuo: o que for gravado
+  entre um backup e a falha se perde (até um dia, com o agendamento).
 
 - O **arquivo da portabilidade não tem senha**: traz CPF, endereço e o
   prontuário inteiro, em texto. A tela avisa; cifrar exigiria biblioteca nova
@@ -1372,6 +1495,15 @@ do `schema.sql`):
 ```bash
 mysql -u root -p --default-character-set=utf8mb4 < database/schema.sql
 mysql -u root -p --default-character-set=utf8mb4 < database/seed.sql
+```
+
+Backup (precisa de `db.usuario`/`db.senha` no `config.properties`):
+
+```bat
+database\backup.bat              REM grava backups\saudeconecta-<data>.sql
+database\agendar-backup.bat      REM uma vez: todo dia as 12:00
+database\restaurar.bat --teste   REM confere se o backup volta (pede o root)
+database\restaurar.bat           REM restaura o mais recente (pede o root)
 ```
 
 Login de teste do seed: `gabriel@gmail.com` / `Teste@123`. A senha dele está

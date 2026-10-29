@@ -10,6 +10,7 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +50,9 @@ public class ContaDAO {
         { "exames", "SELECT * FROM exames WHERE paciente_id = ? ORDER BY data, id" },
         { "exame_itens", "SELECT i.* FROM exame_itens i JOIN exames e ON e.id = i.exame_id "
                 + "WHERE e.paciente_id = ? ORDER BY i.exame_id, i.ordem, i.id" },
+        // O PDF que o paciente importou é dado dele: sai inteiro, em base64.
+        { "exames_documentos", "SELECT d.* FROM exames_documentos d JOIN exames e ON e.id = d.exame_id "
+                + "WHERE e.paciente_id = ? ORDER BY d.exame_id" },
         { "alergias", "SELECT * FROM alergias WHERE paciente_id = ? ORDER BY id" },
         { "condicoes", "SELECT * FROM condicoes WHERE paciente_id = ? ORDER BY id" },
         { "medicacoes", "SELECT * FROM medicacoes WHERE paciente_id = ? ORDER BY id" },
@@ -72,7 +76,7 @@ public class ContaDAO {
 
     /**
      * Todas as linhas da conta, agrupadas por assunto. Uma conexão só para o
-     * arquivo inteiro: são 17 leituras seguidas.
+     * arquivo inteiro: são 18 leituras seguidas.
      */
     public Map<String, Object> exportar(int idPaciente) throws SQLException {
         Map<String, Object> dados = new LinkedHashMap<>();
@@ -132,6 +136,8 @@ public class ContaDAO {
             return valor;
         }
         if (valor instanceof Timestamp) return ((Timestamp) valor).toLocalDateTime().toString();
+        // Arquivo (o PDF de um exame importado): o toString daria "[B@1b6d3586".
+        if (valor instanceof byte[]) return Base64.getEncoder().encodeToString((byte[]) valor);
         // java.sql.Date, LocalDate e LocalDateTime já escrevem ISO no toString.
         return valor.toString();
     }

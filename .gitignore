@@ -27,3 +27,8 @@ npm-debug.log*
 Thumbs.db
 .vscode/
 *.swp
+
+# Backups do banco (database\backup.bat): têm CPF, endereço e prontuário
+# de todo mundo. Repositório público — nunca versionar.
+backups/
+*.sql.bak

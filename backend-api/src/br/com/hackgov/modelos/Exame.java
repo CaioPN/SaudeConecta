@@ -24,7 +24,27 @@ public class Exame {
     private String nome;
     private String laudo;
     private Medico solicitante;
+    private String origem;
+    private boolean temDocumento;
     private List<ItemExame> itens = new ArrayList<>();
+
+    /** "medico" (registrado no portal) ou "paciente" (importado de outro lugar). */
+    public String getOrigem() {
+        return origem;
+    }
+
+    public void setOrigem(String origem) {
+        this.origem = origem;
+    }
+
+    /** true quando o PDF original está guardado em exames_documentos. */
+    public boolean isTemDocumento() {
+        return temDocumento;
+    }
+
+    public void setTemDocumento(boolean temDocumento) {
+        this.temDocumento = temDocumento;
+    }
 
     public int getIdExame() {
         return idExame;

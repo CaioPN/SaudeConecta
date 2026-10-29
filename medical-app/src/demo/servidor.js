@@ -207,7 +207,9 @@ function consultaJson(c) {
 function exameJson(e) {
   return {
     id: e.id, dependente_id: e.dependente_id ?? null, consulta_id: e.consulta_id ?? null, tipo: e.tipo,
-    data: e.data, local: e.local, nome: e.nome, laudo: e.laudo, solicitante: medicoJson(e.solicitante),
+    data: e.data, local: e.local, nome: e.nome, laudo: e.laudo,
+    origem: e.origem || 'medico', tem_documento: Boolean(e.documento),
+    solicitante: medicoJson(e.solicitante),
     itens: e.itens.map((i) => ({ ...i })),
   };
 }
@@ -672,6 +674,69 @@ const ROTAS = [
       imagem: lista.filter((e) => e.tipo === 'imagem').map(exameJson),
     };
   }],
+  // Importar exame de outro lugar: as mesmas travas do ApiServer.importarExame.
+  // O PDF fica na memória da página, como todo o resto da demonstração.
+  ['post', '/exames', ({ corpo }) => {
+    const tipo = corpo.tipo === 'imagem' ? 'imagem' : 'sangue';
+    const data = campo(corpo, 'data');
+    const local = campo(corpo, 'local');
+    if (!data || Number.isNaN(Date.parse(data)) || data > hojeIso()) falhar(400, 'Informe a data do exame (não pode ser no futuro).');
+    if (!local || local.length > 160) falhar(400, 'Informe o laboratório ou o local do exame (até 160 caracteres).');
+    const depId = typeof corpo.dependenteId === 'number' ? corpo.dependenteId : null;
+    if (depId != null && !dependente(depId)) falhar(404, 'Dependente não encontrado.');
+
+    const e = {
+      id: novoId(), dependente_id: depId, consulta_id: null, tipo, data, local,
+      nome: null, laudo: null, solicitante: null, origem: 'paciente', itens: [], documento: null,
+    };
+    if (tipo === 'imagem') {
+      e.nome = campo(corpo, 'nome');
+      e.laudo = campo(corpo, 'laudo');
+      if (!e.nome || e.nome.length > 160) falhar(400, 'Informe o nome do exame (até 160 caracteres).');
+    } else {
+      if (!Array.isArray(corpo.itens) || !corpo.itens.length) falhar(400, 'Informe ao menos um resultado.');
+      if (corpo.itens.length > 80) falhar(400, 'Um exame pode ter até 80 resultados.');
+      for (const l of corpo.itens) {
+        const ok = campo(l, 'nome') && typeof l.valor === 'number'
+          && typeof l.refMin === 'number' && typeof l.refMax === 'number' && l.refMin <= l.refMax;
+        if (!ok) falhar(400, 'Cada resultado precisa de nome, valor e faixa de referência (mínimo menor ou igual ao máximo).');
+        e.itens.push({ id: novoId(), nome: campo(l, 'nome'), valor: l.valor, unidade: campo(l, 'unidade') || '', ref_min: l.refMin, ref_max: l.refMax });
+      }
+    }
+    if (corpo.documento) {
+      const conteudo = campo(corpo.documento, 'conteudo');
+      let pdf = false;
+      try {
+        pdf = Boolean(conteudo) && atob(conteudo.slice(0, 8)).startsWith('%PDF-');
+      } catch {
+        pdf = false;
+      }
+      if (!pdf || conteudo.length > 5 * 1024 * 1024 / 3 * 4 + 4) falhar(400, 'O arquivo precisa ser um PDF de até 5 MB.');
+      e.documento = { nome: campo(corpo.documento, 'nome') || 'exame.pdf', conteudo };
+    }
+    estado.exames.push(e);
+    auditar('importou_exame', 'exames',
+      `${tipo === 'imagem' ? 'Exame de imagem' : `${e.itens.length} resultado(s)`}${e.documento ? ' · com o PDF original' : ''}`,
+      depId);
+    return [201, { id: e.id, sucesso: true }];
+  }],
+  ['get', '/exames/:id/documento', ({ id }) => {
+    const e = estado.exames.find((x) => x.id === Number(id) && x.documento);
+    if (!e) falhar(404, 'Este exame não tem documento guardado.');
+    const depId = e.dependente_id ?? null;
+    auditar('abriu_documento_exame', 'exames', alvoDaLeitura(depId), depId, true);
+    const binario = atob(e.documento.conteudo);
+    const bytes = new Uint8Array(binario.length);
+    for (let i = 0; i < binario.length; i += 1) bytes[i] = binario.charCodeAt(i);
+    return new Blob([bytes], { type: 'application/pdf' });
+  }],
+  ['delete', '/exames/:id', ({ id }) => {
+    const e = estado.exames.find((x) => x.id === Number(id) && x.origem === 'paciente');
+    if (!e) falhar(404, 'Exame não encontrado ou registrado por um profissional.');
+    estado.exames = estado.exames.filter((x) => x !== e);
+    auditar('excluiu_exame', 'exames', null, e.dependente_id ?? null);
+    return { sucesso: true };
+  }],
   ['post', '/exames/exportacao', ({ corpo }) => {
     const depId = typeof corpo.dependenteId === 'number' ? corpo.dependenteId : null;
     const alvo = alvoDaLeitura(depId);
@@ -1055,7 +1120,9 @@ export function responder(config) {
         if (!fn) falhar(404, 'Rota não encontrada.');
         const resultado = fn({ ...params, query: config.params || {}, corpo, config });
         const [status, data] = Array.isArray(resultado) ? resultado : [200, resultado];
-        resolve(montar(status, JSON.parse(JSON.stringify(data))));
+        // Arquivo (o PDF de um exame importado) passa como está; o resto é
+        // copiado por JSON, como se tivesse atravessado a rede.
+        resolve(montar(status, data instanceof Blob ? data : JSON.parse(JSON.stringify(data))));
       } catch (err) {
         const status = err instanceof ErroHttp ? err.status : 500;
         const mensagem = err instanceof ErroHttp ? err.message : 'Erro na demonstração.';

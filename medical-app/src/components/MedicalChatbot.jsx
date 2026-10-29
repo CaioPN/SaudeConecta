@@ -34,6 +34,17 @@ const BASE_CONHECIMENTO = [
             'O PDF abre com senha: os 4 primeiros dígitos do seu CPF.',
     },
     {
+        chaves: ['importar', 'importo', 'outro hospital', 'outro laboratorio', 'outro laboratório',
+                 'outra clinica', 'outra clínica', 'anexar', 'enviar pdf', 'mandar pdf', 'subir pdf',
+                 'pdf do exame', 'pdf do resultado', 'colocar exame', 'adicionar exame'],
+        resposta:
+            'Dá para trazer um exame feito em outro lugar: em "Exames", toque em "Importar exame de outro ' +
+            'hospital ou laboratório" e escolha o PDF do resultado (até 5 MB). O app lê o arquivo no seu ' +
+            'próprio aparelho e preenche os valores; você confere com o documento e salva. O exame aparece ' +
+            'como "informado por você", e o PDF original fica guardado em "Ver documento original". ' +
+            'Se o PDF for uma foto ou papel escaneado, você preenche os valores olhando o documento.',
+    },
+    {
         chaves: ['evolucao', 'evolução', 'grafico', 'gráfico', 'comparar', 'subiu', 'baixou',
                  'mudou', 'historico do exame', 'histórico do exame', 'ao longo do tempo'],
         resposta:

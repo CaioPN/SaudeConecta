@@ -1,6 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import useVoltar from '../hooks/useVoltar';
-import { ChevronLeft, Image as ImageIcon, Droplet, Download, Calendar, Building2, Stethoscope, AlertTriangle, Lock } from 'lucide-react';
+import { ChevronLeft, Image as ImageIcon, Droplet, Download, Calendar, Building2, Stethoscope, AlertTriangle, Lock, Trash2 } from 'lucide-react';
+import ICONES from '../utils/icones';
+import ImportarExame from '../components/ImportarExame';
+import ConfirmarExclusao from '../components/ConfirmarExclusao';
+import { mensagemDaAcao } from '../utils/falhas';
 import { senhaDoPaciente, novoRelatorio, fecharRelatorio, nomeDeArquivo } from '../utils/pdf';
 import { useAuth } from '../context/AuthContext';
 import { usePessoas } from '../context/PessoasContext';
@@ -15,7 +19,7 @@ import StatusBadge from '../components/StatusBadge';
 import Modal from '../components/Modal';
 import EstadoErro from '../components/EstadoErro';
 import GraficoEvolucao from '../components/GraficoEvolucao';
-import { buscarExames } from '../services/exames';
+import { buscarExames, buscarDocumento, excluirExameImportado } from '../services/exames';
 import { registrarExportacao } from '../services/auditoria';
 import {
   situacaoItem, textoReferencia, formatarData, totalAlterados, seriesPorItem, chaveDoItem,
@@ -35,6 +39,12 @@ export default function Exams() {
   const [tentativa, setTentativa] = useState(0);
   // Item cujo gráfico de evolução está aberto ({ nome, chave }), ou null.
   const [evolucao, setEvolucao] = useState(null);
+  // Exame trazido de outro lugar: a janela de importação, o que está para
+  // ser excluído e o erro de uma ação sobre ele (abrir o PDF, excluir).
+  const [importando, setImportando] = useState(false);
+  const [aExcluir, setAExcluir] = useState(null);
+  const [abrindo, setAbrindo] = useState(null);
+  const [erroAcao, setErroAcao] = useState('');
 
   // As séries saem das coletas que a tela já tem: o gráfico não faz
   // requisição nenhuma, e por isso também não gera linha nova na auditoria.
@@ -70,6 +80,57 @@ export default function Exams() {
       ativo = false;
     };
   }, [dependenteId, tentativa]);
+
+  const recarregar = () => setTentativa((t) => t + 1);
+
+  // A janela abre ANTES de buscar o arquivo: aberta depois do await, o
+  // navegador já não a liga ao toque do paciente e a bloqueia como pop-up.
+  const abrirDocumento = async (exame) => {
+    setErroAcao('');
+    setAbrindo(exame.id);
+    const janela = window.open('', '_blank');
+    try {
+      const blob = await buscarDocumento(exame.id);
+      const url = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+      if (janela) janela.location.href = url;
+      else window.location.href = url;
+      // O endereço só vale nesta aba; um minuto dá para o leitor carregar.
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (falha) {
+      if (janela) janela.close();
+      setErroAcao(mensagemDaAcao(falha, 'Não foi possível abrir o documento.'));
+    } finally {
+      setAbrindo(null);
+    }
+  };
+
+  const excluir = async () => {
+    try {
+      await excluirExameImportado(aExcluir.id);
+      setAExcluir(null);
+      recarregar();
+    } catch (falha) {
+      setAExcluir(null);
+      setErroAcao(mensagemDaAcao(falha, 'Não foi possível excluir o exame.'));
+    }
+  };
+
+  /** Etiqueta e ações do exame que o próprio paciente trouxe de outro lugar. */
+  const acoesDoImportado = (exame) => exame.origem === 'paciente' && (
+    <div className="exame-importado-acoes">
+      {exame.temDocumento ? (
+        <button type="button" className="btn-documento" onClick={() => abrirDocumento(exame)}
+          disabled={abrindo === exame.id}>
+          <ICONES.documentoOriginal size={16} />
+          {abrindo === exame.id ? 'Abrindo…' : 'Ver documento original'}
+        </button>
+      ) : <span />}
+      <button type="button" className="item-remover" onClick={() => setAExcluir(exame)}
+        title="Excluir este exame" aria-label="Excluir este exame">
+        <Trash2 size={16} />
+      </button>
+    </div>
+  );
 
   // Gera e baixa um PDF com o histórico de exames do paciente.
   const baixarPDF = () => {
@@ -183,6 +244,13 @@ export default function Exams() {
         </p>
       )}
 
+      {/* Fora do cabeçalho: ao lado de "Ocultar" e "Baixar PDF" ele empurrava
+          o botão do PDF para fora do quadro. */}
+      <button type="button" onClick={() => setImportando(true)} className="btn-importar">
+        <ICONES.importarExame size={16} />
+        <span>Importar exame de outro hospital ou laboratório</span>
+      </button>
+
       <div className="tabs-wrapper">
         <button onClick={() => setTab('sangue')} className={`tab-btn ${tab === 'sangue' ? 'active' : ''}`}>
           <Droplet size={18} />
@@ -196,6 +264,7 @@ export default function Exams() {
       </div>
 
       <div className="tela-lista">
+      {erroAcao && <p className="form-erro">{erroAcao}</p>}
       {carregando && <p className="empty-state">Carregando exames…</p>}
       {erro && !carregando && (
         <EstadoErro erro={erro} oQue="os exames" onTentarDeNovo={() => setTentativa((t) => t + 1)} />
@@ -223,6 +292,7 @@ export default function Exams() {
                         {coleta.crm ? ` · ${coleta.crm}` : ''}
                       </p>
                     )}
+                    {coleta.origem === 'paciente' && <span className="etiqueta-informado">informado por você</span>}
                   </div>
                   {oculto ? (
                     <span className="status-badge oculto">•••</span>
@@ -246,6 +316,7 @@ export default function Exams() {
                     onEvolucao={(it) => setEvolucao({ nome: it.nome, chave: chaveDoItem(it) })}
                   />
                 ))}
+                {acoesDoImportado(coleta)}
               </div>
             );
           })
@@ -263,6 +334,7 @@ export default function Exams() {
                   <ImageIcon size={16} /> {exame.nome}
                   <BotaoExplicacao tipo="exame" termo={exame.nome} />
                 </h3>
+                {exame.origem === 'paciente' && <span className="etiqueta-informado">informado por você</span>}
               </div>
 
               <InfoField icon={Calendar} label="Realizado em">
@@ -288,6 +360,7 @@ export default function Exams() {
                   </p>
                 </>
               )}
+              {acoesDoImportado(exame)}
             </div>
           ))
         )
@@ -305,6 +378,28 @@ export default function Exams() {
           <GraficoEvolucao nome={evolucao.nome} pontos={series[evolucao.chave]} />
         )}
       </Modal>
+
+      <Modal open={importando} title="Importar exame" onClose={() => setImportando(false)}>
+        {/* O Modal desmonta o formulário ao fechar, então cada abertura começa
+            do zero. O exame vai para a pessoa escolhida no seletor. */}
+        <ImportarExame
+          dependenteId={dependenteId}
+          nomePessoa={dependenteId ? pessoa.nome : null}
+          onCancelar={() => setImportando(false)}
+          onSalvo={() => {
+            setImportando(false);
+            recarregar();
+          }}
+        />
+      </Modal>
+
+      <ConfirmarExclusao
+        aberto={Boolean(aExcluir)}
+        titulo="Excluir exame"
+        mensagem="Deseja excluir este exame que você importou? Os resultados e o PDF guardado vão junto."
+        onConfirmar={excluir}
+        onCancelar={() => setAExcluir(null)}
+      />
     </div>
   );
 }

@@ -77,3 +77,23 @@ ia.reserva.key=
 db.usuario=
 db.senha=
 jwt.segredo=
+
+# ------------------------------------------------------------------
+# Backup do banco (opcional) — usado por database\backup.bat
+#
+# O backup entra com db.usuario/db.senha acima (só precisa de SELECT).
+# Tudo aqui tem padrão; preencha só o que quiser mudar.
+#
+#   backup.pasta      onde gravar (padrão: a pasta backups\ na raiz do projeto,
+#                     que está no .gitignore)
+#   backup.copia      uma SEGUNDA pasta, fora deste disco (pendrive, HD
+#                     externo). É o que salva se o disco morrer. O arquivo tem
+#                     CPF e prontuário de todo mundo, em texto: não aponte para
+#                     uma pasta compartilhada com outras pessoas.
+#   backup.manter     quantos backups automáticos guardar (padrão: 14)
+#   backup.mysql_bin  pasta do mysqldump.exe, se ele não estiver em
+#                     C:\Program Files\MySQL\MySQL Server *\bin nem no PATH
+backup.pasta=
+backup.copia=
+backup.manter=
+backup.mysql_bin=

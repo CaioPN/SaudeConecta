@@ -3082,3 +3082,100 @@ body[data-contraste="escuro"] .app-container::before {
 }
 .form-botoes .btn-excluir { flex: 1; margin: 0; }
 .form-botoes .btn-excluir:disabled { opacity: 0.6; cursor: default; }
+
+/* ===================== Importar exame de outro lugar =====================
+   (components/ImportarExame.jsx e os cartões importados em Exams.jsx).
+   Cores só por variável: o fundo escuro redefine as variáveis. */
+.importar-exame {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.importar-exame .btn-primary,
+.importar-exame .btn-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+}
+/* O <input type="file"> do navegador não segue a fonte nem o modo escuro:
+   fica escondido, e quem abre a escolha é o botão. */
+.importar-entrada { display: none; }
+.importar-nota,
+.importar-aviso {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: calc(13px * var(--escala-fonte));
+  line-height: 1.5;
+}
+.importar-nota svg,
+.importar-aviso svg { flex-shrink: 0; margin-top: 3px; }
+.importar-nota {
+  border: 1px solid var(--verde-borda);
+  background-color: var(--verde-fundo);
+  color: var(--status-ok);
+}
+.importar-aviso {
+  border: 1px solid var(--amarelo-borda);
+  background-color: var(--amarelo-fundo);
+  color: var(--text-dark);
+}
+/* Linha que precisa de ajuste antes de salvar (faltou a faixa, por exemplo). */
+.item-exame-form.incompleto { border: 1px solid var(--status-warn); }
+.item-exame-form .campo-erro { margin: 0; }
+
+.btn-importar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border: 1px dashed var(--borda-azul-forte);
+  border-radius: 10px;
+  background-color: var(--superficie);
+  color: var(--primary-blue);
+  font-size: calc(13px * var(--escala-fonte));
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.exame-importado-acoes {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--borda-cinza);
+}
+.btn-documento {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--primary-blue);
+  font-size: calc(13px * var(--escala-fonte));
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-documento:disabled { opacity: 0.6; cursor: default; }
+.item-exame-campo {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.item-exame-campo span {
+  color: var(--text-gray);
+  font-size: calc(11px * var(--escala-fonte));
+  font-weight: 600;
+}

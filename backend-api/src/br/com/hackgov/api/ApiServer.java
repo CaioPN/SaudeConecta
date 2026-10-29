@@ -44,6 +44,7 @@ import br.com.hackgov.modelos.Alergia;
 import br.com.hackgov.modelos.Aviso;
 import br.com.hackgov.modelos.Consulta;
 import br.com.hackgov.modelos.Dependente;
+import br.com.hackgov.modelos.DocumentoExame;
 import br.com.hackgov.modelos.DoseVacina;
 import br.com.hackgov.modelos.Exame;
 import br.com.hackgov.modelos.Explicacao;
@@ -87,6 +88,9 @@ import br.com.hackgov.util.SenhaUtil;
  *   GET    /api/consultas         lista; aceita ?dependenteId=
  *   GET    /api/consultas/{id}    detalhe de uma consulta
  *   GET    /api/exames            coletas de sangue e exames de imagem
+ *   POST   /api/exames            o paciente importa um exame de outro lugar (com o PDF)
+ *   GET    /api/exames/{id}/documento  o PDF original de um exame importado
+ *   DELETE /api/exames/{id}       apaga um exame que ELE importou
  *   GET    /api/prontuario        alergias, condições e medicações
  *   POST   /api/prontuario        o paciente informa uma alergia ou condição
  *   DELETE /api/prontuario/{tipo}/{id}  apaga uma que ELE informou
@@ -1473,8 +1477,9 @@ public class ApiServer {
     }
 
     /**
-     * /api/exames — lista os exames do paciente logado (GET) ou registra na
-     * trilha de auditoria o download do PDF (POST /api/exames/exportacao).
+     * /api/exames — lista os exames do paciente logado (GET), registra na
+     * trilha de auditoria o download do PDF (POST /api/exames/exportacao) e
+     * cuida dos exames que o paciente importou (POST, documento e DELETE).
      */
     private static void exames(HttpExchange ex) throws IOException {
         String metodo = ex.getRequestMethod();
@@ -1485,7 +1490,15 @@ public class ApiServer {
             registrarExportacao(ex);
             return;
         }
+        if (path.startsWith("/api/exames/")) {
+            exameImportado(ex, metodo, path.substring("/api/exames/".length()));
+            return;
+        }
         if (!"/api/exames".equals(path)) { enviarErro(ex, 404, "Rota não encontrada."); return; }
+        if ("POST".equals(metodo)) {
+            importarExame(ex);
+            return;
+        }
         if (!"GET".equals(metodo)) { enviarErro(ex, 405, "Método não permitido."); return; }
 
         Integer userId = autenticar(ex);
@@ -1517,6 +1530,267 @@ public class ApiServer {
         } catch (SQLException e) {
             System.out.println("[ERRO exames] " + e.getMessage());
             enviarErro(ex, 500, "Erro ao buscar exames.");
+        }
+    }
+
+    /** Maior PDF aceito na importação de exame. Um laudo comum tem 100–500 KB. */
+    private static final int LIMITE_DOCUMENTO_BYTES = 5 * 1024 * 1024;
+    /**
+     * Corpo da importação: o PDF chega em base64 dentro do JSON, e base64
+     * ocupa 4/3 do arquivo. Só esta rota tem teto maior que LIMITE_CORPO_BYTES.
+     */
+    private static final int LIMITE_CORPO_IMPORTACAO = LIMITE_DOCUMENTO_BYTES / 3 * 4 + 64 * 1024;
+    /** Um hemograma completo com bioquímica passa pouco de 40 linhas. */
+    private static final int MAX_ITENS_IMPORTADOS = 80;
+    /** Maior valor que cabe em DECIMAL(10,2), o tipo de exame_itens. */
+    private static final double MAIOR_VALOR_ITEM = 99_999_999.99;
+
+    /**
+     * POST /api/exames — o paciente traz um exame feito em outro lugar.
+     *
+     * Quem lê o PDF é o NAVEGADOR (pdf.js, no aparelho do paciente): o texto
+     * do laudo nunca vai para modelo de IA nenhum, e o paciente confere cada
+     * valor antes de salvar. Aqui chegam os valores já conferidos e o arquivo
+     * original, que fica guardado para quem quiser comparar com o documento.
+     *
+     * O exame nasce com origem "paciente", e a tela mostra "informado por
+     * você": um valor digitado (ou lido) errado não pode se passar por
+     * resultado registrado por um profissional.
+     */
+    @SuppressWarnings("unchecked")
+    private static void importarExame(HttpExchange ex) throws IOException {
+        Integer userId = autenticar(ex);
+        if (userId == null) return;
+
+        try {
+            Map<String, Object> body = lerCorpo(ex, LIMITE_CORPO_IMPORTACAO);
+
+            String tipo = Exame.TIPO_IMAGEM.equals(campo(body, "tipo")) ? Exame.TIPO_IMAGEM : Exame.TIPO_SANGUE;
+            String data = campo(body, "data");
+            String local = campo(body, "local");
+            if (data == null || !dataValida(data) || LocalDate.parse(data).isAfter(LocalDate.now())) {
+                enviarErro(ex, 400, "Informe a data do exame (não pode ser no futuro).");
+                return;
+            }
+            if (local == null || local.length() > 160) {
+                enviarErro(ex, 400, "Informe o laboratório ou o local do exame (até 160 caracteres).");
+                return;
+            }
+
+            Integer dependenteId = body.get("dependenteId") instanceof Number
+                    ? ((Number) body.get("dependenteId")).intValue()
+                    : null;
+            if (dependenteId != null && dependenteDAO.nomeDoPaciente(dependenteId, userId) == null) {
+                enviarErro(ex, 404, "Dependente não encontrado.");
+                return;
+            }
+
+            Exame e = new Exame();
+            e.setIdPaciente(userId);
+            if (dependenteId != null) e.setIdDependente(dependenteId);
+            e.setTipo(tipo);
+            e.setData(data);
+            e.setLocal(local);
+
+            if (Exame.TIPO_IMAGEM.equals(tipo)) {
+                String nome = campo(body, "nome");
+                String laudo = campo(body, "laudo");
+                if (nome == null || nome.length() > 160) {
+                    enviarErro(ex, 400, "Informe o nome do exame (até 160 caracteres).");
+                    return;
+                }
+                if (laudo != null && laudo.length() > 5000) {
+                    enviarErro(ex, 400, "O laudo pode ter até 5000 caracteres.");
+                    return;
+                }
+                e.setNome(nome);
+                e.setLaudo(laudo);
+            } else {
+                Object bruto = body.get("itens");
+                if (!(bruto instanceof List) || ((List<Object>) bruto).isEmpty()) {
+                    enviarErro(ex, 400, "Informe ao menos um resultado.");
+                    return;
+                }
+                if (((List<Object>) bruto).size() > MAX_ITENS_IMPORTADOS) {
+                    enviarErro(ex, 400, "Um exame pode ter até " + MAX_ITENS_IMPORTADOS + " resultados.");
+                    return;
+                }
+                for (Object o : (List<Object>) bruto) {
+                    ItemExame item = itemImportado(o);
+                    if (item == null) {
+                        enviarErro(ex, 400, "Cada resultado precisa de nome, valor e faixa de referência "
+                                + "(mínimo menor ou igual ao máximo).");
+                        return;
+                    }
+                    e.getItens().add(item);
+                }
+            }
+
+            DocumentoExame documento = null;
+            if (body.get("documento") instanceof Map) {
+                documento = documentoImportado((Map<String, Object>) body.get("documento"));
+                if (documento == null) {
+                    enviarErro(ex, 400, "O arquivo precisa ser um PDF de até "
+                            + (LIMITE_DOCUMENTO_BYTES / (1024 * 1024)) + " MB.");
+                    return;
+                }
+            }
+
+            int id = exameDAO.inserirImportado(e, documento);
+
+            // Nem o nome do exame nem resultado na trilha: ela é lida na tela
+            // sem passar pelo olhinho, e "HIV" ao lado da data já diz demais.
+            String detalhe = (Exame.TIPO_IMAGEM.equals(tipo)
+                    ? "Exame de imagem" : e.getItens().size() + " resultado(s)")
+                    + (documento != null ? " · com o PDF original" : "");
+            auditar(ex, userId, "importou_exame", "exames", detalhe, dependenteId);
+
+            Map<String, Object> resp = new LinkedHashMap<>();
+            resp.put("id", id);
+            resp.put("sucesso", Boolean.TRUE);
+            enviarJson(ex, 201, resp);
+
+        } catch (SQLException e) {
+            System.out.println("[ERRO importar exame] " + e.getMessage());
+            enviarErro(ex, 500, "Erro ao salvar o exame.");
+        }
+    }
+
+    /** Uma linha de resultado vinda do corpo, ou null se ela não vale. */
+    @SuppressWarnings("unchecked")
+    private static ItemExame itemImportado(Object o) {
+        if (!(o instanceof Map)) return null;
+        Map<String, Object> linha = (Map<String, Object>) o;
+        String nome = campo(linha, "nome");
+        String unidade = campo(linha, "unidade");
+        Object valor = linha.get("valor");
+        Object refMin = linha.get("refMin");
+        Object refMax = linha.get("refMax");
+        if (nome == null || nome.length() > 120 || (unidade != null && unidade.length() > 20)
+                || !(valor instanceof Number) || !(refMin instanceof Number) || !(refMax instanceof Number)) {
+            return null;
+        }
+        double v = ((Number) valor).doubleValue();
+        double min = ((Number) refMin).doubleValue();
+        double max = ((Number) refMax).doubleValue();
+        if (min > max || Math.abs(v) > MAIOR_VALOR_ITEM
+                || Math.abs(min) > MAIOR_VALOR_ITEM || Math.abs(max) > MAIOR_VALOR_ITEM) {
+            return null;
+        }
+        ItemExame item = new ItemExame();
+        item.setNome(nome);
+        item.setValor(v);
+        item.setUnidade(unidade == null ? "" : unidade);
+        item.setRefMin(min);
+        item.setRefMax(max);
+        return item;
+    }
+
+    /**
+     * O PDF vindo do corpo ({ nome, conteudo } em base64), ou null se não
+     * for PDF ou passar do limite.
+     *
+     * A conferência é pelos primeiros bytes ("%PDF-"), não pelo nome nem pelo
+     * tipo que o navegador informa: os dois são o que o cliente quiser que
+     * sejam. Sem ela, a rota guardaria qualquer arquivo, e "Ver documento
+     * original" o devolveria a quem abrisse.
+     */
+    private static DocumentoExame documentoImportado(Map<String, Object> bruto) {
+        String base64 = campo(bruto, "conteudo");
+        if (base64 == null) return null;
+        byte[] bytes;
+        try {
+            bytes = java.util.Base64.getDecoder().decode(base64);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+        if (bytes.length < 5 || bytes.length > LIMITE_DOCUMENTO_BYTES
+                || !"%PDF-".equals(new String(bytes, 0, 5, StandardCharsets.US_ASCII))) {
+            return null;
+        }
+        DocumentoExame d = new DocumentoExame();
+        d.setNomeArquivo(nomeDeArquivoSeguro(campo(bruto, "nome")));
+        d.setConteudo(bytes);
+        return d;
+    }
+
+    /**
+     * O nome do arquivo volta no cabeçalho Content-Disposition. Sem esta
+     * limpeza, uma quebra de linha no nome viraria um cabeçalho a mais na
+     * resposta; e barra ou ".." não têm o que fazer num nome de arquivo.
+     */
+    private static String nomeDeArquivoSeguro(String nome) {
+        String limpo = nome == null ? "" : nome.replaceAll("[^\\p{L}\\p{N} ._()-]", "").trim();
+        if (limpo.isEmpty() || limpo.startsWith(".")) limpo = "exame";
+        if (!limpo.toLowerCase().endsWith(".pdf")) limpo += ".pdf";
+        return limpo.length() > 120 ? limpo.substring(limpo.length() - 120) : limpo;
+    }
+
+    /**
+     * /api/exames/{id}/documento (GET) e /api/exames/{id} (DELETE) — só o que
+     * o próprio paciente importou. Os dois filtram pelo paciente do JWT: o id
+     * da URL de um exame de outra conta devolve 404, igual a um que não existe.
+     */
+    private static void exameImportado(HttpExchange ex, String metodo, String resto) throws IOException {
+        Integer userId = autenticar(ex);
+        if (userId == null) return;
+
+        String[] partes = resto.split("/");
+        int idExame;
+        try {
+            idExame = Integer.parseInt(partes[0]);
+        } catch (NumberFormatException e) {
+            enviarErro(ex, 404, "Rota não encontrada.");
+            return;
+        }
+
+        try {
+            if (partes.length == 2 && "documento".equals(partes[1]) && "GET".equals(metodo)) {
+                DocumentoExame d = exameDAO.buscarDocumento(idExame, userId);
+                if (d == null) {
+                    enviarErro(ex, 404, "Este exame não tem documento guardado.");
+                    return;
+                }
+                Integer dependenteId = d.getIdDependente() > 0 ? d.getIdDependente() : null;
+                auditarLeitura(ex, userId, "abriu_documento_exame", "exames",
+                        alvoDaLeitura(userId, dependenteId), dependenteId);
+                enviarPdf(ex, d);
+                return;
+            }
+            if (partes.length == 1 && "DELETE".equals(metodo)) {
+                int dependente = exameDAO.excluirImportado(idExame, userId);
+                if (dependente < 0) {
+                    enviarErro(ex, 404, "Exame não encontrado ou registrado por um profissional.");
+                    return;
+                }
+                auditar(ex, userId, "excluiu_exame", "exames", null, dependente > 0 ? dependente : null);
+                Map<String, Object> resp = new LinkedHashMap<>();
+                resp.put("sucesso", Boolean.TRUE);
+                enviarJson(ex, 200, resp);
+                return;
+            }
+            enviarErro(ex, 405, "Método não permitido.");
+        } catch (SQLException e) {
+            System.out.println("[ERRO exame importado] " + e.getMessage());
+            enviarErro(ex, 500, "Erro ao acessar o exame.");
+        }
+    }
+
+    /**
+     * Devolve o PDF como arquivo. `sandbox` no CSP: o PDF veio de fora e pode
+     * trazer script embutido; o leitor do navegador o abre sem deixar nada
+     * rodar com a origem da API.
+     */
+    private static void enviarPdf(HttpExchange ex, DocumentoExame d) throws IOException {
+        byte[] bytes = d.getConteudo();
+        Headers h = ex.getResponseHeaders();
+        h.set("Content-Type", "application/pdf");
+        h.set("Content-Security-Policy", "sandbox");
+        h.set("Content-Disposition", "inline; filename=\"exame.pdf\"; filename*=UTF-8''"
+                + java.net.URLEncoder.encode(d.getNomeArquivo(), StandardCharsets.UTF_8).replace("+", "%20"));
+        ex.sendResponseHeaders(200, bytes.length);
+        try (OutputStream out = ex.getResponseBody()) {
+            out.write(bytes);
         }
     }
 
@@ -3307,6 +3581,8 @@ public class ApiServer {
         m.put("local", e.getLocal());
         m.put("nome", e.getNome());
         m.put("laudo", e.getLaudo());
+        m.put("origem", e.getOrigem());
+        m.put("tem_documento", e.isTemDocumento());
         m.put("solicitante", medicoJson(e.getSolicitante()));
 
         List<Object> itens = new ArrayList<>();
@@ -3642,10 +3918,15 @@ public class ApiServer {
     private static final int LIMITE_CORPO_BYTES = 64 * 1024;
 
     private static Map<String, Object> lerCorpo(HttpExchange ex) throws IOException {
+        return lerCorpo(ex, LIMITE_CORPO_BYTES);
+    }
+
+    /** Com teto próprio: só a importação de exame, que traz o PDF, passa dos 64 KB. */
+    private static Map<String, Object> lerCorpo(HttpExchange ex, int limite) throws IOException {
         String texto;
         try (InputStream in = ex.getRequestBody()) {
-            byte[] bytes = in.readNBytes(LIMITE_CORPO_BYTES + 1);
-            if (bytes.length > LIMITE_CORPO_BYTES) {
+            byte[] bytes = in.readNBytes(limite + 1);
+            if (bytes.length > limite) {
                 // Cai no mesmo 400 de "corpo inválido" que as rotas já tratam.
                 throw new IllegalArgumentException("Corpo da requisição grande demais.");
             }

@@ -138,6 +138,18 @@ export const FAQ = [
         r: 'Em "Minha Saúde" → "Exames". Os exames de sangue aparecem agrupados por coleta e os de imagem trazem o laudo.',
       },
       {
+        p: 'Fiz um exame em outro hospital. Consigo colocar no app?',
+        r: 'Consegue. Em "Exames", toque em "Importar exame de outro hospital ou laboratório" e escolha o PDF do resultado. O app lê o arquivo e já preenche a data, o laboratório e os resultados com a faixa de referência; você confere cada valor com o documento, completa o que faltar e salva. O exame aparece com a etiqueta "informado por você", e o PDF original fica guardado: no cartão do exame, "Ver documento original" abre o arquivo.',
+      },
+      {
+        p: 'O PDF do exame é enviado para alguma inteligência artificial?',
+        r: 'Não. A leitura do PDF acontece no seu próprio aparelho, e nada sai dele antes de você tocar em "Salvar exame". Aí vão para o servidor do Saúde Conecta os valores que você conferiu e o arquivo original, como qualquer outro dado do seu prontuário. Nenhuma parte do exame vai para o assistente nem para o glossário.',
+      },
+      {
+        p: 'O app não leu o meu PDF. E agora?',
+        r: 'Se o PDF é uma foto ou um papel escaneado, não há texto dentro dele para ler: o app avisa, e você preenche os resultados olhando o documento — o arquivo vai anexado do mesmo jeito. Cada laboratório monta o laudo de um jeito, então a leitura também pode errar ou deixar uma linha incompleta (por exemplo, quando a referência é só "superior a 40"): a linha fica marcada e o exame só é salvo depois que você ajusta. O limite é de 5 MB por arquivo. Um exame que você importou, você mesmo pode apagar pela lixeira no cartão dele.',
+      },
+      {
         p: 'Não entendi o nome de um exame. O app explica?',
         r: 'Sim. Ao lado do nome de cada exame há um "?" — toque nele para abrir uma explicação em linguagem simples do que aquele exame é e por que o profissional costuma pedi-lo. O texto é escrito por inteligência artificial e fala do exame em geral: ele NÃO avalia o seu resultado, e quem interpreta o que deu continua sendo o profissional de saúde.',
       },
@@ -163,7 +175,7 @@ export const FAQ = [
       },
       {
         p: 'Quem coloca os meus exames e consultas no app?',
-        r: 'O profissional de saúde que atende você, usando o código de acesso temporário que você gera no aplicativo.',
+        r: 'O profissional de saúde que atende você, usando o código de acesso temporário que você gera no aplicativo. Exames feitos em outros lugares você mesmo pode trazer, pelo PDF do resultado: eles aparecem como "informado por você".',
       },
       {
         p: 'Como baixo os meus exames em PDF?',
